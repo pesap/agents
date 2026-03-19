@@ -21,6 +21,10 @@ delegation:
 runtime:
   max_turns: 30
   timeout: 300
+pi:
+  scope: project
+  tools: ""
+  thinking: "enabled"
 tags:
   - thinking
   - first-principles

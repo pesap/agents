@@ -15,6 +15,9 @@ skills:
   - pydantic-modeling
   - infrasys-integration
   - data-validation
+pi:
+  scope: project
+  tools: "read,edit,bash,write"
 runtime:
   max_turns: 30
   timeout: 300

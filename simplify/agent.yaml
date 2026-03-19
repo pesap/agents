@@ -15,6 +15,9 @@ skills:
   - code-reuse-review
   - code-quality-review
   - efficiency-review
+pi:
+  scope: project
+  tools: "read,edit,bash,write,grep,glob"
 runtime:
   max_turns: 30
   timeout: 300

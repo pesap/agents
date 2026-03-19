@@ -16,6 +16,9 @@ skills:
   - linearization
   - decomposition
   - solver-tuning
+pi:
+  scope: project
+  tools: "read,edit,bash,write"
 runtime:
   max_turns: 30
   timeout: 300

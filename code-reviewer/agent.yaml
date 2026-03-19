@@ -71,6 +71,9 @@ compliance:
     soc_report_required: false
     vendor_ai_notification: true
     subcontractor_assessment: false
+pi:
+  scope: project
+  tools: "read,bash"
 tags:
   - code-review
   - security
