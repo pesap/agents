@@ -5,7 +5,7 @@ Expert mathematical optimization modeler that simplifies formulations, linearize
 ## Run
 
 ```bash
-npx @open-gitagent/gitagent run -r https://github.com/pesap/pesap-agents -d optimization-modeler
+npx @open-gitagent/gitagent run -r https://github.com/pesap/pesap-agents -d ./optimization-modeler
 ```
 
 ## What It Can Do

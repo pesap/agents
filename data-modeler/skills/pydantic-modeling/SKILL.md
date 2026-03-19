@@ -39,15 +39,6 @@ class MyModel(BaseModel):
     )
 ```
 
-**Field Definitions:**
-```python
-from typing import Annotated
-from pydantic import Field
-
-name: Annotated[str, Field(min_length=1, max_length=255, description="Entity name")]
-count: Annotated[int, Field(ge=0, description="Must be non-negative")]
-```
-
 **Validators:**
 ```python
 from pydantic import field_validator, model_validator

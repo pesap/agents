@@ -5,7 +5,7 @@ Expert data modeler that follows Pydantic best practices, leverages infrasys for
 ## Run
 
 ```bash
-npx @open-gitagent/gitagent run -r https://github.com/<username>/data-modeler-agent
+npx @open-gitagent/gitagent run -r https://github.com/pesap/pesap-agents -d ./data-modeler
 ```
 
 ## What It Can Do
@@ -17,7 +17,7 @@ npx @open-gitagent/gitagent run -r https://github.com/<username>/data-modeler-ag
 ## Structure
 
 ```
-data-modeler-agent/
+data-modeler/
 ├── agent.yaml
 ├── SOUL.md
 ├── RULES.md
