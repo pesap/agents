@@ -1,0 +1,30 @@
+spec_version: "0.1.0"
+name: performance-freak
+version: 1.0.0
+description: A performance-obsessed agent that optimizes code for speed and memory efficiency — favors smart algorithms, low allocations, and cache-friendly patterns
+author: "pesap"
+license: MIT
+model:
+  preferred: claude-opus-4-6
+  fallback:
+    - claude-sonnet-4-5-20250929
+    - claude-haiku-4-5-20251001
+  constraints:
+    temperature: 0.1
+    max_tokens: 8192
+skills:
+  - algorithmic-optimization
+  - memory-profiling
+tools: []
+delegation:
+  mode: auto
+runtime:
+  max_turns: 30
+  timeout: 300
+tags:
+  - performance
+  - optimization
+  - memory
+  - algorithms
+metadata:
+  category: developer-tools
