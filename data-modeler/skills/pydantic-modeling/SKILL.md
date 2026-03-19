@@ -66,32 +66,47 @@ def validate_date_range(self) -> Self:
     return self
 ```
 
+**Annotated-First Field Definitions (Preferred Style):**
+Always use `Annotated` for field declarations. Even unconstrained fields benefit from descriptions:
+```python
+from typing import Annotated
+from pydantic import Field
+
+class Sensor(BaseModel):
+    # Every field uses Annotated — no bare type hints
+    name: Annotated[str, Field(min_length=1, max_length=255, description="Unique sensor identifier")]
+    latitude: Annotated[float, Field(ge=-90, le=90, description="WGS84 latitude")]
+    longitude: Annotated[float, Field(ge=-180, le=180, description="WGS84 longitude")]
+    is_active: Annotated[bool, Field(default=True, description="Whether sensor is currently reporting")]
+    tags: Annotated[list[str], Field(default_factory=list, description="Classification tags")]
+```
+
 **Discriminated Unions:**
 ```python
 from typing import Annotated, Literal, Union
-from pydantic import Discriminator
+from pydantic import Discriminator, Field
 
 class Cat(BaseModel):
-    pet_type: Literal["cat"]
-    meows: int
+    pet_type: Annotated[Literal["cat"], Field(description="Animal type discriminator")]
+    meows: Annotated[int, Field(ge=0, description="Number of meows per day")]
 
 class Dog(BaseModel):
-    pet_type: Literal["dog"]
-    barks: float
+    pet_type: Annotated[Literal["dog"], Field(description="Animal type discriminator")]
+    barks: Annotated[float, Field(ge=0, description="Average barks per hour")]
 
 Pet = Annotated[Union[Cat, Dog], Discriminator("pet_type")]
 ```
 
 **Generic Models:**
 ```python
-from typing import Generic, TypeVar
-from pydantic import BaseModel
+from typing import Annotated, Generic, TypeVar
+from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 
 class Response(BaseModel, Generic[T]):
-    data: T
-    count: int
+    data: Annotated[T, Field(description="Response payload")]
+    count: Annotated[int, Field(ge=0, description="Total number of results")]
 ```
 
 ### Serialization

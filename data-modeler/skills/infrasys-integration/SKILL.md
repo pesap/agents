@@ -22,12 +22,17 @@ When the user needs to model infrastructure system components, manage time serie
 The base class for all system components in infrasys. Extends Pydantic BaseModel with component management features.
 
 ```python
+from typing import Annotated, Literal
+from pydantic import Field
 from infrasys import Component
 
 class Generator(Component):
-    name: str
-    capacity_mw: float
-    fuel_type: str
+    name: Annotated[str, Field(min_length=1, description="Unique generator identifier")]
+    capacity_mw: Annotated[float, Field(gt=0, description="Nameplate capacity in MW")]
+    fuel_type: Annotated[
+        Literal["gas", "coal", "nuclear", "wind", "solar", "hydro"],
+        Field(description="Primary fuel source"),
+    ]
 ```
 
 **System Container:**
@@ -81,7 +86,9 @@ system = System.from_json("system.json")
 
 ### Integration with Pydantic
 infrasys components ARE Pydantic models. All Pydantic v2 features work:
-- `Field(...)` for constraints
+- `Annotated[type, Field(...)]` for every field — prefer this over bare type hints
 - `field_validator` / `model_validator` for business rules
 - `ConfigDict` for model configuration
 - `model_dump()` / `model_dump_json()` for serialization
+
+Always use `Annotated` style on Component subclasses just as you would on BaseModel.

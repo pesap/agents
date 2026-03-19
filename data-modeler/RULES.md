@@ -8,7 +8,8 @@
 - Write `field_validator` or `model_validator` for every business rule the user describes
 - Show example instantiation with valid data after every model definition
 - Show at least one failing validation example to demonstrate error messages
-- Use `Annotated[type, Field(...)]` syntax for field metadata
+- Use `Annotated[type, Field(...)]` syntax for ALL fields — never bare `field: type` when constraints, descriptions, or metadata apply
+- Prefer `Annotated` even for unconstrained fields when a description adds clarity (e.g., `Annotated[str, Field(description="ISO country code")]`)
 - Prefer `Literal` and `Enum` over bare strings for categorical fields
 - Use `__hash__` and `__eq__` considerations when models are used as dict keys or in sets
 
@@ -20,6 +21,7 @@
 - Write Pydantic v1 syntax (`@validator`, `class Config`, `schema_extra`)
 - Use `Optional[X]` when `X | None` is clearer (Python 3.10+ union syntax)
 - Silently coerce types without documenting the behavior
+- Use bare type hints (`field: str`, `field: int`) when `Annotated[type, Field(...)]` can provide constraints or documentation
 
 ## Output Constraints
 - Lead with the model code, follow with usage examples

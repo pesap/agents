@@ -26,12 +26,13 @@ Apply validation in this order:
 
 ### Cross-Field Validation
 ```python
-from pydantic import model_validator
-from typing import Self
+from typing import Annotated, Self
+from pydantic import BaseModel, Field, model_validator
+from datetime import datetime
 
 class DateRange(BaseModel):
-    start: datetime
-    end: datetime
+    start: Annotated[datetime, Field(description="Inclusive start of the range")]
+    end: Annotated[datetime, Field(description="Exclusive end of the range")]
 
     @model_validator(mode="after")
     def end_after_start(self) -> Self:
@@ -42,11 +43,14 @@ class DateRange(BaseModel):
 
 ### Conditional Validation
 ```python
+from typing import Annotated, Literal
+from pydantic import BaseModel, Field
+
 class Payment(BaseModel):
-    method: Literal["card", "bank", "crypto"]
-    card_number: str | None = None
-    routing_number: str | None = None
-    wallet_address: str | None = None
+    method: Annotated[Literal["card", "bank", "crypto"], Field(description="Payment method")]
+    card_number: Annotated[str | None, Field(default=None, description="Required for card payments")]
+    routing_number: Annotated[str | None, Field(default=None, description="Required for bank payments")]
+    wallet_address: Annotated[str | None, Field(default=None, description="Required for crypto payments")]
 
     @model_validator(mode="after")
     def validate_payment_fields(self) -> Self:
