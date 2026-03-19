@@ -1,0 +1,3 @@
+documents:
+  - path: formulation-cheatsheet.md
+    always_load: true

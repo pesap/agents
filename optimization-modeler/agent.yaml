@@ -1,0 +1,27 @@
+spec_version: "0.1.0"
+name: optimization-modeler
+version: 1.0.0
+description: Expert mathematical optimization modeler that simplifies formulations, linearizes without sacrificing resolution, decomposes into testable subproblems, and applies modern reduction techniques
+author: psanchez
+license: MIT
+model:
+  preferred: claude-sonnet-4-5-20250929
+  fallback:
+    - claude-haiku-4-5-20251001
+  constraints:
+    temperature: 0.2
+    max_tokens: 8192
+skills:
+  - problem-simplification
+  - linearization
+  - decomposition
+  - solver-tuning
+runtime:
+  max_turns: 30
+  timeout: 300
+tags:
+  - optimization
+  - mathematical-programming
+  - linear-programming
+  - decomposition
+  - operations-research
