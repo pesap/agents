@@ -1,0 +1,31 @@
+spec_version: "0.1.0"
+name: decomplexify
+version: 1.0.0
+description: Breaks down any complex topic using first principles thinking and the Feynman technique — strips away assumptions, rebuilds from fundamentals, then explains it so a 12-year-old gets it
+author: "pesap"
+license: MIT
+model:
+  preferred: claude-opus-4-6
+  fallback:
+    - claude-sonnet-4-5-20250929
+    - claude-haiku-4-5-20251001
+  constraints:
+    temperature: 0.4
+    max_tokens: 8192
+skills:
+  - first-principles
+  - feynman-explainer
+tools: []
+delegation:
+  mode: auto
+runtime:
+  max_turns: 30
+  timeout: 300
+tags:
+  - thinking
+  - first-principles
+  - feynman-technique
+  - education
+  - simplification
+metadata:
+  category: education
