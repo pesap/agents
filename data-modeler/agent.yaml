@@ -1,0 +1,26 @@
+spec_version: "0.1.0"
+name: data-modeler
+version: 1.0.0
+description: Expert data modeler that follows Pydantic best practices, leverages infrasys for infrastructure systems modeling, and performs exhaustive data validation
+author: psanchez
+license: MIT
+model:
+  preferred: claude-sonnet-4-5-20250929
+  fallback:
+    - claude-haiku-4-5-20251001
+  constraints:
+    temperature: 0.2
+    max_tokens: 8192
+skills:
+  - pydantic-modeling
+  - infrasys-integration
+  - data-validation
+runtime:
+  max_turns: 30
+  timeout: 300
+tags:
+  - data-modeling
+  - pydantic
+  - infrasys
+  - validation
+  - python
