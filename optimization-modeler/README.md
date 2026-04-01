@@ -2,41 +2,16 @@
 
 Expert mathematical optimization modeler that simplifies formulations, linearizes without sacrificing resolution, decomposes into testable subproblems, and applies modern reduction techniques.
 
-## Run
-
-```bash
-npx @open-gitagent/gitagent run -r https://github.com/pesap/pesap-agents -d ./optimization-modeler
-```
-
-## What It Can Do
-
-- **Problem Simplification** — Variable fixing, bound tightening, constraint aggregation, symmetry breaking, probing
-- **Linearization** — Big-M, McCormick envelopes, SOS2, piecewise-linear, logarithmic formulations, conic reformulations — with error bounds
-- **Decomposition** — Benders, Dantzig-Wolfe, Lagrangian relaxation, ADMM, progressive hedging — with convergence testing
-- **Solver Tuning** — Log interpretation, parameter selection, numerical diagnostics, formulation benchmarking
-
-## Structure
+## Load
 
 ```
-optimization-modeler/
-├── agent.yaml
-├── SOUL.md
-├── RULES.md
-├── README.md
-├── skills/
-│   ├── problem-simplification/
-│   │   └── SKILL.md
-│   ├── linearization/
-│   │   └── SKILL.md
-│   ├── decomposition/
-│   │   └── SKILL.md
-│   └── solver-tuning/
-│       └── SKILL.md
-└── knowledge/
-    ├── index.yaml
-    └── formulation-cheatsheet.md
+/gitagent install optimization-modeler
+/gitagent install pesap/pesap-agents/optimization-modeler
 ```
 
-## Built with
+## Skills
 
-[gitagent](https://github.com/open-gitagent/gitagent) — a git-native, framework-agnostic open standard for AI agents.
+- **decomposition** — Decompose large optimization problems into smaller testable subproblems using Benders, Dantzig-Wolfe, Lagrangian relaxation, ADMM, and hierarchical strategies
+- **linearization** — Linearize nonlinear optimization terms using big-M, McCormick, piecewise-linear, SOS, and conic reformulations
+- **problem-simplification** — Eliminate redundancy, tighten bounds, fix variables, aggregate constraints, and break symmetry
+- **solver-tuning** — Configure solver parameters, interpret solve logs, diagnose numerical issues, and benchmark formulation alternatives

@@ -2,38 +2,15 @@
 
 Expert data modeler that follows Pydantic best practices, leverages infrasys for infrastructure systems modeling, and performs exhaustive data validation.
 
-## Run
-
-```bash
-npx @open-gitagent/gitagent run -r https://github.com/pesap/pesap-agents -d ./data-modeler
-```
-
-## What It Can Do
-
-- **Pydantic Modeling** — Design type-safe Pydantic v2 models with proper configuration, generics, discriminated unions, and serialization
-- **infrasys Integration** — Build infrastructure system components, manage time series data, and work with System containers
-- **Data Validation** — Exhaustive validation: cross-field checks, conditional validation, batch error collection, and defensive data contracts
-
-## Structure
+## Load
 
 ```
-data-modeler/
-├── agent.yaml
-├── SOUL.md
-├── RULES.md
-├── README.md
-├── skills/
-│   ├── pydantic-modeling/
-│   │   └── SKILL.md
-│   ├── infrasys-integration/
-│   │   └── SKILL.md
-│   └── data-validation/
-│       └── SKILL.md
-└── knowledge/
-    ├── index.yaml
-    └── pydantic-cheatsheet.md
+/gitagent install data-modeler
+/gitagent install pesap/pesap-agents/data-modeler
 ```
 
-## Built with
+## Skills
 
-[gitagent](https://github.com/open-gitagent/gitagent) — a git-native, framework-agnostic open standard for AI agents.
+- **data-validation** — Exhaustive data validation patterns: cross-field checks, conditional validation, custom error reporting, and defensive data contracts
+- **infrasys-integration** — Build infrastructure systems models using the infrasys library for component management, time series, and system containers
+- **pydantic-modeling** — Design and build Pydantic v2 data models with proper typing, configuration, and serialization

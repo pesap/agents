@@ -2,38 +2,15 @@
 
 Optimizes GitHub Actions CI pipelines for speed, resource efficiency, smart caching, and minimal artifact bloat.
 
-## Run
-
-```bash
-npx @open-gitagent/gitagent run -r https://github.com/pesap/pesap-agents -d ./github-ci-optimizer
-```
-
-## What It Can Do
-
-- **Workflow Optimization** — Parallelize jobs, reorder for fail-fast, right-size runners, add path filters and concurrency groups
-- **Caching Strategy** — Design cache keys for dependencies, build outputs, and Docker layers to eliminate redundant work
-- **Artifact Management** — Set retention policies, compress uploads, eliminate unused artifacts, reduce storage costs
-
-## Structure
+## Load
 
 ```
-github-ci-optimizer/
-├── agent.yaml
-├── SOUL.md
-├── RULES.md
-├── AGENTS.md
-├── skills/
-│   ├── workflow-optimization/
-│   │   └── SKILL.md
-│   ├── caching-strategy/
-│   │   └── SKILL.md
-│   └── artifact-management/
-│       └── SKILL.md
-├── knowledge/
-│   └── index.yaml
-└── memory/
+/gitagent install github-ci-optimizer
+/gitagent install pesap/pesap-agents/github-ci-optimizer
 ```
 
-## Built with
+## Skills
 
-[gitagent](https://github.com/open-gitagent/gitagent) — a git-native, framework-agnostic open standard for AI agents.
+- **artifact-management** — Optimize artifact uploads, retention, and cross-job data passing in GitHub Actions
+- **caching-strategy** — Design and optimize caching for dependencies, build outputs, and Docker layers in GitHub Actions
+- **workflow-optimization** — Analyze workflows for parallelism, job structure, runner sizing, and execution order

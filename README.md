@@ -1,70 +1,97 @@
 # pesap-agents
 
-A collection of AI agents built with [gitagent](https://github.com/open-gitagent/gitagent) and [pi](https://github.com/mariozechner/pi).
+A collection of AI agents built with [gitagent](https://github.com/open-gitagent/gitagent), plus **pi-gitagent**: a [pi](https://github.com/badlogic/pi-mono) extension that loads any gitagent agent into your session.
+
+## Install
+
+```bash
+pi install https://github.com/pesap/pesap-agents
+```
+
+That's it. Now you have `/gitagent` in every pi session.
+
+## Usage
+
+```bash
+# Load a local agent
+/gitagent install code-reviewer
+
+# Load from GitHub (shorthand)
+/gitagent install pesap/pesap-agents/code-reviewer
+
+# Load from GitHub (full URL)
+/gitagent install https://github.com/pesap/pesap-agents/tree/main/code-reviewer
+
+# Load any gitagent repo
+/gitagent install shreyas-lyzr/architect
+
+# List agents in a repo
+/gitagent list pesap/pesap-agents
+
+# Show loaded agent info
+/gitagent info
+
+# Re-pull latest from remote
+/gitagent refresh
+
+# Remove agent context
+/gitagent unload
+```
+
+When you load an agent, pi-gitagent:
+1. Resolves the agent (local dir or GitHub clone, cached at `~/.pitagent/cache/`)
+2. Parses `agent.yaml`, `SOUL.md`, `RULES.md`, skills, knowledge, memory
+3. Injects the agent's full identity into the system prompt
+4. Switches to the agent's preferred model
+5. Shows a status indicator in the footer
+
+## What Gets Loaded
+
+| gitagent file | How it's used in pi |
+|---------------|---------------------|
+| `SOUL.md` | Appended to system prompt (identity, personality) |
+| `RULES.md` | Appended to system prompt (hard constraints) |
+| `PROMPT.md` | Appended to system prompt (operational instructions) |
+| `DUTIES.md` | Appended to system prompt (segregation of duties) |
+| `skills/` | Listed in system prompt as available capabilities |
+| `knowledge/` | `always_load` docs baked into system prompt |
+| `memory/MEMORY.md` | Loaded into context, agent can write learnings back |
+| `agent.yaml` model | Auto-switches pi to the preferred model |
+| `agent.yaml` compliance | Translated to behavioral constraints |
+
+## Memory and Learning
+
+The agent knows its memory file path and is instructed to write learnings there. After a session:
+
+```bash
+# For remote agents
+cd ~/.pitagent/cache/<hash>
+git add memory/ && git commit -m "feat(memory): update learnings"
+
+# For local agents, just commit normally
+```
 
 ## Agents
 
 | Agent | Description |
 |-------|-------------|
-| [code-reviewer](./code-reviewer) | Analyzes code for bugs, security issues, performance problems, and style |
+| [code-reviewer](./code-reviewer) | Analyzes code for bugs, security issues, performance, and style |
 | [performance-freak](./performance-freak) | Optimizes code for speed and memory efficiency |
-| [simplify](./simplify) | Reviews code for reuse, quality, and efficiency — then fixes issues found |
-| [github-ci-optimizer](./github-ci-optimizer) | Optimizes GitHub Actions CI for speed, caching, and resource efficiency |
-| [data-modeler](./data-modeler) | Expert data modeler using Pydantic v2, infrasys, and exhaustive validation |
-| [decomplexify](./decomplexify) | Breaks down complex topics using first principles thinking and the Feynman technique |
-| [optimization-modeler](./optimization-modeler) | Simplifies formulations, linearizes, decomposes into testable subproblems, and tunes solvers |
+| [simplify](./simplify) | Reviews code for reuse, quality, and efficiency |
+| [github-ci-optimizer](./github-ci-optimizer) | Optimizes GitHub Actions CI |
+| [data-modeler](./data-modeler) | Expert data modeler (Pydantic v2, infrasys) |
+| [decomplexify](./decomplexify) | First principles + Feynman technique |
+| [optimization-modeler](./optimization-modeler) | Simplifies formulations, tunes solvers |
 
-## Single Source of Truth
-
-Each agent is defined by standard gitagent files — **no per-agent boilerplate scripts**:
-
-```
-<agent>/
-├── agent.yaml     ← manifest (model, skills, pi config)
-├── SOUL.md        ← identity, personality, expertise
-├── RULES.md       ← hard constraints, boundaries
-├── PROMPT.md      ← operational instructions (optional)
-├── skills/        ← reusable capability modules
-└── knowledge/     ← reference documents
-```
-
-The `pi` section in `agent.yaml` holds pi-specific config (scope, tools, thinking). A shared `load-agent.ts` reads any agent directory and registers it with pi — no per-agent `index.ts` needed.
-
-### Run with gitagent
+## Try without installing
 
 ```bash
-npx @open-gitagent/gitagent run -r https://github.com/pesap/pesap-agents -d ./code-reviewer
+pi -e git:github.com/pesap/pesap-agents
 ```
 
-### Run with pi
-
-```bash
-npx ts-node load-agent.ts ./code-reviewer
-```
-
-## Agent Loop Orchestration
-
-Run agents in a sequence with **simplify automatically running last** to improve all code changes:
-
-```bash
-# Run with default pipeline: code-reviewer → performance-freak → simplify
-npx ts-node agent-loop.ts "Improve user authentication"
-
-# Run custom agent sequence (simplify always runs last):
-npx ts-node agent-loop.ts "Optimize data model" data-modeler
-
-# Run multiple agents in sequence:
-npx ts-node agent-loop.ts "Refactor API endpoints" code-reviewer performance-freak data-modeler
-```
-
-The **simplify agent** always runs after code changes to:
-- Find existing utilities and eliminate duplication
-- Fix quality issues (redundant state, parameter sprawl, leaky abstractions)
-- Improve efficiency (unnecessary work, missed concurrency, N+1 patterns)
-- Apply fixes directly without leaving TODOs or suggestions
+Then use `/gitagent` as normal. The extension is loaded for that session only.
 
 ## Built with
 
-[gitagent](https://github.com/open-gitagent/gitagent) — git-native, framework-agnostic open standard for AI agents.
-
-[pi](https://github.com/mariozechner/pi) — coding agent harness with subagent orchestration.
+- [gitagent](https://github.com/open-gitagent/gitagent) — git-native agent standard
+- [pi](https://github.com/badlogic/pi-mono) — coding agent harness
