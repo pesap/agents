@@ -5,7 +5,7 @@
  * agent.yaml, SOUL.md, RULES.md, PROMPT.md, DUTIES.md, skills/, knowledge/, memory/
  */
 
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { parseYaml } from "./yaml.js";
 
@@ -74,9 +74,14 @@ function parseSkillFrontmatter(raw: string): { name: string; description: string
   return { name: (fm.name as string) ?? "", description: (fm.description as string) ?? "" };
 }
 
+export interface LoadOptions {
+  /** Base directory for centralized memory storage. Memory goes to <memoryBaseDir>/<agent-name>/MEMORY.md */
+  memoryBaseDir?: string;
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────
 
-export function loadAgent(agentDir: string): LoadedAgent {
+export function loadAgent(agentDir: string, options?: LoadOptions): LoadedAgent {
   const manifestPath = join(agentDir, "agent.yaml");
   if (!existsSync(manifestPath)) throw new Error(`No agent.yaml in ${agentDir}`);
 
@@ -85,7 +90,13 @@ export function loadAgent(agentDir: string): LoadedAgent {
   const rules = readOpt(join(agentDir, "RULES.md"));
   const prompt = readOpt(join(agentDir, "PROMPT.md"));
   const duties = readOpt(join(agentDir, "DUTIES.md"));
-  const memory = readOpt(join(agentDir, "memory", "MEMORY.md"));
+  // Memory — centralized store keeps learnings safe from cache clears and refreshes
+  const memoryDir = options?.memoryBaseDir
+    ? join(options.memoryBaseDir, manifest.name)
+    : join(agentDir, "memory");
+  mkdirSync(memoryDir, { recursive: true });
+  const memoryMdPath = join(memoryDir, "MEMORY.md");
+  const memory = readOpt(memoryMdPath);
 
   // Skills
   const skills: SkillInfo[] = [];
@@ -125,7 +136,6 @@ export function loadAgent(agentDir: string): LoadedAgent {
   }
 
   // Memory instructions
-  const memoryMdPath = join(agentDir, "memory", "MEMORY.md");
   const memorySection = [
     "## Memory\n",
     "You have persistent memory across sessions.",

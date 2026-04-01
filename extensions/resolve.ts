@@ -3,7 +3,7 @@
  *
  * Resolves a gitagent agent from:
  *   - Local directory:       ./code-reviewer, /abs/path/to/agent
- *   - GitHub shorthand:      pesap/agents/code-reviewer
+ *   - GitHub shorthand:      gh:pesap/agents/code-reviewer
  *   - GitHub URL:            https://github.com/pesap/agents/tree/main/code-reviewer
  *   - Git SSH:               git@github.com:pesap/agents.git
  *
@@ -45,12 +45,13 @@ function parseGitHubRef(ref: string): { repoUrl: string; subpath: string; branch
     return { repoUrl: `git@github.com:${owner}/${repo}.git`, subpath: "", branch: "main" };
   }
 
-  // owner/repo[/subpath]
-  const parts = ref.split("/");
-  if (parts.length >= 2 && !ref.startsWith("/") && !ref.startsWith(".")) {
+  // gh:owner/repo[/subpath]
+  const ghMatch = ref.match(/^gh:([^/]+)\/([^/]+)(?:\/(.+))?$/);
+  if (ghMatch) {
+    const [, owner, repo, subpath] = ghMatch;
     return {
-      repoUrl: `https://github.com/${parts[0]}/${parts[1]}.git`,
-      subpath: parts.slice(2).join("/"),
+      repoUrl: `https://github.com/${owner}/${repo}.git`,
+      subpath: subpath ?? "",
       branch: "main",
     };
   }
@@ -99,7 +100,7 @@ export function resolveAgent(ref: string, options: ResolveOptions = {}): Resolve
   if (!github) {
     throw new Error(
       `Cannot resolve "${ref}". Not a local directory or recognized GitHub reference.\n` +
-        `Expected: local path, owner/repo/agent, or https://github.com/owner/repo`
+        `Expected: local path, gh:owner/repo/agent, or https://github.com/owner/repo`
     );
   }
 
