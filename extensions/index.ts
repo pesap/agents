@@ -12,11 +12,11 @@
  *
  * Agent references:
  *   /gitagent install code-reviewer
- *   /gitagent install pesap/pesap-agents/code-reviewer
- *   /gitagent install https://github.com/pesap/pesap-agents/tree/main/code-reviewer
+ *   /gitagent install pesap/agents/code-reviewer
+ *   /gitagent install https://github.com/pesap/agents/tree/main/code-reviewer
  *
  * Install:
- *   pi install https://github.com/pesap/pesap-agents
+ *   pi install https://github.com/pesap/agents
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";

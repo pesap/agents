@@ -3,9 +3,9 @@
  *
  * Resolves a gitagent agent from:
  *   - Local directory:       ./code-reviewer, /abs/path/to/agent
- *   - GitHub shorthand:      pesap/pesap-agents/code-reviewer
- *   - GitHub URL:            https://github.com/pesap/pesap-agents/tree/main/code-reviewer
- *   - Git SSH:               git@github.com:pesap/pesap-agents.git
+ *   - GitHub shorthand:      pesap/agents/code-reviewer
+ *   - GitHub URL:            https://github.com/pesap/agents/tree/main/code-reviewer
+ *   - Git SSH:               git@github.com:pesap/agents.git
  *
  * GitHub repos are shallow-cloned to ~/.pitagent/cache/<hash> and reused.
  */

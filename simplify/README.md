@@ -6,7 +6,7 @@ Reviews changed code for reuse, quality, and efficiency, then fixes issues found
 
 ```
 /gitagent install simplify
-/gitagent install pesap/pesap-agents/simplify
+/gitagent install pesap/agents/simplify
 ```
 
 ## Skills

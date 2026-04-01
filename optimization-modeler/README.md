@@ -6,7 +6,7 @@ Expert mathematical optimization modeler that simplifies formulations, linearize
 
 ```
 /gitagent install optimization-modeler
-/gitagent install pesap/pesap-agents/optimization-modeler
+/gitagent install pesap/agents/optimization-modeler
 ```
 
 ## Skills

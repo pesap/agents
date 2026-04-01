@@ -1,11 +1,11 @@
-# pesap-agents
+# agents
 
 A collection of AI agents built with [gitagent](https://github.com/open-gitagent/gitagent), plus **pi-gitagent**: a [pi](https://github.com/badlogic/pi-mono) extension that loads any gitagent agent into your session.
 
 ## Install
 
 ```bash
-pi install https://github.com/pesap/pesap-agents
+pi install https://github.com/pesap/agents
 ```
 
 That's it. Now you have `/gitagent` in every pi session.
@@ -17,16 +17,16 @@ That's it. Now you have `/gitagent` in every pi session.
 /gitagent install code-reviewer
 
 # Load from GitHub (shorthand)
-/gitagent install pesap/pesap-agents/code-reviewer
+/gitagent install pesap/agents/code-reviewer
 
 # Load from GitHub (full URL)
-/gitagent install https://github.com/pesap/pesap-agents/tree/main/code-reviewer
+/gitagent install https://github.com/pesap/agents/tree/main/code-reviewer
 
 # Load any gitagent repo
 /gitagent install shreyas-lyzr/architect
 
 # List agents in a repo
-/gitagent list pesap/pesap-agents
+/gitagent list pesap/agents
 
 # Show loaded agent info
 /gitagent info
@@ -86,7 +86,7 @@ git add memory/ && git commit -m "feat(memory): update learnings"
 ## Try without installing
 
 ```bash
-pi -e git:github.com/pesap/pesap-agents
+pi -e git:github.com/pesap/agents
 ```
 
 Then use `/gitagent` as normal. The extension is loaded for that session only.

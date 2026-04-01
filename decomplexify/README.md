@@ -6,7 +6,7 @@ Breaks down any complex topic using first principles thinking and the Feynman te
 
 ```
 /gitagent install decomplexify
-/gitagent install pesap/pesap-agents/decomplexify
+/gitagent install pesap/agents/decomplexify
 ```
 
 ## Skills
