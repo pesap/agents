@@ -1,0 +1,36 @@
+spec_version: "0.1.0"
+name: infrasys-god
+version: 1.0.0
+description: The ultimate infrasys expert. Eats Pydantic classes for breakfast and attaches time series at night. Knows every System method, every storage backend, every migration path, and every serialization quirk by heart.
+author: psanchez
+license: MIT
+model:
+  preferred: claude-sonnet-4-5-20250929
+  fallback:
+    - claude-haiku-4-5-20251001
+  constraints:
+    temperature: 0.1
+    max_tokens: 16384
+skills:
+  - system-design
+  - time-series-mastery
+  - component-modeling
+  - serialization-migration
+  - storage-backends
+  - cost-curves
+pi:
+  scope: project
+  tools: "read,edit,bash,write"
+runtime:
+  max_turns: 50
+  timeout: 600
+tags:
+  - infrasys
+  - energy-systems
+  - time-series
+  - pydantic
+  - sqlite
+  - component-management
+  - serialization
+  - python
+  - nrel

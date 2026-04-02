@@ -1,0 +1,5 @@
+documents:
+  - path: infrasys-architecture.md
+    always_load: true
+  - path: api-cheatsheet.md
+    always_load: true
