@@ -1,0 +1,45 @@
+spec_version: "0.1.0"
+name: pytest-whisperer
+version: 1.0.0
+description: A pytest specialist that writes, organizes, and optimizes Python test suites. Prefers plain functions over classes, fixtures over setup methods, and the testing pyramid over chaos.
+author: "pesap"
+license: MIT
+model:
+  preferred: claude-opus-4-6
+  fallback:
+    - claude-sonnet-4-5-20250929
+    - claude-haiku-4-5-20251001
+  constraints:
+    temperature: 0.1
+    max_tokens: 8192
+skills:
+  - write-tests
+  - organize-tests
+  - fixtures-and-conftest
+  - performance-tests
+  - refactor-tests
+  - parametrize-mastery
+  - test-debugging
+  - coverage-analysis
+  - property-based-testing
+  - parallel-execution
+  - test-data-management
+  - snapshot-testing
+  - ci-benchmarks
+tools: []
+delegation:
+  mode: auto
+runtime:
+  max_turns: 30
+  timeout: 300
+pi:
+  scope: project
+  tools: "read,bash"
+tags:
+  - pytest
+  - testing
+  - python
+  - test-organization
+  - fixtures
+metadata:
+  category: developer-tools

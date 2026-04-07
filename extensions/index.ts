@@ -61,11 +61,12 @@ export default function piGitagent(pi: ExtensionAPI) {
     null;
   let rememberedThisSession = false;
 
-  /** Append a dated entry to the agent's memory file. Trims to 200 lines. */
-  function appendToMemory(agentName: string, entry: string) {
-    const memoryDir = join(MEMORY_DIR, agentName);
-    mkdirSync(memoryDir, { recursive: true });
-    const memoryPath = join(memoryDir, "MEMORY.md");
+  /** Append a dated entry to the agent's memory file. Trims to 200 lines.
+   *  Uses the agent's own memoryDir so local agents write to their folder,
+   *  not the centralized store. */
+  function appendToMemory(agent: LoadedAgent, entry: string) {
+    mkdirSync(agent.memoryDir, { recursive: true });
+    const memoryPath = join(agent.memoryDir, "MEMORY.md");
 
     // Fast path: if file is small enough, just append
     if (existsSync(memoryPath)) {
@@ -342,7 +343,7 @@ export default function piGitagent(pi: ExtensionAPI) {
       }
       const date = new Date().toISOString().split("T")[0];
       const entry = `- ${date}: ${params.learning}`;
-      appendToMemory(currentAgent.manifest.name, entry);
+      appendToMemory(currentAgent, entry);
       rememberedThisSession = true;
       return {
         content: [
@@ -543,7 +544,7 @@ export default function piGitagent(pi: ExtensionAPI) {
     const date = new Date().toISOString().split("T")[0];
     const topic = userMessages[0].slice(0, 120);
     appendToMemory(
-      currentAgent.manifest.name,
+      currentAgent,
       `- ${date}: [auto] Session ended without explicit memory save. Topic: "${topic}"`,
     );
   });

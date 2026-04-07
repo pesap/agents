@@ -57,6 +57,8 @@ export interface LoadedAgent {
   duties: string;
   skills: SkillInfo[];
   memory: string;
+  /** The directory where this agent's memory file lives */
+  memoryDir: string;
   /** True when memory lives alongside the agent (local), false when centralized (cached) */
   memoryIsLocal: boolean;
   /** Combined system prompt text to append */
@@ -178,6 +180,7 @@ export function loadAgent(agentDir: string, options?: LoadOptions): LoadedAgent 
     duties,
     skills,
     memory,
+    memoryDir,
     memoryIsLocal: !options?.memoryBaseDir,
     systemPromptAppend: parts.join("\n\n"),
   };
