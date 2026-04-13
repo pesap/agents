@@ -188,8 +188,16 @@ export function loadAgent(agentDir: string, options?: LoadOptions): LoadedAgent 
       documents?: Array<{ path: string; always_load?: boolean }>;
     };
     for (const doc of index?.documents?.filter((d) => d.always_load) ?? []) {
-      const content = readOpt(join(agentDir, "knowledge", doc.path));
-      if (content) knowledgeParts.push(`## Knowledge: ${doc.path}\n\n${content}`);
+      const knowledgePath = join(agentDir, "knowledge", doc.path);
+      const content = readOpt(knowledgePath);
+      if (!content) continue;
+      knowledgeParts.push([
+        `## Knowledge: ${doc.path}`,
+        `Absolute path: \`${knowledgePath}\``,
+        `Path from agent root: \`knowledge/${doc.path}\``,
+        "",
+        content,
+      ].join("\n"));
     }
   }
 
