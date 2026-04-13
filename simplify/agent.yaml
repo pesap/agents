@@ -30,6 +30,18 @@ tags:
   - developer-tools
 
 metadata:
+  category: developer-tools
+  mutates_files: true
+  best_for:
+    - simplification
+    - refactoring
+    - code cleanup
+  runtime_policy:
+    mode: semi-auto
+    approvals:
+      file_write: allow
+      bash_destructive: ask
+      network: ask
   feedback_memory_hook:
     enabled: true
     min_confidence: 0.9

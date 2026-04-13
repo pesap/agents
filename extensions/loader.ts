@@ -25,6 +25,7 @@ export interface AgentManifest {
   skills?: string[];
   tools?: string[];
   agents?: Record<string, { description?: string; delegation?: { mode?: string; triggers?: string[] } }>;
+  delegation?: { mode?: string };
   runtime?: { max_turns?: number; temperature?: number; timeout?: number };
   compliance?: {
     risk_tier?: string;
@@ -37,8 +38,31 @@ export interface AgentManifest {
       enforcement?: string;
     };
   };
+  pi?: { scope?: string; tools?: string };
   tags?: string[];
-  metadata?: Record<string, unknown>;
+  metadata?: {
+    category?: string;
+    beginner_friendly?: boolean;
+    mutates_files?: boolean;
+    best_for?: string[];
+    feedback_memory_hook?: {
+      enabled?: boolean;
+      min_confidence?: number;
+      max_chars?: number;
+      redact_sensitive?: boolean;
+    };
+    runtime_policy?: {
+      mode?: string;
+      approvals?: Record<string, string>;
+      allow_tools?: string[];
+      deny_patterns?: Record<string, string[]>;
+    };
+    accessibility?: {
+      plain_language?: boolean;
+      show_beginner_hints?: boolean;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export interface SkillInfo {
@@ -120,7 +144,7 @@ export function loadAgent(agentDir: string, options?: LoadOptions): LoadedAgent 
   const manifestPath = join(agentDir, "agent.yaml");
   if (!existsSync(manifestPath)) throw new Error(`No agent.yaml in ${agentDir}`);
 
-  const manifest = parseYaml(readFileSync(manifestPath, "utf-8")) as AgentManifest;
+  const manifest = parseYaml(readFileSync(manifestPath, "utf-8")) as unknown as AgentManifest;
   const soul = readOpt(join(agentDir, "SOUL.md"));
   const rules = readOpt(join(agentDir, "RULES.md"));
   const prompt = readOpt(join(agentDir, "PROMPT.md"));

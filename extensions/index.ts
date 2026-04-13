@@ -2,44 +2,26 @@
  * pi-gitagent
  *
  * Pi extension that loads any gitagent agent into the current session.
- *
- * Commands (user-facing, TUI):
- *   /gitagent load <ref>      Load an agent into this session
- *   /gitagent new <prompt>     Create a new agent using the gitagent architect
- *   /gitagent list [ref]      List available agents (local or remote)
- *   /gitagent info            Show the currently loaded agent
- *   /gitagent refresh         Re-pull and reload the current agent
- *   /gitagent unload          Remove the loaded agent context
- *
- * Tools (LLM-callable):
- *   gitagent_load             Load an agent, optionally queue a follow-up task
- *   gitagent_unload           Remove the loaded agent context
- *   gitagent_info             Show the currently loaded agent
- *   gitagent_list             List available agents in a repo or directory
- *   gitagent_remember         Save a learning to the agent's persistent memory
- *
- * Agent references:
- *   /gitagent load code-reviewer
- *   /gitagent load gh:pesap/agents/code-reviewer
- *   /gitagent load https://github.com/pesap/agents/tree/main/code-reviewer
- *
- * Install:
- *   pi install https://github.com/pesap/agents
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { resolveAgent, resolveDir, listAgentsInDir } from "./resolve.js";
 import { loadAgent, mapModel, type LoadedAgent } from "./loader.js";
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { createRuntimeState } from "./state.js";
+import {
+  appendToMemory,
+  extractText,
+  getLastAssistantText,
+  getLastUserText,
+  saveAgentMemoryEntry,
+  todayIsoDate,
+} from "./memory.js";
+import { decideToolPolicy, formatPolicySummary, getRuntimePolicy } from "./policy.js";
+import { formatDoctorReport, runDoctor } from "./doctor.js";
+import { formatRecommendations, recommendAgents } from "./recommend.js";
 
 const MEMORY_DIR = join(homedir(), ".pitagent", "memory");
 const ARCHITECT_REF = "gh:shreyas-lyzr/architect";
@@ -47,91 +29,78 @@ const SKILL_ENFORCEMENT_MAX_STREAK = 2;
 
 const USAGE = [
   "Usage:",
-  "  /gitagent load <ref>      Load an agent into this session",
-  "  /gitagent new <prompt>     Create a new agent via the architect",
-  "  /gitagent list [ref]      List available agents",
-  "  /gitagent info            Show loaded agent",
-  "  /gitagent refresh         Re-pull and reload",
-  "  /gitagent unload          Remove agent context",
+  "  /gitagent load <ref>         Load an agent into this session",
+  "  /gitagent new <prompt>       Create a new agent via the architect",
+  "  /gitagent list [ref]         List available agents",
+  "  /gitagent recommend <task>   Recommend the best agent for a task",
+  "  /gitagent doctor [ref]       Run diagnostics on the current or target agent",
+  "  /gitagent policy             Show runtime policy for the loaded agent",
+  "  /gitagent info               Show loaded agent",
+  "  /gitagent refresh            Re-pull and reload",
+  "  /gitagent unload            Remove agent context",
 ].join("\n");
 
+interface UiContext {
+  ui: {
+    notify: (msg: string, type: string) => void;
+    setStatus: (key: string, text: string | undefined) => void;
+    confirm: (title: string, message: string) => Promise<boolean>;
+  };
+  cwd: string;
+  hasUI?: boolean;
+  sessionManager?: {
+    getEntries: () => unknown[];
+    getBranch: () => unknown[];
+    getSessionFile?: () => string | undefined;
+  };
+  modelRegistry: {
+    find: (provider: string, modelId: string) => unknown;
+  };
+}
+
 export default function piGitagent(pi: ExtensionAPI) {
-  let currentAgent: LoadedAgent | null = null;
-  let currentRef: string | null = null;
-  let pendingRestore: { agent: LoadedAgent | null; ref: string | null } | null =
-    null;
-  let rememberedThisSession = false;
-  let lastSkillAuditFingerprint: string | null = null;
-  let lastFeedbackFingerprint: string | null = null;
-  let skillEnforcementStreak = 0;
+  const state = createRuntimeState();
+  const unsafePi = pi as unknown as {
+    on: (...args: unknown[]) => unknown;
+    registerTool: (definition: unknown) => unknown;
+    registerCommand: (name: string, options: unknown) => unknown;
+  };
 
-  /** Append a dated entry to the agent's memory file. Trims to 200 lines.
-   *  Uses the agent's own memoryDir so local agents write to their folder,
-   *  not the centralized store. */
-  function appendToMemory(agent: LoadedAgent, entry: string) {
-    mkdirSync(agent.memoryDir, { recursive: true });
-    const memoryPath = join(agent.memoryDir, "MEMORY.md");
-
-    // Fast path: if file is small enough, just append
-    if (existsSync(memoryPath)) {
-      const content = readFileSync(memoryPath, "utf-8");
-      const lineCount = (content.match(/\n/g) || []).length + 1;
-
-      if (lineCount < 200) {
-        appendFileSync(memoryPath, `\n${entry}`, "utf-8");
-        return;
-      }
-
-      // Slow path: trim old lines
-      const lines = content.split("\n");
-      lines.push(entry);
-      const trimmed = lines.slice(lines.length - 200);
-      writeFileSync(memoryPath, trimmed.join("\n"), "utf-8");
-    } else {
-      writeFileSync(memoryPath, entry, "utf-8");
+  function setAgentStatus(
+    ui: { setStatus: (key: string, text: string | undefined) => void },
+    agent: LoadedAgent | null,
+  ): void {
+    if (!agent) {
+      ui.setStatus("gitagent", undefined);
+      return;
     }
+    const policy = getRuntimePolicy(agent);
+    ui.setStatus("gitagent", `🤖 ${agent.manifest.name} [${policy.mode}]`);
   }
 
-  /** Extract plain text from a message content array. */
-  function extractText(content: unknown): string {
-    if (typeof content === "string") return content;
-    if (!Array.isArray(content)) return "";
-    return content
-      .filter((b: any) => b.type === "text" && typeof b.text === "string")
-      .map((b: any) => b.text)
-      .join(" ")
-      .trim();
-  }
+  function getFeedbackHookConfig(agent: LoadedAgent): {
+    enabled: boolean;
+    minConfidence: number;
+    maxChars: number;
+    redactSensitive: boolean;
+  } {
+    const raw = agent.manifest.metadata?.feedback_memory_hook;
 
-  function todayIsoDate(): string {
-    return new Date().toISOString().split("T")[0];
-  }
+    const minConfidence =
+      typeof raw?.min_confidence === "number" && raw.min_confidence >= 0 && raw.min_confidence <= 1
+        ? raw.min_confidence
+        : 0.9;
+    const maxChars =
+      typeof raw?.max_chars === "number" && raw.max_chars >= 80 && raw.max_chars <= 500
+        ? Math.floor(raw.max_chars)
+        : 220;
 
-  function saveAgentMemoryEntry(agent: LoadedAgent, entry: string) {
-    appendToMemory(agent, entry);
-    rememberedThisSession = true;
-  }
-
-  function getLastAssistantText(ctx: any): string {
-    const entries = ctx.sessionManager?.getBranch?.() ?? [];
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const entry = entries[i];
-      if (entry?.type !== "message") continue;
-      const msg = (entry as any).message;
-      if (msg?.role === "assistant") return extractText(msg.content);
-    }
-    return "";
-  }
-
-  function getLastUserText(ctx: any): string {
-    const entries = ctx.sessionManager?.getBranch?.() ?? [];
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const entry = entries[i];
-      if (entry?.type !== "message") continue;
-      const msg = (entry as any).message;
-      if (msg?.role === "user") return extractText(msg.content);
-    }
-    return "";
+    return {
+      enabled: raw?.enabled === true,
+      minConfidence,
+      maxChars,
+      redactSensitive: raw?.redact_sensitive !== false,
+    };
   }
 
   function inferSentiment(feedback: string): "positive" | "negative" | "neutral" {
@@ -153,35 +122,6 @@ export default function piGitagent(pi: ExtensionAPI) {
     const source = (params.source ?? "user").trim() || "user";
     const sentiment = params.sentiment ?? inferSentiment(params.feedback);
     return `- ${todayIsoDate()}: [feedback/${topic}/${sentiment}] ${params.feedback.trim()} (source: ${source})`;
-  }
-
-  function getFeedbackHookConfig(agent: LoadedAgent): {
-    enabled: boolean;
-    minConfidence: number;
-    maxChars: number;
-    redactSensitive: boolean;
-  } {
-    const metadata = agent.manifest.metadata as Record<string, unknown> | undefined;
-    const raw = metadata?.feedback_memory_hook as Record<string, unknown> | undefined;
-
-    const minConfidenceRaw = raw?.min_confidence;
-    const maxCharsRaw = raw?.max_chars;
-
-    const minConfidence =
-      typeof minConfidenceRaw === "number" && minConfidenceRaw >= 0 && minConfidenceRaw <= 1
-        ? minConfidenceRaw
-        : 0.9;
-    const maxChars =
-      typeof maxCharsRaw === "number" && maxCharsRaw >= 80 && maxCharsRaw <= 500
-        ? Math.floor(maxCharsRaw)
-        : 220;
-
-    return {
-      enabled: raw?.enabled === true,
-      minConfidence,
-      maxChars,
-      redactSensitive: raw?.redact_sensitive !== false,
-    };
   }
 
   function redactPotentialSensitiveText(text: string): string {
@@ -221,7 +161,7 @@ export default function piGitagent(pi: ExtensionAPI) {
     if (/(test|lint|clippy|quality|bug|error handling)/.test(lower)) {
       return "quality";
     }
-    if (/(agent|skill|hook|tool)/.test(lower)) {
+    if (/(agent|skill|hook|tool|policy)/.test(lower)) {
       return "agent-behavior";
     }
     return "general";
@@ -246,18 +186,14 @@ export default function piGitagent(pi: ExtensionAPI) {
       );
     const hasPraise = /\b(?:great|nice|good|perfect|awesome|thanks|thank you)\b/.test(lower);
     const hasMeta =
-      /\b(?:agent|response|answer|format|style|tone|memory|remember|manual|automatic|hook|tool|skill)\b/.test(
+      /\b(?:agent|response|answer|format|style|tone|memory|remember|manual|automatic|hook|tool|skill|policy)\b/.test(
         lower,
       );
 
     const shouldCapture = hasCorrection || hasPreference || (hasPraise && hasMeta);
     if (!shouldCapture) return null;
 
-    const signal = hasCorrection
-      ? "correction"
-      : hasPreference
-        ? "preference"
-        : "praise";
+    const signal = hasCorrection ? "correction" : hasPreference ? "preference" : "praise";
 
     let confidence = 0.6;
     if (hasMeta) confidence += 0.2;
@@ -272,10 +208,10 @@ export default function piGitagent(pi: ExtensionAPI) {
     };
   }
 
-  function auditAutoFeedback(ctx: any) {
-    if (!currentAgent) return;
+  function auditAutoFeedback(ctx: UiContext): void {
+    if (!state.currentAgent) return;
 
-    const cfg = getFeedbackHookConfig(currentAgent);
+    const cfg = getFeedbackHookConfig(state.currentAgent);
     if (!cfg.enabled) return;
 
     const userText = getLastUserText(ctx);
@@ -285,25 +221,23 @@ export default function piGitagent(pi: ExtensionAPI) {
     if (!parsed) return;
     if (parsed.confidence < cfg.minConfidence) return;
 
-    const sanitized = cfg.redactSensitive
-      ? redactPotentialSensitiveText(parsed.feedback)
-      : parsed.feedback;
+    const sanitized = cfg.redactSensitive ? redactPotentialSensitiveText(parsed.feedback) : parsed.feedback;
     const concise = normalizeFeedbackText(sanitized, cfg.maxChars);
     if (concise.length < 12) return;
 
-    const fingerprint = `${currentAgent.manifest.name}:${concise.slice(-220)}`;
-    if (fingerprint === lastFeedbackFingerprint) return;
-    lastFeedbackFingerprint = fingerprint;
+    const fingerprint = `${state.currentAgent.manifest.name}:${concise.slice(-220)}`;
+    if (fingerprint === state.lastFeedbackFingerprint) return;
+    state.lastFeedbackFingerprint = fingerprint;
 
     const entry = formatFeedbackEntry({
       feedback: concise,
       topic: parsed.topic,
       source: "user-auto",
     });
-    saveAgentMemoryEntry(currentAgent, entry);
+    saveAgentMemoryEntry(state, state.currentAgent, entry);
 
     pi.appendEntry("gitagent-feedback-captured", {
-      agent: currentAgent.manifest.name,
+      agent: state.currentAgent.manifest.name,
       mode: "auto-inferred",
       topic: parsed.topic,
       signal: parsed.signal,
@@ -313,7 +247,7 @@ export default function piGitagent(pi: ExtensionAPI) {
     });
 
     ctx.ui.notify(
-      `📝 Auto-saved user feedback to ${currentAgent.manifest.name} memory (${parsed.signal}).`,
+      `📝 Auto-saved user feedback to ${state.currentAgent.manifest.name} memory (${parsed.signal}).`,
       "info",
     );
   }
@@ -327,9 +261,7 @@ export default function piGitagent(pi: ExtensionAPI) {
     }
 
     const hasSkillsSection =
-      /(?:^|\n)#{1,6}\s*skills?\s*(?:used|applied|check|activation)\b/i.test(
-        assistantText,
-      ) ||
+      /(?:^|\n)#{1,6}\s*skills?\s*(?:used|applied|check|activation)\b/i.test(assistantText) ||
       /skills?\s*(?:used|applied|check|activation)\s*:/i.test(assistantText);
 
     if (!hasSkillsSection) {
@@ -346,9 +278,8 @@ export default function piGitagent(pi: ExtensionAPI) {
       .map((skill) => skill.name);
 
     const explicitlyNone =
-      /skills?\s*(?:used|applied|check|activation)[^\n]*none/i.test(
-        assistantText,
-      ) || /no\s+applicable\s+skill/i.test(assistantText);
+      /skills?\s*(?:used|applied|check|activation)[^\n]*none/i.test(assistantText) ||
+      /no\s+applicable\s+skill/i.test(assistantText);
 
     if (matchedSkills.length === 0 && !explicitlyNone) {
       return {
@@ -362,23 +293,23 @@ export default function piGitagent(pi: ExtensionAPI) {
   }
 
   function auditSkillUsage(
-    ctx: any,
+    ctx: UiContext,
   ): { checked: boolean; result?: { ok: boolean; reason: string; matchedSkills: string[] } } {
-    if (!currentAgent || currentAgent.skills.length === 0) {
-      skillEnforcementStreak = 0;
+    if (!state.currentAgent || state.currentAgent.skills.length === 0) {
+      state.skillEnforcementStreak = 0;
       return { checked: false };
     }
 
     const assistantText = getLastAssistantText(ctx);
     if (!assistantText) return { checked: false };
 
-    const fingerprint = `${currentAgent.manifest.name}:${assistantText.slice(-160)}`;
-    if (fingerprint === lastSkillAuditFingerprint) return { checked: false };
-    lastSkillAuditFingerprint = fingerprint;
+    const fingerprint = `${state.currentAgent.manifest.name}:${assistantText.slice(-160)}`;
+    if (fingerprint === state.lastSkillAuditFingerprint) return { checked: false };
+    state.lastSkillAuditFingerprint = fingerprint;
 
-    const result = verifySkillSection(currentAgent, assistantText);
+    const result = verifySkillSection(state.currentAgent, assistantText);
     pi.appendEntry("gitagent-skill-check", {
-      agent: currentAgent.manifest.name,
+      agent: state.currentAgent.manifest.name,
       ok: result.ok,
       reason: result.reason,
       matchedSkills: result.matchedSkills,
@@ -387,12 +318,12 @@ export default function piGitagent(pi: ExtensionAPI) {
 
     if (!result.ok) {
       ctx.ui.notify(
-        `⚠️ Skill hook: ${currentAgent.manifest.name} is missing a valid Skills Used section (${result.reason}).`,
+        `⚠️ Skill hook: ${state.currentAgent.manifest.name} is missing a valid Skills Used section (${result.reason}).`,
         "info",
       );
 
-      if (skillEnforcementStreak < SKILL_ENFORCEMENT_MAX_STREAK) {
-        skillEnforcementStreak += 1;
+      if (state.skillEnforcementStreak < SKILL_ENFORCEMENT_MAX_STREAK) {
+        state.skillEnforcementStreak += 1;
         const enforcementPrompt = [
           "Your previous response failed the skill verification hook.",
           "Please restate your answer and include a `Skills Used` section.",
@@ -401,14 +332,14 @@ export default function piGitagent(pi: ExtensionAPI) {
         ].join(" ");
 
         pi.appendEntry("gitagent-skill-enforcement", {
-          agent: currentAgent.manifest.name,
+          agent: state.currentAgent.manifest.name,
           reason: result.reason,
-          streak: skillEnforcementStreak,
+          streak: state.skillEnforcementStreak,
           at: new Date().toISOString(),
         });
         pi.sendUserMessage(enforcementPrompt, { deliverAs: "followUp" });
         ctx.ui.notify(
-          `🧰 Skill hook enforcement queued (${skillEnforcementStreak}/${SKILL_ENFORCEMENT_MAX_STREAK}).`,
+          `🧰 Skill hook enforcement queued (${state.skillEnforcementStreak}/${SKILL_ENFORCEMENT_MAX_STREAK}).`,
           "info",
         );
       } else {
@@ -418,84 +349,226 @@ export default function piGitagent(pi: ExtensionAPI) {
         );
       }
     } else {
-      skillEnforcementStreak = 0;
+      state.skillEnforcementStreak = 0;
     }
 
     return { checked: true, result };
   }
 
-  /** Resolve + load in one shot. Every load path funnels through here. */
   function resolveAndLoad(ref: string, cwd: string): LoadedAgent {
     const resolved = resolveAgent(ref, { cwd });
-    // Local agents keep memory alongside the agent directory.
-    // Remote/cached agents use centralized memory so it survives cache clears.
     const opts = resolved.remote ? { memoryBaseDir: MEMORY_DIR } : {};
     return loadAgent(resolved.dir, opts);
   }
 
-  /** Set the agent as current, persist the ref, update status bar. */
   function activateAgent(
     agent: LoadedAgent,
     ref: string,
     ctx: { ui: { setStatus: (key: string, text: string | undefined) => void } },
-  ) {
-    currentAgent = agent;
-    currentRef = ref;
-    rememberedThisSession = false;
-    lastSkillAuditFingerprint = null;
-    lastFeedbackFingerprint = null;
-    skillEnforcementStreak = 0;
+  ): void {
+    state.currentAgent = agent;
+    state.currentRef = ref;
+    state.rememberedThisSession = false;
+    state.lastSkillAuditFingerprint = null;
+    state.lastFeedbackFingerprint = null;
+    state.skillEnforcementStreak = 0;
     pi.appendEntry("gitagent-loaded", { ref });
-    ctx.ui.setStatus("gitagent", `🤖 ${agent.manifest.name}`);
+    setAgentStatus(ctx.ui, agent);
   }
 
-  /** Try switching to the agent's preferred model. Returns true if switched. */
   async function switchModel(
     agent: LoadedAgent,
-    ctx: {
-      modelRegistry: { find: (provider: string, modelId: string) => any };
-    },
+    ctx: { modelRegistry: { find: (provider: string, modelId: string) => unknown } },
   ): Promise<boolean> {
     const modelPref = agent.manifest.model?.preferred;
     if (!modelPref) return false;
     const mapped = mapModel(modelPref);
     const model = ctx.modelRegistry.find(mapped.provider, mapped.modelId);
-    return model ? await pi.setModel(model) : false;
+    return model
+      ? await pi.setModel(model as Parameters<ExtensionAPI["setModel"]>[0])
+      : false;
   }
 
-  // ── Restore state from session entries ─────────────────────────────────
+  function buildAgentInfo(agent: LoadedAgent) {
+    const feedbackCfg = getFeedbackHookConfig(agent);
+    return {
+      name: agent.manifest.name,
+      version: agent.manifest.version,
+      description: agent.manifest.description,
+      model: agent.manifest.model?.preferred ?? "default",
+      skills: agent.skills.map((s) => s.name),
+      memory: agent.memory ? "has content" : "empty",
+      memory_mode: agent.memoryIsLocal ? "local repo memory" : "centralized ~/.pitagent memory",
+      source: agent.dir,
+      policy: formatPolicySummary(agent),
+      skill_verification_hook:
+        agent.skills.length > 0
+          ? `active (strict mode: auto follow-up enforcement, max streak ${SKILL_ENFORCEMENT_MAX_STREAK})`
+          : "inactive (no skills loaded)",
+      feedback_memory_hook: feedbackCfg.enabled
+        ? `active (min_confidence=${feedbackCfg.minConfidence}, max_chars=${feedbackCfg.maxChars}, redact_sensitive=${feedbackCfg.redactSensitive})`
+        : "inactive (set metadata.feedback_memory_hook.enabled=true in agent.yaml)",
+    };
+  }
 
-  pi.on("session_start", async (_event, ctx) => {
-    const entries = ctx.sessionManager.getEntries();
+  function showAgentInfo(
+    ctx: { ui: { notify: (msg: string, type: string) => void } },
+    agent: LoadedAgent,
+  ) {
+    const info = buildAgentInfo(agent);
+    const lines = Object.entries(info).map(([k, v]) => {
+      if (Array.isArray(v)) return `${k}: ${v.join(" | ") || "none"}`;
+      return `${k}: ${v}`;
+    });
+    ctx.ui.notify(lines.join("\n"), "info");
+  }
+
+  function getAgentList(ref: string, cwd: string): string[] {
+    const dir = ref === cwd ? cwd : resolveDir(ref, { cwd });
+    const subs = listAgentsInDir(dir);
+    const agents: string[] = [];
+    try {
+      loadAgent(dir);
+      agents.push(". (root agent)");
+    } catch {
+      // directory is a collection, not an agent root
+    }
+    agents.push(...subs);
+    return agents;
+  }
+
+  function handleList(
+    ctx: { ui: { notify: (msg: string, type: string) => void }; cwd: string },
+    ref?: string,
+  ) {
+    try {
+      const agents = getAgentList(ref ?? ctx.cwd, ctx.cwd);
+      if (agents.length === 0) {
+        ctx.ui.notify("No agents found", "info");
+        return;
+      }
+      ctx.ui.notify(`Available agents:\n${agents.map((agent) => `  ${agent}`).join("\n")}`, "info");
+    } catch (error) {
+      ctx.ui.notify(`${(error as Error).message}`, "error");
+    }
+  }
+
+  function handleNew(piApi: ExtensionAPI, ctx: UiContext, prompt: string) {
+    try {
+      state.pendingRestore = { agent: state.currentAgent, ref: state.currentRef };
+      state.currentAgent = resolveAndLoad(ARCHITECT_REF, ctx.cwd);
+      state.currentRef = null;
+      setAgentStatus(ctx.ui, state.currentAgent);
+      ctx.ui.notify("Loaded architect agent. Creating your agent...", "info");
+      piApi.sendUserMessage(prompt);
+    } catch (error) {
+      state.pendingRestore = null;
+      ctx.ui.notify(`Failed to load architect: ${(error as Error).message}`, "error");
+    }
+  }
+
+  function logPolicyDecision(payload: Record<string, unknown>): void {
+    pi.appendEntry("gitagent-policy-decision", {
+      ...payload,
+      at: new Date().toISOString(),
+    });
+  }
+
+  // ── Restore state from session entries ───────────────────────────────
+
+  unsafePi.on("session_start", async (_event: unknown, ctx: UiContext) => {
+    const entries = ctx.sessionManager?.getEntries() ?? [];
     let lastRef: string | null = null;
 
-    // Scan backwards to find the most recent load/unload
     for (let i = entries.length - 1; i >= 0; i--) {
-      const entry = entries[i];
-      if (entry.type === "custom") {
-        if (entry.customType === "gitagent-loaded") {
-          lastRef = (entry as any).data?.ref ?? null;
-          break;
-        } else if (entry.customType === "gitagent-unloaded") {
-          break; // Most recent was unload, stop
-        }
+      const entry = entries[i] as {
+        type?: string;
+        customType?: string;
+        data?: { ref?: string | null };
+      };
+      if (entry.type !== "custom") continue;
+      if (entry.customType === "gitagent-loaded") {
+        lastRef = entry.data?.ref ?? null;
+        break;
+      }
+      if (entry.customType === "gitagent-unloaded") {
+        break;
       }
     }
 
-    if (lastRef) {
-      try {
-        const agent = resolveAndLoad(lastRef, ctx.cwd);
-        activateAgent(agent, lastRef, ctx);
-      } catch {
-        currentAgent = null;
-        currentRef = null;
-      }
+    if (!lastRef) return;
+
+    try {
+      const agent = resolveAndLoad(lastRef, ctx.cwd);
+      activateAgent(agent, lastRef, ctx);
+    } catch {
+      state.currentAgent = null;
+      state.currentRef = null;
+      setAgentStatus(ctx.ui, null);
     }
   });
 
-  // ── LLM-callable tools ─────────────────────────────────────────────────
+  // ── Policy enforcement ───────────────────────────────────────────────
 
-  pi.registerTool({
+  unsafePi.on("tool_call", async (event: { toolName: string; input: unknown }, ctx: UiContext) => {
+    if (!state.currentAgent) return;
+
+    const decision = decideToolPolicy(state.currentAgent, event.toolName, event.input);
+    const basePayload = {
+      agent: state.currentAgent.manifest.name,
+      toolName: event.toolName,
+      summary: decision.classification.summary,
+      classification: decision.classification.risk,
+      matchedRule: decision.classification.matchedRule,
+      policyMode: getRuntimePolicy(state.currentAgent).mode,
+      reason: decision.reason,
+    };
+
+    if (decision.outcome === "allow") {
+      if (decision.classification.risk !== "safe") {
+        logPolicyDecision({ ...basePayload, outcome: "auto-allow" });
+      }
+      return;
+    }
+
+    if (decision.outcome === "block") {
+      logPolicyDecision({ ...basePayload, outcome: "blocked" });
+      ctx.ui.notify(
+        `Blocked ${event.toolName} for ${state.currentAgent.manifest.name}: ${decision.reason}`,
+        "info",
+      );
+      return { block: true, reason: `Blocked by gitagent policy: ${decision.reason}` };
+    }
+
+    if (!ctx.hasUI) {
+      logPolicyDecision({ ...basePayload, outcome: "blocked-no-ui" });
+      return {
+        block: true,
+        reason: `Approval required for ${event.toolName}, but no interactive UI is available`,
+      };
+    }
+
+    const approved = await ctx.ui.confirm(
+      `Approve ${event.toolName}?`,
+      `${state.currentAgent.manifest.name} wants to run: ${decision.classification.summary}\n\nPolicy reason: ${decision.reason}\n\nAllow this action once?`,
+    );
+
+    logPolicyDecision({
+      ...basePayload,
+      outcome: approved ? "approved" : "denied",
+    });
+
+    if (!approved) {
+      return { block: true, reason: `Denied by policy approval prompt: ${decision.reason}` };
+    }
+
+    ctx.ui.notify(`Approved ${event.toolName} for ${state.currentAgent.manifest.name}.`, "info");
+    return;
+  });
+
+  // ── LLM-callable tools ────────────────────────────────────────────────
+
+  unsafePi.registerTool({
     name: "gitagent_load",
     label: "Load Agent",
     description:
@@ -518,25 +591,33 @@ export default function piGitagent(pi: ExtensionAPI) {
         }),
       ),
     }),
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+    async execute(
+      _toolCallId: string,
+      params: { ref: string; followUp?: string },
+      _signal: AbortSignal | undefined,
+      _onUpdate: unknown,
+      ctx: UiContext,
+    ) {
       try {
         const agent = resolveAndLoad(params.ref, ctx.cwd);
         activateAgent(agent, params.ref, ctx);
 
         const switched = await switchModel(agent, ctx);
         const modelName = agent.manifest.model?.preferred ?? "default";
-        const skillNames = agent.skills.map((s) => s.name).join(", ") || "none";
+        const skillNames = agent.skills.map((skill) => skill.name).join(", ") || "none";
+        const policyMode = getRuntimePolicy(agent).mode;
 
         if (params.followUp) {
           pi.sendUserMessage(params.followUp, { deliverAs: "followUp" });
         }
 
         const lines = [
-          `Loaded ${agent.manifest.name} (model: ${modelName}, skills: ${skillNames}).`,
+          `Loaded ${agent.manifest.name} (model: ${modelName}, skills: ${skillNames}, policy: ${policyMode}).`,
+          switched ? `Model switched to ${modelName}.` : "",
           params.followUp
             ? `Follow-up task queued: "${params.followUp}" — it will run with ${agent.manifest.name}'s context active.`
             : "Agent context will be active on the next message.",
-        ];
+        ].filter(Boolean);
 
         return {
           content: [{ type: "text", text: lines.join("\n") }],
@@ -544,45 +625,48 @@ export default function piGitagent(pi: ExtensionAPI) {
             agent: agent.manifest.name,
             ref: params.ref,
             followUp: params.followUp ?? null,
+            policyMode,
           },
         };
-      } catch (err) {
-        throw new Error(
-          `Failed to load agent "${params.ref}": ${(err as Error).message}`,
-        );
+      } catch (error) {
+        throw new Error(`Failed to load agent "${params.ref}": ${(error as Error).message}`);
       }
     },
   });
 
-  pi.registerTool({
+  unsafePi.registerTool({
     name: "gitagent_unload",
     label: "Unload Agent",
     description: "Remove the currently loaded gitagent agent from the session.",
     promptSnippet: "Unload the current gitagent agent from the session.",
     parameters: Type.Object({}),
-    async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
-      if (!currentAgent) {
+    async execute(
+      _toolCallId: string,
+      _params: Record<string, never>,
+      _signal: AbortSignal | undefined,
+      _onUpdate: unknown,
+      ctx: UiContext,
+    ) {
+      if (!state.currentAgent) {
         return {
           content: [{ type: "text", text: "No agent loaded." }],
           details: {},
         };
       }
-      const name = currentAgent.manifest.name;
-      currentAgent = null;
-      currentRef = null;
-      lastFeedbackFingerprint = null;
+      const name = state.currentAgent.manifest.name;
+      state.currentAgent = null;
+      state.currentRef = null;
+      state.lastFeedbackFingerprint = null;
       pi.appendEntry("gitagent-unloaded", {});
-      ctx.ui.setStatus("gitagent", undefined);
+      setAgentStatus(ctx.ui, null);
       return {
-        content: [
-          { type: "text", text: `Unloaded ${name}. Agent context removed.` },
-        ],
+        content: [{ type: "text", text: `Unloaded ${name}. Agent context removed.` }],
         details: { unloaded: name },
       };
     },
   });
 
-  pi.registerTool({
+  unsafePi.registerTool({
     name: "gitagent_info",
     label: "Agent Info",
     description: "Show information about the currently loaded gitagent agent.",
@@ -590,17 +674,15 @@ export default function piGitagent(pi: ExtensionAPI) {
       "Show the currently loaded gitagent agent's name, model, skills, and memory status.",
     parameters: Type.Object({}),
     async execute() {
-      if (!currentAgent) {
+      if (!state.currentAgent) {
         return {
           content: [{ type: "text", text: "No agent loaded." }],
           details: {},
         };
       }
-      const info = buildAgentInfo(currentAgent);
+      const info = buildAgentInfo(state.currentAgent);
       const text = Object.entries(info)
-        .map(
-          ([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") || "none" : v}`,
-        )
+        .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(" | ") || "none" : value}`)
         .join("\n");
       return {
         content: [{ type: "text", text }],
@@ -609,46 +691,44 @@ export default function piGitagent(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  unsafePi.registerTool({
     name: "gitagent_list",
     label: "List Agents",
-    description:
-      "List available gitagent agents in a directory or GitHub repo.",
-    promptSnippet:
-      "List available gitagent agents in a local directory or GitHub repo.",
+    description: "List available gitagent agents in a directory or GitHub repo.",
+    promptSnippet: "List available gitagent agents in a local directory or GitHub repo.",
     parameters: Type.Object({
       ref: Type.Optional(
         Type.String({
-          description:
-            "Directory or GitHub reference to list. Defaults to current working directory.",
+          description: "Directory or GitHub reference to list. Defaults to current working directory.",
         }),
       ),
     }),
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+    async execute(
+      _toolCallId: string,
+      params: { ref?: string },
+      _signal: AbortSignal | undefined,
+      _onUpdate: unknown,
+      ctx: UiContext,
+    ) {
       try {
         const agents = getAgentList(params.ref ?? ctx.cwd, ctx.cwd);
         if (agents.length === 0) {
           return {
-            content: [{ type: "text", text: `No agents found` }],
+            content: [{ type: "text", text: "No agents found" }],
             details: {},
           };
         }
         return {
-          content: [
-            {
-              type: "text",
-              text: `Available agents:\n${agents.map((a) => `  ${a}`).join("\n")}`,
-            },
-          ],
+          content: [{ type: "text", text: `Available agents:\n${agents.map((agent) => `  ${agent}`).join("\n")}` }],
           details: { agents },
         };
-      } catch (err) {
-        throw new Error(`Failed to list agents: ${(err as Error).message}`);
+      } catch (error) {
+        throw new Error(`Failed to list agents: ${(error as Error).message}`);
       }
     },
   });
 
-  pi.registerTool({
+  unsafePi.registerTool({
     name: "gitagent_remember",
     label: "Remember",
     description:
@@ -660,35 +740,27 @@ export default function piGitagent(pi: ExtensionAPI) {
     ],
     parameters: Type.Object({
       learning: Type.String({
-        description:
-          "The learning to save. Be concise, one fact or pattern per entry.",
+        description: "The learning to save. Be concise, one fact or pattern per entry.",
       }),
     }),
-    async execute(_toolCallId, params) {
-      if (!currentAgent) {
-        throw new Error(
-          "No agent loaded. Load an agent first with gitagent_load.",
-        );
+    async execute(_toolCallId: string, params: { learning: string }) {
+      if (!state.currentAgent) {
+        throw new Error("No agent loaded. Load an agent first with gitagent_load.");
       }
       const entry = `- ${todayIsoDate()}: ${params.learning}`;
-      saveAgentMemoryEntry(currentAgent, entry);
+      saveAgentMemoryEntry(state, state.currentAgent, entry);
       return {
-        content: [
-          {
-            type: "text",
-            text: `Saved to ${currentAgent.manifest.name}'s memory.`,
-          },
-        ],
-        details: { agent: currentAgent.manifest.name, entry },
+        content: [{ type: "text", text: `Saved to ${state.currentAgent.manifest.name}'s memory.` }],
+        details: { agent: state.currentAgent.manifest.name, entry },
       };
     },
   });
 
-  // ── /gitagent command (TUI) ────────────────────────────────────────────
+  // ── /gitagent command ────────────────────────────────────────────────
 
-  pi.registerCommand("gitagent", {
+  unsafePi.registerCommand("gitagent", {
     description: "Load a gitagent agent into this session",
-    handler: async (args, ctx) => {
+    handler: async (args: string | undefined, ctx: UiContext) => {
       const parts = (args ?? "").trim().split(/\s+/);
       const subcommand = parts[0] || "";
       const rest = parts.slice(1).join(" ").trim();
@@ -704,26 +776,24 @@ export default function piGitagent(pi: ExtensionAPI) {
             activateAgent(agent, rest, ctx);
             const switched = await switchModel(agent, ctx);
             const modelName = agent.manifest.model?.preferred ?? "default";
-            const skillNames =
-              agent.skills.map((s) => s.name).join(", ") || "none";
+            const skillNames = agent.skills.map((skill) => skill.name).join(", ") || "none";
+            const policyMode = getRuntimePolicy(agent).mode;
             ctx.ui.notify(
-              `Loaded ${agent.manifest.name} (model: ${modelName}, skills: ${skillNames})`,
+              `Loaded ${agent.manifest.name} (model: ${modelName}, skills: ${skillNames}, policy: ${policyMode})`,
               "info",
             );
-            if (switched)
+            if (switched) {
               ctx.ui.notify(`Switched model to ${modelName}`, "info");
-          } catch (err) {
-            ctx.ui.notify(`${(err as Error).message}`, "error");
+            }
+          } catch (error) {
+            ctx.ui.notify(`${(error as Error).message}`, "error");
           }
           return;
         }
 
         case "new": {
           if (!rest) {
-            ctx.ui.notify(
-              "Usage: /gitagent new <prompt describing the agent to create>",
-              "error",
-            );
+            ctx.ui.notify("Usage: /gitagent new <prompt describing the agent to create>", "error");
             return;
           }
           handleNew(pi, ctx, rest);
@@ -735,9 +805,53 @@ export default function piGitagent(pi: ExtensionAPI) {
           return;
         }
 
+        case "recommend": {
+          if (!rest) {
+            ctx.ui.notify("Usage: /gitagent recommend <task description>", "error");
+            return;
+          }
+          try {
+            const recommendations = recommendAgents(rest, ctx.cwd);
+            ctx.ui.notify(formatRecommendations(recommendations), "info");
+          } catch (error) {
+            ctx.ui.notify(`Recommendation failed: ${(error as Error).message}`, "error");
+          }
+          return;
+        }
+
+        case "doctor": {
+          try {
+            const agent = rest ? resolveAndLoad(rest, ctx.cwd) : state.currentAgent;
+            if (!agent) {
+              ctx.ui.notify("No agent loaded. Use /gitagent doctor <ref> or load an agent first.", "error");
+              return;
+            }
+            const report = runDoctor(agent, ctx.modelRegistry, mapModel);
+            ctx.ui.notify(formatDoctorReport(report), report.ok ? "info" : "error");
+          } catch (error) {
+            ctx.ui.notify(`Doctor failed: ${(error as Error).message}`, "error");
+          }
+          return;
+        }
+
+        case "policy": {
+          if (!state.currentAgent) {
+            ctx.ui.notify("No agent loaded.", "info");
+            return;
+          }
+          ctx.ui.notify(
+            [
+              `Runtime policy for ${state.currentAgent.manifest.name}:`,
+              ...formatPolicySummary(state.currentAgent).map((line) => `  ${line}`),
+            ].join("\n"),
+            "info",
+          );
+          return;
+        }
+
         case "info": {
-          if (currentAgent) {
-            showAgentInfo(ctx, currentAgent);
+          if (state.currentAgent) {
+            showAgentInfo(ctx, state.currentAgent);
           } else {
             ctx.ui.notify("No agent loaded.", "info");
           }
@@ -745,35 +859,33 @@ export default function piGitagent(pi: ExtensionAPI) {
         }
 
         case "refresh": {
-          if (!currentAgent || !currentRef) {
+          if (!state.currentAgent || !state.currentRef) {
             ctx.ui.notify("No agent loaded.", "info");
             return;
           }
           try {
-            resolveAgent(currentRef, { refresh: true, cwd: ctx.cwd });
-            currentAgent = resolveAndLoad(currentRef, ctx.cwd);
+            resolveAgent(state.currentRef, { refresh: true, cwd: ctx.cwd });
+            state.currentAgent = resolveAndLoad(state.currentRef, ctx.cwd);
+            setAgentStatus(ctx.ui, state.currentAgent);
             ctx.ui.notify(
-              `Refreshed ${currentAgent.manifest.name}. Takes effect on next prompt.`,
+              `Refreshed ${state.currentAgent.manifest.name}. Takes effect on next prompt.`,
               "info",
             );
-          } catch (err) {
-            ctx.ui.notify(`Refresh failed: ${(err as Error).message}`, "error");
+          } catch (error) {
+            ctx.ui.notify(`Refresh failed: ${(error as Error).message}`, "error");
           }
           return;
         }
 
         case "unload": {
-          if (currentAgent) {
-            const name = currentAgent.manifest.name;
-            currentAgent = null;
-            currentRef = null;
-            lastFeedbackFingerprint = null;
+          if (state.currentAgent) {
+            const name = state.currentAgent.manifest.name;
+            state.currentAgent = null;
+            state.currentRef = null;
+            state.lastFeedbackFingerprint = null;
             pi.appendEntry("gitagent-unloaded", {});
-            ctx.ui.notify(
-              `Unloaded ${name}. Takes effect on next prompt.`,
-              "info",
-            );
-            ctx.ui.setStatus("gitagent", undefined);
+            setAgentStatus(ctx.ui, null);
+            ctx.ui.notify(`Unloaded ${name}. Takes effect on next prompt.`, "info");
           } else {
             ctx.ui.notify("No agent loaded.", "info");
           }
@@ -788,172 +900,62 @@ export default function piGitagent(pi: ExtensionAPI) {
     },
   });
 
-  // ── New agent handler (temporary architect swap) ───────────────────────
+  // ── Architect restore and audits ─────────────────────────────────────
 
-  function handleNew(
-    pi: ExtensionAPI,
-    ctx: {
-      ui: {
-        notify: (msg: string, type: string) => void;
-        setStatus: (key: string, text: string | undefined) => void;
-      };
-      cwd: string;
-    },
-    prompt: string,
-  ) {
-    try {
-      pendingRestore = { agent: currentAgent, ref: currentRef };
-
-      currentAgent = resolveAndLoad(ARCHITECT_REF, ctx.cwd);
-      currentRef = null;
-
-      ctx.ui.setStatus(
-        "gitagent",
-        `🤖 ${currentAgent.manifest.name} (creating...)`,
-      );
-      ctx.ui.notify("Loaded architect agent. Creating your agent...", "info");
-
-      pi.sendUserMessage(prompt);
-    } catch (err) {
-      pendingRestore = null;
-      ctx.ui.notify(
-        `Failed to load architect: ${(err as Error).message}`,
-        "error",
-      );
-    }
-  }
-
-  // Auto-restore previous agent when the architect finishes its turn
-  pi.on("agent_end", async (_event, ctx: any) => {
-    if (!pendingRestore) {
+  unsafePi.on("agent_end", async (_event: unknown, ctx: UiContext) => {
+    if (!state.pendingRestore) {
       auditAutoFeedback(ctx);
       auditSkillUsage(ctx);
       return;
     }
 
-    const restore = pendingRestore;
-    pendingRestore = null;
+    const restore = state.pendingRestore;
+    state.pendingRestore = null;
 
-    currentAgent = restore.agent;
-    currentRef = restore.ref;
-    lastSkillAuditFingerprint = null;
-    lastFeedbackFingerprint = null;
-    skillEnforcementStreak = 0;
+    state.currentAgent = restore.agent;
+    state.currentRef = restore.ref;
+    state.lastSkillAuditFingerprint = null;
+    state.lastFeedbackFingerprint = null;
+    state.skillEnforcementStreak = 0;
 
-    if (currentAgent) {
-      ctx.ui.setStatus("gitagent", `🤖 ${currentAgent.manifest.name}`);
-      ctx.ui.notify(
-        `Architect finished. Restored ${currentAgent.manifest.name}.`,
-        "info",
-      );
+    setAgentStatus(ctx.ui, state.currentAgent);
+    if (state.currentAgent) {
+      ctx.ui.notify(`Architect finished. Restored ${state.currentAgent.manifest.name}.`, "info");
     } else {
-      ctx.ui.setStatus("gitagent", undefined);
-      ctx.ui.notify(
-        "Architect finished. No previous agent to restore.",
-        "info",
-      );
+      ctx.ui.notify("Architect finished. No previous agent to restore.", "info");
     }
   });
 
-  // ── Auto-save session context to memory on shutdown ─────────────────
+  // ── Auto-save session context to memory on shutdown ──────────────────
 
-  pi.on("session_shutdown", async (_event, ctx) => {
-    if (!currentAgent) return;
-    if (rememberedThisSession) return; // LLM already saved learnings explicitly
+  unsafePi.on("session_shutdown", async (_event: unknown, ctx: UiContext) => {
+    if (!state.currentAgent) return;
+    if (state.rememberedThisSession) return;
 
-    // Extract user messages to determine if this was a non-trivial session
-    const entries = ctx.sessionManager.getBranch();
+    const entries = ctx.sessionManager?.getBranch() ?? [];
     const userMessages: string[] = [];
-    for (const entry of entries) {
+    for (const rawEntry of entries) {
+      const entry = rawEntry as { type?: string; message?: { role?: string; content?: unknown } };
       if (entry.type !== "message") continue;
-      const msg = (entry as any).message;
-      if (msg?.role === "user") {
-        const text = extractText(msg.content);
-        if (text) userMessages.push(text);
-      }
+      if (entry.message?.role !== "user") continue;
+      const text = extractText(entry.message.content);
+      if (text) userMessages.push(text);
     }
 
-    // Skip trivial sessions (greetings, single questions, etc.)
     if (userMessages.length < 2) return;
 
-    const date = new Date().toISOString().split("T")[0];
-    const topic = userMessages[0].slice(0, 120);
     appendToMemory(
-      currentAgent,
-      `- ${date}: [auto] Session ended without explicit memory save. Topic: "${topic}"`,
+      state.currentAgent,
+      `- ${todayIsoDate()}: [auto] Session ended without explicit memory save. Topic: "${userMessages[0]?.slice(0, 120) ?? ""}"`,
     );
   });
 
-  // ── System prompt injection ────────────────────────────────────────────
+  // ── System prompt injection ──────────────────────────────────────────
 
-  pi.on("before_agent_start", async (event) => {
-    if (!currentAgent) return undefined;
-
+  unsafePi.on("before_agent_start", async (event: { systemPrompt: string }) => {
+    if (!state.currentAgent) return undefined;
     return {
-      systemPrompt:
-        event.systemPrompt + "\n\n" + currentAgent.systemPromptAppend,
+      systemPrompt: event.systemPrompt + "\n\n" + state.currentAgent.systemPromptAppend,
     };
   });
-
-  // ── Helpers ────────────────────────────────────────────────────────────
-
-  function buildAgentInfo(agent: LoadedAgent) {
-    const feedbackCfg = getFeedbackHookConfig(agent);
-    return {
-      name: agent.manifest.name,
-      version: agent.manifest.version,
-      description: agent.manifest.description,
-      model: agent.manifest.model?.preferred ?? "default",
-      skills: agent.skills.map((s) => s.name),
-      memory: agent.memory ? "has content" : "empty",
-      source: agent.dir,
-      skill_verification_hook:
-        agent.skills.length > 0
-          ? `active (strict mode: auto follow-up enforcement, max streak ${SKILL_ENFORCEMENT_MAX_STREAK})`
-          : "inactive (no skills loaded)",
-      feedback_memory_hook: feedbackCfg.enabled
-        ? `active (min_confidence=${feedbackCfg.minConfidence}, max_chars=${feedbackCfg.maxChars}, redact_sensitive=${feedbackCfg.redactSensitive})`
-        : "inactive (set metadata.feedback_memory_hook.enabled=true in agent.yaml)",
-    };
-  }
-
-  function showAgentInfo(
-    ctx: { ui: { notify: (msg: string, type: string) => void } },
-    agent: LoadedAgent,
-  ) {
-    const info = buildAgentInfo(agent);
-    const lines = Object.entries(info).map(
-      ([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") || "none" : v}`,
-    );
-    ctx.ui.notify(lines.join("\n"), "info");
-  }
-
-  function getAgentList(ref: string, cwd: string): string[] {
-    const dir = ref === cwd ? cwd : resolveDir(ref, { cwd });
-    const isRoot = existsSync(join(dir, "agent.yaml"));
-    const subs = listAgentsInDir(dir);
-    const agents: string[] = [];
-    if (isRoot) agents.push(". (root agent)");
-    agents.push(...subs);
-    return agents;
-  }
-
-  function handleList(
-    ctx: { ui: { notify: (msg: string, type: string) => void }; cwd: string },
-    ref?: string,
-  ) {
-    try {
-      const agents = getAgentList(ref ?? ctx.cwd, ctx.cwd);
-      if (agents.length === 0) {
-        ctx.ui.notify(`No agents found`, "info");
-        return;
-      }
-      ctx.ui.notify(
-        `Available agents:\n${agents.map((a) => `  ${a}`).join("\n")}`,
-        "info",
-      );
-    } catch (err) {
-      ctx.ui.notify(`${(err as Error).message}`, "error");
-    }
-  }
 }

@@ -81,6 +81,18 @@ tags:
   - developer-experience
 metadata:
   category: developer-tools
+  beginner_friendly: true
+  mutates_files: true
+  best_for:
+    - README writing
+    - docs cleanup
+    - onboarding docs
+  runtime_policy:
+    mode: supervised
+    approvals:
+      file_write: ask
+      bash_destructive: ask
+      network: ask
   feedback_memory_hook:
     enabled: true
     min_confidence: 0.9

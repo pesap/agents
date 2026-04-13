@@ -80,6 +80,21 @@ tags:
   - accessibility
 metadata:
   category: developer-tools
+  beginner_friendly: true
+  mutates_files: false
+  best_for:
+    - CLI UX reviews
+    - accessibility improvements
+    - command design
+  runtime_policy:
+    mode: supervised
+    approvals:
+      file_write: ask
+      bash_destructive: ask
+      network: ask
+    allow_tools:
+      - read
+      - bash
   feedback_memory_hook:
     enabled: true
     min_confidence: 0.85

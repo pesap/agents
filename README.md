@@ -31,6 +31,16 @@ That's it. Now you have `/gitagent` in every pi session.
 # List agents in a repo
 /gitagent list gh:pesap/agents
 
+# Recommend the best agent for a task
+/gitagent recommend "review a risky Rust refactor for bugs"
+
+# Run diagnostics on the loaded or target agent
+/gitagent doctor
+/gitagent doctor gh:pesap/agents/code-reviewer
+
+# Explain the loaded agent's runtime policy
+/gitagent policy
+
 # Show loaded agent info
 /gitagent info
 
@@ -42,6 +52,8 @@ That's it. Now you have `/gitagent` in every pi session.
 ```
 
 Loaded agents persist across sessions in the same pi session file, so you don't need to reload after restarts.
+
+The runtime now also derives a safety policy for the loaded agent. By default this comes from `metadata.runtime_policy` when present, otherwise it falls back to sensible compliance-based defaults. File edits and risky shell commands can be auto-allowed, approval-gated, or blocked per agent.
 
 ### LLM-callable tools
 
@@ -89,6 +101,44 @@ When you load an agent, pi-gitagent:
 3. Injects the agent's full identity into the system prompt
 4. Switches to the agent's preferred model
 5. Shows a status indicator in the footer
+
+## Runtime Policy, Diagnostics, and Recommendation
+
+`/gitagent policy` shows how the active agent is allowed to behave at runtime. The current implementation classifies file mutation, destructive shell commands, and networky shell commands, then decides whether to allow, ask, or block.
+
+`/gitagent doctor` validates the agent runtime, including:
+- cache and memory directories are writable
+- preferred and fallback models resolve
+- skills loaded correctly
+- feedback memory hook status
+- active runtime policy summary
+
+`/gitagent recommend <task>` scores agents in the current repo and suggests the best matches with short reasons.
+
+Optional manifest metadata:
+
+```yaml
+metadata:
+  category: developer-tools
+  beginner_friendly: true
+  mutates_files: false
+  best_for:
+    - code review
+    - security review
+  runtime_policy:
+    mode: supervised
+    approvals:
+      file_write: ask
+      bash_destructive: ask
+      network: ask
+    allow_tools:
+      - read
+      - bash
+    deny_patterns:
+      bash:
+        - rm -rf
+        - git push
+```
 
 ## Creating New Agents
 

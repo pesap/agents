@@ -82,6 +82,21 @@ tags:
   - pull-requests
 metadata:
   category: developer-tools
+  beginner_friendly: true
+  mutates_files: false
+  best_for:
+    - code review
+    - security review
+    - bug hunting
+  runtime_policy:
+    mode: read-only
+    approvals:
+      file_write: block
+      bash_destructive: ask
+      network: ask
+    allow_tools:
+      - read
+      - bash
   feedback_memory_hook:
     enabled: true
     min_confidence: 0.9
