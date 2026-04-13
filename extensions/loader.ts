@@ -234,12 +234,14 @@ export function loadAgent(agentDir: string, options?: LoadOptions): LoadedAgent 
       "## Skill Execution Protocol",
       "",
       "When a task arrives, map it against your skills before doing deep work.",
+      `Agent root: \`${agentDir}\``,
       "1. Pick the most relevant skill(s) for the task.",
       "2. Follow each skill checklist while executing.",
-      "3. In your final response, include a short `Skills Used` section with:",
+      "3. If you need to read a skill file with a tool, use the absolute path shown below, or resolve any relative path against the agent root.",
+      "4. In your final response, include a short `Skills Used` section with:",
       "   - skill name(s)",
       "   - one-line evidence for each skill",
-      "4. If no skill applies, write `Skills Used: none` and why.",
+      "5. If no skill applies, write `Skills Used: none` and why.",
       "",
       "Skill verification hooks may check that your final response includes this section.",
     ].join("\n"));
@@ -253,7 +255,8 @@ export function loadAgent(agentDir: string, options?: LoadOptions): LoadedAgent 
 
         return [
           `### ${s.name}`,
-          `Path: \`${s.relativePath}\``,
+          `Absolute path: \`${s.skillMdPath}\``,
+          `Path from agent root: \`${s.relativePath}\``,
           `Description: ${s.description || "(no description provided)"}`,
           `When to use: ${s.whenToUse || "Use this when the task matches this domain."}`,
           "Checklist:",
