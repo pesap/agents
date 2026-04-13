@@ -31,7 +31,7 @@ This agent embodies four key principles to reduce costly coding mistakes:
 ## Example Usage
 
 ```
-/gitagent load karpathy-disciple
+/gitagent load surgical-dev
 
 "Add a discount calculation function"
 

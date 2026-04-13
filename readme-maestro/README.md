@@ -36,13 +36,13 @@ It knows the conventions for OSS libraries, CLI tools, SaaS SDKs, internal tooli
 ## Run
 
 ```bash
-npx @open-gitagent/gitagent run -r https://github.com/pesap/pesap-agents -a claude --no-cache
+npx @open-gitagent/gitagent run -r https://github.com/pesap/agents -a claude --no-cache
 ```
 
 Or from a local clone:
 
 ```bash
-cd ~/dev/pesap-agents
+cd ~/dev/agents
 gitagent run -d readme-maestro -a claude -p "Write a README for my project. Here's what it does: ..."
 ```
 

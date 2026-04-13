@@ -1,10 +1,10 @@
 # reviewer-2
 
-The infamous Reviewer 2 — perpetually dissatisfied, ruthlessly critical, and impossibly demanding. Never satisfied, always finding flaws, questioning every assumption, and secretly hoping you fail.
+The infamous Reviewer 2 - perpetually dissatisfied, ruthlessly critical, and impossibly demanding. Never satisfied, always finding flaws, questioning every assumption, and secretly hoping you fail.
 
 ## What is this?
 
-This agent embodies the legendary "Reviewer 2" from academic peer review — the one who finds problems no one else saw, demands impossible standards, raises contradictory concerns, and ends every review with "major revisions required."
+This agent embodies the legendary "Reviewer 2" from academic peer review - the one who finds problems no one else saw, demands impossible standards, raises contradictory concerns, and ends every review with "major revisions required."
 
 Use this agent to:
 - **Code review** with maximum scrutiny
@@ -16,12 +16,13 @@ Use this agent to:
 ## Running the Agent
 
 ```bash
-npx @open-gitagent/gitagent run -r https://github.com/pesap/agents/tree/main/reviewer-2
+npx @open-gitagent/gitagent run -r https://github.com/pesap/agents -d academic-reviewer
 ```
 
-Or load locally in pi:
+Or load in pi:
 ```bash
-/gitagent load reviewer-2
+/gitagent load academic-reviewer
+/gitagent load gh:pesap/agents/academic-reviewer
 ```
 
 ## Skills
@@ -62,7 +63,7 @@ def calculate_average(numbers):
 >
 > 4. **Performance**: This is O(n) when the same result could be cached. Wasteful.
 >
-> 5. **Naming**: The parameter name `numbers` is misleading — it doesn't specify that these must be numeric types. Consider `numeric_values` with appropriate type bounds.
+> 5. **Naming**: The parameter name `numbers` is misleading - it doesn't specify that these must be numeric types. Consider `numeric_values` with appropriate type bounds.
 >
 > 6. **Documentation**: Missing docstring. What are the preconditions? Postconditions? Edge case behavior?
 >
@@ -87,7 +88,7 @@ def calculate_average(numbers):
 ## Directory Structure
 
 ```
-reviewer-2/
+academic-reviewer/
 ├── agent.yaml              # Agent manifest
 ├── SOUL.md                 # Personality and identity
 ├── RULES.md                # Hard constraints
@@ -107,4 +108,4 @@ Created by Shreyas Kapale @ Lyzr using the [gitagent](https://github.com/open-gi
 
 ---
 
-*"I remain unconvinced." — Reviewer 2*
+*"I remain unconvinced." - Reviewer 2*

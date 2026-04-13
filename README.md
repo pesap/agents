@@ -2,6 +2,8 @@
 
 A collection of AI agents built with [gitagent](https://github.com/open-gitagent/gitagent), plus **pi-gitagent**: a [pi](https://github.com/badlogic/pi-mono) extension that loads any gitagent agent into your session.
 
+Current repo stats: **14 agents**, **57 skills**, **36 knowledge files**, and **1 pi extension** for `/gitagent`.
+
 ## Install
 
 ```bash
@@ -26,7 +28,7 @@ That's it. Now you have `/gitagent` in every pi session.
 /gitagent run simplify -- review this diff for duplication and complexity
 
 # Chain agents sequentially, passing the previous output forward
-/gitagent chain simplify reviewer-2 surgical-dev -- review this diff, refine the findings, then implement the fix
+/gitagent chain simplify academic-reviewer surgical-dev -- review this diff, refine the findings, then implement the fix
 
 # Load any gitagent repo
 /gitagent load gh:shreyas-lyzr/architect
@@ -196,14 +198,20 @@ The LLM saves learnings by calling the `gitagent_remember` tool, and feedback ca
 
 | Agent | Description |
 |-------|-------------|
+| [academic-reviewer](./academic-reviewer) (`reviewer-2`) | Ruthless code and architecture critique |
+| [cli-ux-guru](./cli-ux-guru) | CLI UX, output formatting, and error-message design |
 | [code-reviewer](./code-reviewer) | Analyzes code for bugs, security issues, performance, and style |
-| [performance-freak](./performance-freak) | Optimizes code for speed and memory efficiency |
-| [simplify](./simplify) | Reviews code for reuse, quality, and efficiency |
+| [data-modeler](./data-modeler) | Expert data modeler for Pydantic v2 and infrasys |
+| [decomplexify](./decomplexify) | First-principles breakdowns with Feynman-style explanations |
+| [dslop](./dslop) | Multi-agent review-readiness pass before commit |
 | [github-ci-optimizer](./github-ci-optimizer) | Optimizes GitHub Actions CI |
-| [data-modeler](./data-modeler) | Expert data modeler (Pydantic v2, infrasys) |
-| [decomplexify](./decomplexify) | First principles + Feynman technique |
-| [optimization-modeler](./optimization-modeler) | Simplifies formulations, tunes solvers |
-| [dslop](./dslop) | Multi-agent pre-commit deslop pass with Python and Rust overlays |
+| [infrasys-god](./infrasys-god) | Deep infrasys modeling, storage, and migration expertise |
+| [optimization-modeler](./optimization-modeler) | Simplifies formulations and tunes solvers |
+| [performance-freak](./performance-freak) | Optimizes code for speed and memory efficiency |
+| [pytest-whisperer](./pytest-whisperer) | Writes and tunes pytest suites, including performance tests |
+| [readme-maestro](./readme-maestro) | Crafts README files and docs that are easy to scan and use |
+| [simplify](./simplify) | Reviews code for reuse, quality, and efficiency |
+| [surgical-dev](./surgical-dev) | Minimal, verified code changes guided by Karpathy-style principles |
 
 ## Try without installing
 
