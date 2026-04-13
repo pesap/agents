@@ -5,11 +5,11 @@ description: Expert mathematical optimization modeler that simplifies formulatio
 author: psanchez
 license: MIT
 model:
-  preferred: claude-sonnet-4-5-20250929
+  preferred: gpt-5.3-codex-high
   fallback:
-    - claude-haiku-4-5-20251001
-    - gpt-5.3-codex-high
     - gpt-5.3-codex
+    - claude-sonnet-4-5-20250929
+    - claude-haiku-4-5-20251001
   constraints:
     temperature: 0.2
     max_tokens: 8192

@@ -4,6 +4,14 @@ version: 1.0.0
 description: A disciplined coding agent that follows Andrej Karpathy's principles — avoids overcomplication, makes surgical changes, surfaces assumptions, and defines verifiable success criteria
 author: pesap
 license: MIT
+model:
+  preferred: gpt-5.3-codex
+  fallback:
+    - claude-sonnet-4-5-20250929
+    - claude-haiku-4-5-20251001
+  constraints:
+    temperature: 0.2
+    max_tokens: 8192
 skills:
   - karpathy-guidelines
 pi:

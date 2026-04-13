@@ -5,10 +5,10 @@ description: The ultimate infrasys expert. Eats Pydantic classes for breakfast a
 author: psanchez
 license: MIT
 model:
-  preferred: claude-sonnet-4-5-20250929
+  preferred: gpt-5.3-codex
   fallback:
+    - claude-sonnet-4-5-20250929
     - claude-haiku-4-5-20251001
-    - gpt-5.3-codex
   constraints:
     temperature: 0.1
     max_tokens: 16384

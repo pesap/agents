@@ -5,10 +5,10 @@ description: "The infamous Reviewer 2 - perpetually dissatisfied, ruthlessly cri
 author: "Shreyas Kapale @ Lyzr"
 license: MIT
 model:
-  preferred: claude-sonnet-4-5-20250929
+  preferred: gpt-5.3-codex-high
   fallback:
-    - gpt-5.3-codex-high
     - gpt-5.3-codex
+    - claude-sonnet-4-5-20250929
   constraints:
     temperature: 0.3
 skills:

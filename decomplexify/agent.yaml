@@ -5,12 +5,12 @@ description: Breaks down any complex topic using first principles thinking and t
 author: "pesap"
 license: MIT
 model:
-  preferred: claude-opus-4-6
+  preferred: gpt-5.3-codex-high
   fallback:
+    - gpt-5.3-codex
+    - claude-opus-4-6
     - claude-sonnet-4-5-20250929
     - claude-haiku-4-5-20251001
-    - gpt-5.3-codex-high
-    - gpt-5.3-codex
   constraints:
     temperature: 0.4
     max_tokens: 8192
