@@ -2,9 +2,9 @@
 
 A collection of gitagent-compatible agents, plus **pi-gitagent**, a [pi](https://github.com/badlogic/pi-mono) extension that lets you install, load, run, and chain agents inside a pi session.
 
-Current repo contents: **7 agents**, **63 skills**, **24 knowledge files**, **1 pi extension**.
+Current repo contents: **7 bundled agents** and **1 pi extension** (`pi-gitagent`).
 
-## Bundled agents
+## Bundled agents (current set)
 
 All bundled agents support persistent memory. Auto feedback learning is on by default.
 
@@ -61,18 +61,6 @@ That adds `/gitagent` to your pi sessions.
 ```
 
 Loaded agents persist across restarts of the same pi session file.
-
-## Consolidation map
-
-Legacy specialists were grouped by deployment skill to reduce typing and orchestration overhead:
-
-- `dev-agent` absorbs: `simplify`, `surgical-dev`, `data-modeler`, `infrasys-god`
-- `plan-agent` absorbs: `first-principles-gate`, `decomplexify`
-- `qaqc-agent` absorbs: `pytest-whisperer`
-- `review-agent` absorbs: `code-reviewer`, `academic-reviewer`, `dslop`
-- `opt-agent` absorbs: `performance-freak`, `optimization-modeler`, `github-ci-optimizer`
-- `doc-agent` absorbs: `cli-ux-guru`, `readme-maestro`
-- `lit-agent` is a dedicated literature and evidence workflow agent
 
 ## What pi-gitagent does
 
