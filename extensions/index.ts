@@ -999,29 +999,39 @@ async function handleDebug(pi: ExtensionAPI, args: string, ctx: ExtensionCommand
   }
 
   ensureAgentEnabledForCommand(pi, ctx, "debug");
-
+  const subagentAvailable = hasSubagentTool(pi);
+  const parallelTarget = subagentAvailable ? parsed.parallel : 1;
+  const applyFixMode = parsed.fix ? "yes" : "no";
+  const debugInstruction = subagentAvailable
+    ? "Instruction: If the subagent tool is available, run parallel hypothesis investigations and synthesize findings before selecting a fix."
+    : "Instruction: pi-subagents is not installed in this session, run hypothesis investigations sequentially without subagent delegation.";
+  const subagentMode = subagentAvailable ? "on" : "off";
+  const fixMode = parsed.fix ? "on" : "off";
   await beginWorkflowTracking(pi, ctx, "debug", parsed.problem, {
-    parallel: parsed.parallel,
+    parallel: parallelTarget,
     fix: parsed.fix,
+    subagentAvailable,
   });
-
   await enqueueWorkflow(pi, "debug-workflow.md", "debug-workflow.yaml", [
     `User problem: ${parsed.problem}`,
-    `Parallel subagents target: ${parsed.parallel}`,
-    `Apply fix: ${parsed.fix ? "yes" : "no"}`,
+    `Parallel subagents target: ${parallelTarget}`,
+    `Apply fix: ${applyFixMode}`,
     "",
-    "Instruction: If the subagent tool is available, run parallel hypothesis investigations and synthesize findings before selecting a fix.",
+    debugInstruction,
     "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`.",
   ]);
-
   pi.appendEntry("pesap-debug-command", {
     problem: parsed.problem,
-    parallel: parsed.parallel,
+    parallel: parallelTarget,
     fix: parsed.fix,
+    subagentAvailable,
     at: nowIso(),
   });
+  if (!subagentAvailable) {
+    notify(ctx, "pi-subagents not detected, running /debug in single-agent mode.", "warning");
+  }
 
-  notify(ctx, `Started debug workflow (parallel=${parsed.parallel}, fix=${parsed.fix ? "on" : "off"}).`, "info");
+  notify(ctx, `Started debug workflow (parallel=${parallelTarget}, fix=${fixMode}, subagents=${subagentMode}).`, "info");
 }
 
 async function handleFeature(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {

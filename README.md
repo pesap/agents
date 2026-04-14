@@ -18,7 +18,7 @@ pi -e https://github.com/pesap/agents
 
 - `/start-agent` - initialize pesap-agent context injection in the current session
 - `/end-agent` - stop pesap-agent context injection in the current session
-- `/debug <problem> [--parallel N] [--fix]`
+- `/debug <problem> [--parallel N] [--fix]` (auto-initializes the agent if needed, and parallel delegation falls back to single-agent mode when pi-subagents is unavailable)
 - `/feature <request> [--parallel N] [--ship]` (auto-initializes the agent if needed, and parallel delegation falls back to single-agent mode when pi-subagents is unavailable)
 - `/learn-skill <topic> [--from-file path] [--from-url url] [--dry-run]`
 - `/review [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>] [--extra "focus"]` (adapted from `https://github.com/earendil-works/pi-review`)
