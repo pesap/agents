@@ -1,9 +1,0 @@
-documents:
-  - path: secure-coding-patterns.md
-    always_load: true
-  - path: owasp-top-10.md
-    always_load: true
-  - path: common-critiques.md
-    always_load: false
-  - path: review-template.md
-    always_load: false

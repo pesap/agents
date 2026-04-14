@@ -1,5 +1,0 @@
-documents:
-  - path: first-principles-guide.md
-    always_load: true
-  - path: feynman-technique.md
-    always_load: false
