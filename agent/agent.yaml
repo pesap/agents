@@ -14,8 +14,11 @@ model:
 skills:
   - debug-investigation
   - feature-delivery
-  - skill-authoring
+  - skill-creator
   - github
+  - simplify
+  - caveman
+  - surgical-dev
 pi:
   scope: project
   tools: "read,edit,write,grep,ast_search,nu,bash,subagent,gitagent_remember"

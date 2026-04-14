@@ -10,4 +10,4 @@ documents:
   - path: skillflows/feature-workflow.yaml
     purpose: feature orchestration
   - path: skillflows/learn-skill-workflow.yaml
-    purpose: skill authoring orchestration
+    purpose: skill creation orchestration

@@ -1,0 +1,16 @@
+name: simplify-workflow
+version: 1
+objective: Simplify scoped code safely while preserving exact behavior
+steps:
+  - id: scope
+    action: confirm_target_scope_and_constraints
+  - id: standards
+    action: load_project_conventions_for_style_and_safety
+  - id: simplify
+    action: reduce_complexity_without_semantic_change
+  - id: validate
+    action: run_targeted_checks_for_touched_paths
+  - id: report
+    action: summarize_changes_validation_and_risks
+  - id: learn
+    action: persist_simplification_learnings

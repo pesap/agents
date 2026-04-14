@@ -16,11 +16,14 @@ pi -e https://github.com/pesap/agents
 
 ## Included commands
 
-- `/start-agent` - enable pesap-agent workflow mode in the current session
-- `/end-agent` - pause pesap-agent workflow mode in the current session
+- `/start-agent` - initialize pesap-agent context injection in the current session
+- `/end-agent` - stop pesap-agent context injection in the current session
 - `/debug <problem> [--parallel N] [--fix]`
-- `/feature <request> [--parallel N] [--ship]` (parallel delegation auto-falls back to single-agent mode when pi-subagents is unavailable)
+- `/feature <request> [--parallel N] [--ship]` (auto-initializes the agent if needed, and parallel delegation falls back to single-agent mode when pi-subagents is unavailable)
 - `/learn-skill <topic> [--from-file path] [--from-url url] [--dry-run]`
+- `/review [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>] [--extra "focus"]` (adapted from `https://github.com/earendil-works/pi-review`)
+- `/simplify [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>] [--extra "focus"]` (code simplification workflow, behavior-preserving)
+- `/reaview ...` - alias for `/review`
 
 ## Self-learning storage
 
@@ -40,7 +43,7 @@ Stored artifacts:
 ## Package layout
 
 - `extensions/index.ts` - command and workflow orchestration extension
-- `pesap-agent/` - gitagent-style single agent definition
+- `agent/` - gitagent-style single agent definition
 - `commands/` - workflow prompt templates
 - `themes/` - optional themes (empty by default)
 

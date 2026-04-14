@@ -1,0 +1,18 @@
+name: review-workflow
+version: 1
+objective: Run a scoped code review with prioritized, actionable findings and a clear verdict
+steps:
+  - id: scope
+    action: confirm_review_target_and_constraints
+  - id: collect
+    action: gather_required_diff_or_snapshot_context
+  - id: inspect
+    action: evaluate_correctness_security_performance_maintainability
+  - id: findings
+    action: emit_prioritized_findings_with_file_references
+  - id: verdict
+    action: produce_correct_or_needs_attention_verdict
+  - id: callouts
+    action: append_human_reviewer_callouts_non_blocking
+  - id: learn
+    action: persist_review_learnings

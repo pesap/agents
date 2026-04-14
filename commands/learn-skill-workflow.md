@@ -4,7 +4,8 @@ You are running the pesap `/learn-skill` workflow.
 
 Requirements:
 - Be concise.
-- Create a reusable skill with clear trigger conditions.
-- Include when-to-use and when-not-to-use guidance.
-- Keep instructions compact and safe by default.
+- Build or improve a reusable skill with explicit trigger behavior.
+- Ask clarifying questions when scope, trigger, or output format is ambiguous.
+- Keep instructions compact, safe, and generalizable (no overfitting).
+- For non-trivial skills, propose 2-3 realistic test prompts.
 - End with: skill summary, generated artifacts, learnings, `Result: success|partial|failed`, and `Confidence: 0..1`.

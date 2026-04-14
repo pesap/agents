@@ -1,16 +1,15 @@
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { randomUUID } from "node:crypto";
-import { promises as fs } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const AGENT_DIR = path.join(PACKAGE_ROOT, "pesap-agent");
+const AGENT_DIR = resolveAgentDir(PACKAGE_ROOT);
 const SKILLFLOWS_DIR = path.join(AGENT_DIR, "skillflows");
 const COMMANDS_DIR = path.join(PACKAGE_ROOT, "commands");
 
-const BOOTSTRAP_MARKER = "pesap-bootstrap-injected";
 const AGENT_STATE_TYPE = "pesap-agent-state";
 
 const DEFAULT_DEBUG_PARALLEL = 3;
@@ -23,8 +22,23 @@ const PROMOTION_MIN_OBSERVATIONS = 3;
 const PROMOTION_SUCCESS_THRESHOLD = 0.75;
 const PROMOTION_IMPROVEMENT_THRESHOLD = 0.4;
 
-type WorkflowType = "debug" | "feature" | "learn-skill";
+type WorkflowType = "debug" | "feature" | "review" | "simplify" | "learn-skill";
 type WorkflowOutcome = "success" | "partial" | "failed";
+
+const REVIEW_COMMAND_SOURCE = "https://github.com/earendil-works/pi-review";
+const SIMPLIFY_COMMAND_SOURCE = "https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-simplifier/agents/code-simplifier.md";
+
+type ReviewMode = "uncommitted" | "branch" | "commit" | "pr" | "folder";
+
+interface ParsedReviewArgs {
+  mode: ReviewMode;
+  branch?: string;
+  commit?: string;
+  pr?: string;
+  paths?: string[];
+  extraInstruction?: string;
+  error?: string;
+}
 
 interface PendingWorkflow {
   id: string;
@@ -72,7 +86,7 @@ interface LearningState {
 }
 
 let pendingWorkflow: PendingWorkflow | null = null;
-let agentEnabled = true;
+let agentEnabled = false;
 const learningPathCache = new Map<string, LearningPaths>();
 
 function normalizeWhitespace(value: string): string {
@@ -86,6 +100,11 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
   return normalized || "new-skill";
+}
+
+function resolveAgentDir(packageRoot: string): string {
+  const candidates = ["agent", "pesap-agent"].map((name) => path.join(packageRoot, name));
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
 }
 
 function nowIso(): string {
@@ -133,20 +152,18 @@ async function appendLine(filePath: string, line: string): Promise<void> {
   await fs.appendFile(filePath, `${line}\n`, "utf8");
 }
 
-function hasCustomMarker(ctx: ExtensionContext, customType: string): boolean {
-  for (const entry of ctx.sessionManager.getEntries()) {
-    if (entry.type !== "custom") continue;
-    if ((entry as { customType?: string }).customType === customType) return true;
-  }
-  return false;
-}
+
 
 function getAgentEnabledFromSession(ctx: ExtensionContext): boolean {
-  let enabled = true;
+  let enabled = false;
   for (const entry of ctx.sessionManager.getEntries()) {
     if (entry.type !== "custom") continue;
-    const custom = entry as { customType?: string; data?: { enabled?: unknown } };
+    const custom = entry as { customType?: string; data?: { enabled?: unknown; initialized?: unknown } };
     if (custom.customType !== AGENT_STATE_TYPE) continue;
+    if (typeof custom.data?.initialized === "boolean") {
+      enabled = custom.data.initialized;
+      continue;
+    }
     if (typeof custom.data?.enabled === "boolean") {
       enabled = custom.data.enabled;
     }
@@ -156,7 +173,23 @@ function getAgentEnabledFromSession(ctx: ExtensionContext): boolean {
 
 function setAgentEnabledState(ctx: Pick<ExtensionContext, "hasUI" | "ui">, enabled: boolean): void {
   agentEnabled = enabled;
-  setStatus(ctx, enabled ? "pesap-agent ready" : "pesap-agent paused");
+  setStatus(ctx, enabled ? "🐉 pesap-agent enabled" : undefined);
+}
+
+function ensureAgentEnabledForCommand(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  source: WorkflowType,
+): void {
+  if (agentEnabled) return;
+  setAgentEnabledState(ctx, true);
+  pi.appendEntry(AGENT_STATE_TYPE, {
+    initialized: true,
+    enabled: true,
+    source,
+    at: nowIso(),
+  });
+  notify(ctx, `pesap-agent initialized automatically for /${source}.`, "info");
 }
 
 function removeFlag(input: string, pattern: RegExp): { value: string; match: RegExpMatchArray | null } {
@@ -220,6 +253,221 @@ function parseLearnSkillArgs(args: string): {
     fromFile,
     fromUrl,
     dryRun,
+  };
+}
+
+function tokenizeArgs(value: string): string[] {
+  const tokens: string[] = [];
+  let current = "";
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < value.length; i += 1) {
+    const char = value[i];
+
+    if (quote) {
+      if (char === "\\" && i + 1 < value.length) {
+        current += value[i + 1];
+        i += 1;
+        continue;
+      }
+
+      if (char === quote) {
+        quote = null;
+        continue;
+      }
+
+      current += char;
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      if (current) {
+        tokens.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current) tokens.push(current);
+  return tokens;
+}
+
+function parseReviewArgs(args: string, commandName = "review"): ParsedReviewArgs {
+  const usage = `Usage: /${commandName} [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>] [--extra "focus"]`;
+  const trimmed = args.trim();
+  if (!trimmed) {
+    return { mode: "uncommitted" };
+  }
+
+  const tokens = tokenizeArgs(trimmed);
+  const positional: string[] = [];
+  let extraInstruction: string | undefined;
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (token === "--extra") {
+      const extra = tokens.slice(i + 1).join(" ").trim();
+      if (!extra) {
+        return { mode: "uncommitted", error: usage };
+      }
+      extraInstruction = extra;
+      break;
+    }
+
+    positional.push(token);
+  }
+
+  if (positional.length === 0) {
+    return { mode: "uncommitted", extraInstruction };
+  }
+
+  const [modeToken, ...rest] = positional;
+  const mode = modeToken.toLowerCase();
+
+  if (mode === "uncommitted") {
+    if (rest.length > 0) {
+      return { mode: "uncommitted", error: "`uncommitted` does not accept additional arguments." };
+    }
+    return { mode: "uncommitted", extraInstruction };
+  }
+
+  if (mode === "branch") {
+    const branch = rest[0]?.trim();
+    if (!branch || rest.length !== 1) {
+      return { mode: "branch", error: `Usage: /${commandName} branch <base-branch> [--extra "focus"]` };
+    }
+    return { mode: "branch", branch, extraInstruction };
+  }
+
+  if (mode === "commit") {
+    const commit = rest[0]?.trim();
+    if (!commit || rest.length !== 1) {
+      return { mode: "commit", error: `Usage: /${commandName} commit <sha> [--extra "focus"]` };
+    }
+    return { mode: "commit", commit, extraInstruction };
+  }
+
+  if (mode === "pr") {
+    const pr = rest[0]?.trim();
+    if (!pr || rest.length !== 1) {
+      return { mode: "pr", error: `Usage: /${commandName} pr <number|url> [--extra "focus"]` };
+    }
+    return { mode: "pr", pr, extraInstruction };
+  }
+
+  if (mode === "folder") {
+    const paths = rest.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+    if (paths.length === 0) {
+      return { mode: "folder", error: `Usage: /${commandName} folder <path ...> [--extra "focus"]` };
+    }
+    return { mode: "folder", paths, extraInstruction };
+  }
+
+  return {
+    mode: "uncommitted",
+    error: usage,
+  };
+}
+
+function buildReviewTarget(parsed: ParsedReviewArgs): { summary: string; instruction: string; flags: Record<string, unknown> } {
+  if (parsed.mode === "branch") {
+    return {
+      summary: `branch ${parsed.branch}`,
+      instruction: [
+        `Review changes against base branch \`${parsed.branch}\`.`,
+        `Find merge base first, e.g. \`git merge-base HEAD ${parsed.branch}\`, then inspect diff from that SHA.`,
+      ].join(" "),
+      flags: { mode: "branch", branch: parsed.branch },
+    };
+  }
+
+  if (parsed.mode === "commit") {
+    return {
+      summary: `commit ${parsed.commit}`,
+      instruction: `Review only changes introduced by commit \`${parsed.commit}\` (use \`git show ${parsed.commit}\` or equivalent).`,
+      flags: { mode: "commit", commit: parsed.commit },
+    };
+  }
+
+  if (parsed.mode === "pr") {
+    return {
+      summary: `pull request ${parsed.pr}`,
+      instruction: [
+        `Review pull request reference \`${parsed.pr}\`.`,
+        "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch before reviewing.",
+      ].join(" "),
+      flags: { mode: "pr", pr: parsed.pr },
+    };
+  }
+
+  if (parsed.mode === "folder") {
+    const paths = parsed.paths ?? [];
+    return {
+      summary: `folders ${paths.join(", ")}`,
+      instruction: `Snapshot review only for paths: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
+      flags: { mode: "folder", paths },
+    };
+  }
+
+  return {
+    summary: "uncommitted changes",
+    instruction: "Review staged, unstaged, and untracked changes in the current workspace.",
+    flags: { mode: "uncommitted" },
+  };
+}
+
+function buildSimplifyTarget(parsed: ParsedReviewArgs): { summary: string; instruction: string; flags: Record<string, unknown> } {
+  if (parsed.mode === "branch") {
+    return {
+      summary: `branch ${parsed.branch}`,
+      instruction: [
+        `Simplify code changed against base branch \`${parsed.branch}\` while preserving exact behavior.`,
+        `Find merge base first, e.g. \`git merge-base HEAD ${parsed.branch}\`, then work from that diff scope.`,
+      ].join(" "),
+      flags: { mode: "branch", branch: parsed.branch },
+    };
+  }
+
+  if (parsed.mode === "commit") {
+    return {
+      summary: `commit ${parsed.commit}`,
+      instruction: `Simplify only code introduced by commit \`${parsed.commit}\` while keeping output and API behavior unchanged.`,
+      flags: { mode: "commit", commit: parsed.commit },
+    };
+  }
+
+  if (parsed.mode === "pr") {
+    return {
+      summary: `pull request ${parsed.pr}`,
+      instruction: [
+        `Simplify code in pull request reference \`${parsed.pr}\` with no behavior drift.`,
+        "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch first.",
+      ].join(" "),
+      flags: { mode: "pr", pr: parsed.pr },
+    };
+  }
+
+  if (parsed.mode === "folder") {
+    const paths = parsed.paths ?? [];
+    return {
+      summary: `folders ${paths.join(", ")}`,
+      instruction: `Simplify code only in paths: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
+      flags: { mode: "folder", paths },
+    };
+  }
+
+  return {
+    summary: "uncommitted changes",
+    instruction: "Simplify staged, unstaged, and untracked code in the current workspace while preserving exact functionality.",
+    flags: { mode: "uncommitted" },
   };
 }
 function hasSubagentTool(pi: ExtensionAPI): boolean {
@@ -311,9 +559,9 @@ function summarizeEvidence(text: string, max = 280): string {
   return `${compact.slice(0, max - 1).trimEnd()}…`;
 }
 
-function setStatus(ctx: Pick<ExtensionContext, "hasUI" | "ui">, label: string): void {
+function setStatus(ctx: Pick<ExtensionContext, "hasUI" | "ui">, label?: string): void {
   if (!ctx.hasUI) return;
-  ctx.ui.setStatus("pesap", `🧠 ${label}`);
+  ctx.ui.setStatus("pesap", label);
 }
 
 function notify(ctx: Pick<ExtensionContext, "hasUI" | "ui">, message: string, type: "info" | "error" | "warning" | "success"): void {
@@ -380,6 +628,34 @@ async function readWorkflow(name: string): Promise<string> {
 async function readCommandPrompt(name: string): Promise<string> {
   const filePath = path.join(COMMANDS_DIR, name);
   return readText(filePath);
+}
+
+// Adapted from https://github.com/earendil-works/pi-review
+async function loadProjectReviewGuidelines(cwd: string): Promise<string | null> {
+  let currentDir = path.resolve(cwd);
+
+  while (true) {
+    const piDir = path.join(currentDir, ".pi");
+    const guidelinesPath = path.join(currentDir, "REVIEW_GUIDELINES.md");
+
+    const piStats = await fs.stat(piDir).catch(() => null);
+    if (piStats?.isDirectory()) {
+      const guidelineStats = await fs.stat(guidelinesPath).catch(() => null);
+      if (!guidelineStats?.isFile()) return null;
+
+      try {
+        const content = await fs.readFile(guidelinesPath, "utf8");
+        const trimmed = content.trim();
+        return trimmed || null;
+      } catch {
+        return null;
+      }
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) return null;
+    currentDir = parentDir;
+  }
 }
 
 async function getLearningMemoryTail(cwd: string): Promise<string> {
@@ -488,7 +764,6 @@ async function beginWorkflowTracking(
   const pending: PendingWorkflow = { id, type, input, flags, startedAt, runFile };
   pendingWorkflow = pending;
 
-  setStatus(ctx, `${type} running`);
   return pending;
 }
 
@@ -640,7 +915,6 @@ async function completeWorkflowTracking(
 
   await maybeEmitPromotionHint(paths, observation, ctx);
 
-  setStatus(ctx, "pesap-agent ready");
   notify(ctx, `Workflow ${workflow.type} completed (${outcome}, confidence=${confidence.toFixed(2)}).`, "info");
 }
 
@@ -650,14 +924,12 @@ async function handleDebug(pi: ExtensionAPI, args: string, ctx: ExtensionCommand
     notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
     return;
   }
-  if (!agentEnabled) {
-    notify(ctx, "Agent is paused. Run /start-agent first.", "error");
-    return;
-  }
   if (!parsed.problem) {
     notify(ctx, "Usage: /debug <problem> [--parallel N] [--fix]", "error");
     return;
   }
+
+  ensureAgentEnabledForCommand(pi, ctx, "debug");
 
   await beginWorkflowTracking(pi, ctx, "debug", parsed.problem, {
     parallel: parsed.parallel,
@@ -689,14 +961,11 @@ async function handleFeature(pi: ExtensionAPI, args: string, ctx: ExtensionComma
     notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
     return;
   }
-  if (!agentEnabled) {
-    notify(ctx, "Agent is paused. Run /start-agent first.", "error");
-    return;
-  }
   if (!parsed.request) {
     notify(ctx, "Usage: /feature <request> [--parallel N] [--ship]", "error");
     return;
   }
+  ensureAgentEnabledForCommand(pi, ctx, "feature");
 
   const subagentAvailable = hasSubagentTool(pi);
   const parallelTarget = subagentAvailable ? parsed.parallel : 1;
@@ -734,20 +1003,116 @@ async function handleFeature(pi: ExtensionAPI, args: string, ctx: ExtensionComma
   );
 }
 
+async function handleReview(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
+  const parsed = parseReviewArgs(args);
+  if (pendingWorkflow) {
+    notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
+    return;
+  }
+
+  if (parsed.error) {
+    notify(ctx, parsed.error, "error");
+    return;
+  }
+
+  ensureAgentEnabledForCommand(pi, ctx, "review");
+
+  const target = buildReviewTarget(parsed);
+  const projectGuidelines = await loadProjectReviewGuidelines(ctx.cwd);
+
+  await beginWorkflowTracking(pi, ctx, "review", target.summary, {
+    ...target.flags,
+    extraInstruction: parsed.extraInstruction ?? null,
+    source: REVIEW_COMMAND_SOURCE,
+  });
+
+  await enqueueWorkflow(pi, "review-workflow.md", "review-workflow.yaml", [
+    `Review target: ${target.summary}`,
+    `Target mode: ${parsed.mode}`,
+    `Source reference: ${REVIEW_COMMAND_SOURCE}`,
+    "",
+    `Instruction: ${target.instruction}`,
+    parsed.extraInstruction ? `Additional focus: ${parsed.extraInstruction}` : "",
+    projectGuidelines
+      ? [
+          "",
+          "Project review guidelines (REVIEW_GUIDELINES.md):",
+          "```markdown",
+          projectGuidelines,
+          "```",
+        ].join("\n")
+      : "",
+    "Instruction: Prioritize correctness, security, performance, and maintainability findings with concrete evidence.",
+    "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`.",
+  ]);
+
+  pi.appendEntry("pesap-review-command", {
+    mode: parsed.mode,
+    ...target.flags,
+    extraInstruction: parsed.extraInstruction ?? null,
+    source: REVIEW_COMMAND_SOURCE,
+    at: nowIso(),
+  });
+
+  notify(ctx, `Started review workflow (${target.summary}).`, "info");
+}
+
+async function handleSimplify(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
+  const parsed = parseReviewArgs(args, "simplify");
+  if (pendingWorkflow) {
+    notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
+    return;
+  }
+
+  if (parsed.error) {
+    notify(ctx, parsed.error, "error");
+    return;
+  }
+
+  ensureAgentEnabledForCommand(pi, ctx, "simplify");
+
+  const target = buildSimplifyTarget(parsed);
+
+  await beginWorkflowTracking(pi, ctx, "simplify", target.summary, {
+    ...target.flags,
+    extraInstruction: parsed.extraInstruction ?? null,
+    source: SIMPLIFY_COMMAND_SOURCE,
+  });
+
+  await enqueueWorkflow(pi, "simplify-workflow.md", "simplify-workflow.yaml", [
+    `Simplify target: ${target.summary}`,
+    `Target mode: ${parsed.mode}`,
+    `Source reference: ${SIMPLIFY_COMMAND_SOURCE}`,
+    "",
+    `Instruction: ${target.instruction}`,
+    parsed.extraInstruction ? `Additional focus: ${parsed.extraInstruction}` : "",
+    "Instruction: Preserve exact behavior, API shape, and outputs. Ask before any semantic change.",
+    "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`.",
+  ]);
+
+  pi.appendEntry("pesap-simplify-command", {
+    mode: parsed.mode,
+    ...target.flags,
+    extraInstruction: parsed.extraInstruction ?? null,
+    source: SIMPLIFY_COMMAND_SOURCE,
+    at: nowIso(),
+  });
+
+  notify(ctx, `Started simplify workflow (${target.summary}).`, "info");
+}
+
 async function handleLearnSkill(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const parsed = parseLearnSkillArgs(args);
   if (pendingWorkflow) {
     notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
     return;
   }
-  if (!agentEnabled) {
-    notify(ctx, "Agent is paused. Run /start-agent first.", "error");
-    return;
-  }
   if (!parsed.topic && !parsed.fromFile && !parsed.fromUrl) {
     notify(ctx, "Usage: /learn-skill <topic> [--from-file path] [--from-url url] [--dry-run]", "error");
     return;
   }
+
+  ensureAgentEnabledForCommand(pi, ctx, "learn-skill");
 
   const paths = await ensureLearningStore(ctx.cwd);
 
@@ -827,29 +1192,15 @@ export default function pesapExtension(pi: ExtensionAPI): void {
     const paths = await ensureLearningStore(ctx.cwd);
     agentEnabled = getAgentEnabledFromSession(ctx);
     setAgentEnabledState(ctx, agentEnabled);
-    notify(
-      ctx,
-      `Pesap learning store: ${paths.root} (${agentEnabled ? "active" : "paused"})`,
-      "info",
-    );
+    notify(ctx, `pesap-agent path: ${paths.root}`, "info");
   });
 
-  pi.on("before_agent_start", async (_event, ctx) => {
+  pi.on("before_agent_start", async (event, ctx) => {
     if (!agentEnabled) return;
-    if (hasCustomMarker(ctx, BOOTSTRAP_MARKER)) return;
-
     const bootstrap = await getBootstrapPayload(ctx.cwd);
     if (!bootstrap.trim()) return;
-
-    pi.appendEntry(BOOTSTRAP_MARKER, { at: nowIso() });
-
     return {
-      message: {
-        customType: "pesap-bootstrap",
-        content: bootstrap,
-        display: false,
-        details: { source: AGENT_DIR },
-      },
+      systemPrompt: `${event.systemPrompt.trimEnd()}\n\n${bootstrap}`,
     };
   });
 
@@ -863,31 +1214,27 @@ export default function pesapExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("start-agent", {
-    description: "Enable pesap-agent workflows for this session",
+    description: "Initialize pesap-agent context injection for this session",
     handler: async (_args, ctx) => {
       if (agentEnabled) {
-        notify(ctx, "pesap-agent is already active.", "info");
+        notify(ctx, "pesap-agent is already initialized.", "info");
         return;
       }
-
       setAgentEnabledState(ctx, true);
-      pi.appendEntry(AGENT_STATE_TYPE, { enabled: true, at: nowIso() });
-      notify(ctx, "pesap-agent activated.", "success");
+      pi.appendEntry(AGENT_STATE_TYPE, { initialized: true, enabled: true, at: nowIso() });
+      notify(ctx, "pesap-agent initialized.", "success");
     },
   });
 
   pi.registerCommand("end-agent", {
-    description: "Pause pesap-agent workflows for this session",
+    description: "Stop pesap-agent context injection for this session",
     handler: async (_args, ctx) => {
       if (!agentEnabled) {
-        notify(ctx, "pesap-agent is already paused.", "info");
         return;
       }
-
       pendingWorkflow = null;
       setAgentEnabledState(ctx, false);
-      pi.appendEntry(AGENT_STATE_TYPE, { enabled: false, at: nowIso() });
-      notify(ctx, "pesap-agent paused. Run /start-agent to resume.", "success");
+      pi.appendEntry(AGENT_STATE_TYPE, { initialized: false, enabled: false, at: nowIso() });
     },
   });
   pi.registerCommand("debug", {
@@ -901,6 +1248,27 @@ export default function pesapExtension(pi: ExtensionAPI): void {
     description: "Run the pesap feature workflow",
     handler: async (args, ctx) => {
       await handleFeature(pi, args ?? "", ctx);
+    },
+  });
+
+  pi.registerCommand("review", {
+    description: "Run the pesap code review workflow (adapted from pi-review)",
+    handler: async (args, ctx) => {
+      await handleReview(pi, args ?? "", ctx);
+    },
+  });
+
+  pi.registerCommand("simplify", {
+    description: "Run the pesap code simplification workflow",
+    handler: async (args, ctx) => {
+      await handleSimplify(pi, args ?? "", ctx);
+    },
+  });
+
+  pi.registerCommand("reaview", {
+    description: "Alias for /review",
+    handler: async (args, ctx) => {
+      await handleReview(pi, args ?? "", ctx);
     },
   });
 

@@ -15,10 +15,7 @@
       "./extensions/index.ts"
     ],
     "skills": [
-      "./pesap-agent/skills"
-    ],
-    "prompts": [
-      "./commands"
+      "./agent/skills"
     ],
     "themes": [
       "./themes"

@@ -1,9 +1,10 @@
 # INSTRUCTIONS
 
 Operational defaults:
-- Be concise by default.
+- Use caveman style by default (terse, direct, technically exact).
 - Use subagents when parallel exploration is likely to reduce time-to-root-cause.
 - Capture durable learnings after meaningful tasks.
+- Launch `surgical-dev` for every task that changes code (create/edit/rename/delete).
 
 Command workflow contracts:
 
