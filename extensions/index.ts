@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { createBashTool } from "@mariozechner/pi-coding-agent";
 import { randomUUID } from "node:crypto";
 import { existsSync, promises as fs } from "node:fs";
 import { homedir } from "node:os";
@@ -9,6 +10,7 @@ const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 const AGENT_DIR = resolveAgentDir(PACKAGE_ROOT);
 const SKILLFLOWS_DIR = path.join(AGENT_DIR, "skillflows");
 const COMMANDS_DIR = path.join(PACKAGE_ROOT, "commands");
+const INTERCEPTED_COMMANDS_DIR = path.join(PACKAGE_ROOT, "intercepted-commands");
 
 const AGENT_STATE_TYPE = "pesap-agent-state";
 
@@ -88,6 +90,66 @@ interface LearningState {
 let pendingWorkflow: PendingWorkflow | null = null;
 let agentEnabled = false;
 const learningPathCache = new Map<string, LearningPaths>();
+
+const BLOCKED_COMMAND_PATTERNS = {
+  pip: /(?:^|\n|[;|&]{1,2})\s*(?:\S+\/)?pip\s*(?:$|\s)/m,
+  pip3: /(?:^|\n|[;|&]{1,2})\s*(?:\S+\/)?pip3\s*(?:$|\s)/m,
+  poetry: /(?:^|\n|[;|&]{1,2})\s*(?:\S+\/)?poetry\s*(?:$|\s)/m,
+  pythonPip: /(?:^|\n|[;|&]{1,2})\s*(?:\S+\/)?python(?:3(?:\.\d+)?)?\b[^\n;|&]*(?:\s-m\s*pip\b|\s-mpip\b)/m,
+  pythonVenv: /(?:^|\n|[;|&]{1,2})\s*(?:\S+\/)?python(?:3(?:\.\d+)?)?\b[^\n;|&]*(?:\s-m\s*venv\b|\s-mvenv\b)/m,
+  pythonPyCompile:
+    /(?:^|\n|[;|&]{1,2})\s*(?:\S+\/)?python(?:3(?:\.\d+)?)?\b[^\n;|&]*(?:\s-m\s*py_compile\b|\s-mpy_compile\b)/m,
+};
+
+const UV_INSTALL_GUIDANCE = [
+  "To install a package for a script: uv run --with PACKAGE python script.py",
+  "To add a dependency to the project: uv add PACKAGE",
+];
+
+function formatBlockedCommandMessage(headline: string, guidance: string[]): string {
+  return [headline, "", ...guidance.map((line) => `  ${line}`), ""].join("\n");
+}
+function getBlockedCommandMessage(command: string): string | null {
+  if (BLOCKED_COMMAND_PATTERNS.pip.test(command)) {
+    return formatBlockedCommandMessage("Error: pip is disabled while pesap-agent is active. Use uv instead:", UV_INSTALL_GUIDANCE);
+  }
+
+  if (BLOCKED_COMMAND_PATTERNS.pip3.test(command)) {
+    return formatBlockedCommandMessage("Error: pip3 is disabled while pesap-agent is active. Use uv instead:", UV_INSTALL_GUIDANCE);
+  }
+
+  if (BLOCKED_COMMAND_PATTERNS.poetry.test(command)) {
+    return formatBlockedCommandMessage("Error: poetry is disabled while pesap-agent is active. Use uv instead:", [
+      "To initialize a project: uv init",
+      "To add a dependency: uv add PACKAGE",
+      "To sync dependencies: uv sync",
+      "To run commands: uv run COMMAND",
+    ]);
+  }
+
+  if (BLOCKED_COMMAND_PATTERNS.pythonPip.test(command)) {
+    return formatBlockedCommandMessage("Error: 'python -m pip' is disabled while pesap-agent is active. Use uv instead:", UV_INSTALL_GUIDANCE);
+  }
+
+  if (BLOCKED_COMMAND_PATTERNS.pythonVenv.test(command)) {
+    return formatBlockedCommandMessage("Error: 'python -m venv' is disabled while pesap-agent is active. Use uv instead:", [
+      "To create a virtual environment: uv venv",
+    ]);
+  }
+
+  if (BLOCKED_COMMAND_PATTERNS.pythonPyCompile.test(command)) {
+    return formatBlockedCommandMessage(
+      "Error: 'python -m py_compile' is disabled while pesap-agent is active because it writes .pyc files to __pycache__.",
+      ["To verify syntax without bytecode output: uv run python -m ast path/to/file.py >/dev/null"],
+    );
+  }
+  return null;
+}
+
+function prependInterceptedCommandsPath(command: string): string {
+  const escapedPath = INTERCEPTED_COMMANDS_DIR.replace(/\"/g, '\\\"');
+  return `export PATH="${escapedPath}:$PATH"\n${command}`;
+}
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -1195,6 +1257,23 @@ async function handleLearnSkill(pi: ExtensionAPI, args: string, ctx: ExtensionCo
 }
 
 export default function pesapExtension(pi: ExtensionAPI): void {
+  const bashTool = createBashTool(process.cwd(), {
+    spawnHook: (spawnContext) => {
+      if (!agentEnabled) return spawnContext;
+
+      const blockedMessage = getBlockedCommandMessage(spawnContext.command);
+      if (blockedMessage) {
+        throw new Error(blockedMessage);
+      }
+
+      return {
+        ...spawnContext,
+        command: prependInterceptedCommandsPath(spawnContext.command),
+      };
+    },
+  });
+
+  pi.registerTool(bashTool);
   pi.on("session_start", async (_event, ctx) => {
     const paths = await ensureLearningStore(ctx.cwd);
     agentEnabled = getAgentEnabledFromSession(ctx);

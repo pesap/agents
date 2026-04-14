@@ -25,6 +25,15 @@ pi -e https://github.com/pesap/agents
 - `/simplify [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>] [--extra "focus"]` (code simplification workflow, behavior-preserving)
 - `/reaview ...` - alias for `/review`
 
+## Intercepted shell commands (active agent only)
+
+When pesap-agent is enabled (`/start-agent`, or auto-enabled by workflow commands), the extension wraps the `bash` tool and intercepts Python packaging commands inspired by https://github.com/mitsuhiko/agent-stuff:
+
+- `pip`, `pip3`, `poetry` → blocked with `uv` replacement guidance
+- `python`, `python3` → routed through `uv run` wrappers
+- `python -m pip|venv|py_compile` → blocked with actionable alternatives
+
+Run `/end-agent` to disable this interception for the current session.
 ## Self-learning storage
 
 The extension writes durable learning artifacts to a local writable store:
@@ -42,9 +51,10 @@ Stored artifacts:
 
 ## Package layout
 
-- `extensions/index.ts` - command and workflow orchestration extension
+- `extensions/index.ts` - command/workflow orchestration and bash interception while agent mode is enabled
 - `agent/` - gitagent-style single agent definition
 - `commands/` - workflow prompt templates
+- `intercepted-commands/` - command shims for pip/pip3/poetry/python/python3 during active agent sessions
 - `themes/` - optional themes (empty by default)
 
 ## Compliance baseline
