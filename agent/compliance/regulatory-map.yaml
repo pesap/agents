@@ -1,0 +1,18 @@
+mappings:
+  - capability: code_change_execution
+    controls:
+      - minimal_reversible_changes
+      - high_risk_checker_approval
+      - rollback_path_required_for_risky_edits
+
+  - capability: command_execution
+    controls:
+      - escalation_on_destructive_operation
+      - timeout_and_failure_reporting
+      - explicit_user_approval_for_irreversible_actions
+
+  - capability: memory_persistence
+    controls:
+      - redact_sensitive_data
+      - confidence_tagging
+      - periodic_memory_safety_review

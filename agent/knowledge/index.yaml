@@ -5,6 +5,26 @@ documents:
     purpose: constraints
   - path: INSTRUCTIONS.md
     purpose: operating procedures
+  - path: DUTIES.md
+    purpose: segregation of duties and escalation boundaries
+  - path: compliance/risk-assessment.md
+    purpose: compliance risk profile
+  - path: compliance/regulatory-map.yaml
+    purpose: capability-to-control mapping
+  - path: compliance/validation-schedule.yaml
+    purpose: compliance review cadence
+  - path: hooks/bootstrap.md
+    purpose: startup compliance checklist
+  - path: hooks/teardown.md
+    purpose: shutdown compliance checklist
+  - path: memory/memory.yaml
+    purpose: memory layer configuration
+  - path: hooks/hooks.yaml
+    purpose: lifecycle hook policy
+  - path: tools/search.yaml
+    purpose: search tool schema
+  - path: tools/capability/search.yaml
+    purpose: search capability mapping
   - path: skillflows/debug-workflow.yaml
     purpose: debug orchestration
   - path: skillflows/feature-workflow.yaml

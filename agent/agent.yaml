@@ -19,12 +19,34 @@ skills:
   - simplify
   - caveman
   - surgical-dev
+  - create-pisubagents
 pi:
   scope: project
   tools: "read,edit,write,grep,ast_search,nu,bash,subagent,gitagent_remember"
 runtime:
   max_turns: 40
   timeout: 300
+compliance:
+  risk_tier: standard
+  frameworks:
+    - internal
+  supervision:
+    human_in_the_loop: conditional
+    review_cadence: weekly
+    escalation_triggers:
+      - confidence_below: 0.7
+      - action_type: destructive_operation
+      - action_type: secret_or_pii_exposure_risk
+    override_capability: true
+    kill_switch: true
+  recordkeeping:
+    audit_logging: true
+    log_format: structured_json
+    retention_period: 90d
+  data_governance:
+    pii_handling: redact
+    data_classification: confidential
+    consent_required: true
 metadata:
   category: development
   mutates_files: true

@@ -5,6 +5,7 @@ Operational defaults:
 - Use subagents when parallel exploration is likely to reduce time-to-root-cause.
 - Capture durable learnings after meaningful tasks.
 - Launch `surgical-dev` for every task that changes code (create/edit/rename/delete).
+- If a requested subagent or chain does not exist, load `create-pisubagents` skill, create/update it, then continue the task.
 
 Command workflow contracts:
 

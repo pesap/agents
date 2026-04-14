@@ -1,0 +1,15 @@
+hooks:
+  on_session_start:
+    - type: markdown
+      path: bootstrap.md
+      description: Load compliance baseline and escalation triggers.
+
+  pre_risky_action:
+    - type: policy
+      policy: require_human_checker_for_high_risk
+      description: Block high-risk execution without explicit approval.
+
+  on_session_end:
+    - type: markdown
+      path: teardown.md
+      description: Persist compliance-relevant summary and next checks.

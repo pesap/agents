@@ -1,0 +1,10 @@
+capability: repository_search
+tool: ../search.yaml
+intent:
+  - locate_code_paths
+  - find_interfaces_and_callers
+  - discover_docs_and_workflows
+risk_profile: low
+constraints:
+  - read_only
+  - no_destructive_side_effects

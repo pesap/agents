@@ -1,0 +1,22 @@
+schedule:
+  - type: workflow_guardrail_review
+    cadence: weekly
+    owner: human-checker
+    checks:
+      - high_risk_actions_had_explicit_approval
+      - destructive_ops_were_escalated
+      - low_confidence_outputs_were_flagged
+
+  - type: memory_safety_review
+    cadence: weekly
+    owner: human-checker
+    checks:
+      - no_secrets_or_pii_in_memory_artifacts
+      - redaction_policy_still_enabled
+
+  - type: policy_alignment_review
+    cadence: monthly
+    owner: maintainer
+    checks:
+      - rules_and_duties_are_consistent
+      - compliance_triggers_match_actual_risks

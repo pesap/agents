@@ -682,14 +682,15 @@ async function getLearnedSkillsList(cwd: string): Promise<string[]> {
 }
 
 async function getBootstrapPayload(cwd: string): Promise<string> {
-  const [soul, rules, instructions, memoryTail, learnedSkills] = await Promise.all([
+  const [soul, rules, duties, instructions, complianceProfile, memoryTail, learnedSkills] = await Promise.all([
     readTextIfExists(path.join(AGENT_DIR, "SOUL.md")),
     readTextIfExists(path.join(AGENT_DIR, "RULES.md")),
+    readTextIfExists(path.join(AGENT_DIR, "DUTIES.md")),
     readTextIfExists(path.join(AGENT_DIR, "INSTRUCTIONS.md")),
+    readTextIfExists(path.join(AGENT_DIR, "compliance", "risk-assessment.md")),
     getLearningMemoryTail(cwd),
     getLearnedSkillsList(cwd),
   ]);
-
   return [
     "Pesap agent bootstrap context (single-agent runtime):",
     "",
@@ -698,9 +699,15 @@ async function getBootstrapPayload(cwd: string): Promise<string> {
     "",
     "[RULES]",
     rules.trim(),
+    duties.trim() ? "" : "",
+    duties.trim() ? "[DUTIES]" : "",
+    duties.trim(),
     "",
     "[INSTRUCTIONS]",
     instructions.trim(),
+    complianceProfile.trim() ? "" : "",
+    complianceProfile.trim() ? "[COMPLIANCE PROFILE]" : "",
+    complianceProfile.trim(),
     memoryTail ? "" : "",
     memoryTail ? "[LEARNING MEMORY TAIL]" : "",
     memoryTail,

@@ -47,6 +47,14 @@ Stored artifacts:
 - `commands/` - workflow prompt templates
 - `themes/` - optional themes (empty by default)
 
+## Compliance baseline
+
+- `agent/DUTIES.md` - maker/checker separation and escalation boundaries
+- `agent/compliance/` - risk profile, capability controls, and review cadence
+- `agent/hooks/` - bootstrap/teardown compliance hook stubs
+- `agent/memory/runtime/live/` - `dailylog.md`, `key-decisions.md`, `context.md`
+- `agent/tools/search.yaml` + `agent/tools/capability/search.yaml` - tool schema and capability mapping
+
 ## Design goals
 
 1. Keep one canonical agent identity.
