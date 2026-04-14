@@ -19,7 +19,7 @@ pi -e https://github.com/pesap/agents
 - `/start-agent` - enable pesap-agent workflow mode in the current session
 - `/end-agent` - pause pesap-agent workflow mode in the current session
 - `/debug <problem> [--parallel N] [--fix]`
-- `/feature <request> [--parallel N] [--ship]`
+- `/feature <request> [--parallel N] [--ship]` (parallel delegation auto-falls back to single-agent mode when pi-subagents is unavailable)
 - `/learn-skill <topic> [--from-file path] [--from-url url] [--dry-run]`
 
 ## Self-learning storage

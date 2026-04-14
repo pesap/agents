@@ -222,7 +222,9 @@ function parseLearnSkillArgs(args: string): {
     dryRun,
   };
 }
-
+function hasSubagentTool(pi: ExtensionAPI): boolean {
+  return pi.getAllTools().some((tool) => tool.name === "subagent");
+}
 function buildSkillTemplate(skillName: string, topic: string): string {
   const summary = topic || skillName;
   return [
@@ -696,28 +698,40 @@ async function handleFeature(pi: ExtensionAPI, args: string, ctx: ExtensionComma
     return;
   }
 
+  const subagentAvailable = hasSubagentTool(pi);
+  const parallelTarget = subagentAvailable ? parsed.parallel : 1;
   await beginWorkflowTracking(pi, ctx, "feature", parsed.request, {
-    parallel: parsed.parallel,
+    parallel: parallelTarget,
     ship: parsed.ship,
+    subagentAvailable,
   });
-
   await enqueueWorkflow(pi, "feature-workflow.md", "feature-workflow.yaml", [
     `Feature request: ${parsed.request}`,
-    `Parallel subagents target: ${parsed.parallel}`,
+    `Parallel subagents target: ${parallelTarget}`,
     `Ship mode: ${parsed.ship ? "yes" : "no"}`,
     "",
-    "Instruction: Use parallel subagents for implementation/tests/docs when that reduces delivery time or risk.",
+    subagentAvailable
+      ? "Instruction: Use parallel subagents for implementation/tests/docs when that reduces delivery time or risk."
+      : "Instruction: pi-subagents is not installed in this session, run implementation/tests/docs sequentially without subagent delegation.",
     "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`.",
   ]);
-
   pi.appendEntry("pesap-feature-command", {
     request: parsed.request,
-    parallel: parsed.parallel,
+    parallel: parallelTarget,
     ship: parsed.ship,
+    subagentAvailable,
     at: nowIso(),
   });
 
-  notify(ctx, `Started feature workflow (parallel=${parsed.parallel}, ship=${parsed.ship ? "on" : "off"}).`, "info");
+  if (!subagentAvailable) {
+    notify(ctx, "pi-subagents not detected, running /feature in single-agent mode.", "warning");
+  }
+
+  notify(
+    ctx,
+    `Started feature workflow (parallel=${parallelTarget}, ship=${parsed.ship ? "on" : "off"}, subagents=${subagentAvailable ? "on" : "off"}).`,
+    "info",
+  );
 }
 
 async function handleLearnSkill(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
