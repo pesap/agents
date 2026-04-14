@@ -11,8 +11,10 @@ import { loadAgent, mapModel, type LoadedAgent } from "./loader.js";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
+  clearInstalledAgents,
   getRegistryPath,
   readInstalledAgents,
+  removeInstalledAgents,
   upsertInstalledAgents,
   type InstalledAgentRecord,
 } from "./registry.js";
@@ -42,11 +44,12 @@ const USAGE = [
   "Usage:",
   "  /gitagent install <ref>             Install one agent or every agent in a repo/path",
   "  /gitagent installed                 List installed agents",
+  "  /gitagent remove <name|all>         Remove installed agents from the local registry",
   "  /gitagent load <ref>                Load an agent into this session",
   "  /gitagent run <ref> -- <task>       Run one agent without changing the saved session agent",
   "  /gitagent chain <a> <b> -- <task>   Run agents sequentially, passing output forward",
   "  /gitagent new <prompt>              Create a new agent via the architect",
-  "  /gitagent list [ref]                List available agents in a repo/path",
+  "  /gitagent list [ref]                List available agents, or agents in a repo/path",
   "  /gitagent recommend <task>          Recommend the best agent for a task",
   "  /gitagent doctor [ref]              Run diagnostics on the current or target agent",
   "  /gitagent policy [ref]              Show runtime policy for the loaded or target agent",
@@ -430,12 +433,40 @@ export default function piGitagent(pi: ExtensionAPI) {
       .join("\n");
   }
 
-  function formatAgentListText(agents: string[]): string {
-    return agents.length === 0
-      ? "No agents found"
-      : `Available agents:\n${agents.map((agent) => `  ${agent}`).join("\n")}`;
+  interface AgentListResult {
+    installed: string[];
+    directory: string[];
+    ref?: string;
   }
 
+  function listAgentsForDirectory(dir: string): string[] {
+    const agents = listAgentsInDir(dir);
+    if (existsSync(join(dir, "agent.yaml"))) {
+      agents.unshift(". (root agent)");
+    }
+    return agents;
+  }
+
+  function formatAgentListText(result: AgentListResult): string {
+    const hasInstalled = result.installed.length > 0;
+    const hasDirectory = result.directory.length > 0;
+    if (!hasInstalled && !hasDirectory) return "No agents found";
+
+    if (result.ref) {
+      return `Available agents:\n${result.directory.map((agent) => `  ${agent}`).join("\n")}`;
+    }
+
+    const lines = ["Available agents:"];
+    if (hasInstalled) {
+      lines.push("Installed aliases:");
+      lines.push(...result.installed.map((agent) => `  ${agent}`));
+    }
+    if (hasDirectory) {
+      lines.push(hasInstalled ? "Current directory:" : "Local agents:");
+      lines.push(...result.directory.map((agent) => `  ${agent}`));
+    }
+    return lines.join("\n");
+  }
   function formatInstalledAgentsText(installed: InstalledAgentRecord[]): string {
     if (installed.length === 0) {
       return [
@@ -451,9 +482,9 @@ export default function piGitagent(pi: ExtensionAPI) {
         return `  ${agent.name}  [${source}]  ${agent.dir}`;
       }),
       `Registry: ${getRegistryPath()}`,
+      "Remove one with /gitagent remove <name>, or wipe the registry with /gitagent remove all.",
     ].join("\n");
   }
-
   function discoverInstallableAgentDirs(dir: string): string[] {
     const agents = listAgentsInDir(dir).map((name) => join(dir, name));
     if (existsSync(join(dir, "agent.yaml"))) {
@@ -461,7 +492,6 @@ export default function piGitagent(pi: ExtensionAPI) {
     }
     return agents;
   }
-
   function buildInstallRecords(ref: string, cwd: string): InstalledAgentRecord[] {
     const localDir = resolveExistingLocalPath(ref, cwd, false);
     const remoteSpec = localDir ? null : parseGitHubRef(ref);
@@ -478,13 +508,11 @@ export default function piGitagent(pi: ExtensionAPI) {
         : targetDir
       : undefined;
     const agentDirs = discoverInstallableAgentDirs(targetDir);
-
     if (agentDirs.length === 0) {
       throw new Error(`No installable agents found in ${targetDir}.`);
     }
 
     const installedAt = new Date().toISOString();
-
     return agentDirs.map((agentDir) => {
       const agent = loadAgent(agentDir, {
         memoryBaseDir: remoteSpec ? MEMORY_DIR : undefined,
@@ -503,7 +531,6 @@ export default function piGitagent(pi: ExtensionAPI) {
       };
     });
   }
-
   function findInstallConflicts(records: InstalledAgentRecord[]): Array<{
     incoming: InstalledAgentRecord;
     existing: InstalledAgentRecord;
@@ -521,11 +548,9 @@ export default function piGitagent(pi: ExtensionAPI) {
       return sameInstall ? [] : [{ incoming: record, existing }];
     });
   }
-
   function handleInstalledList(ctx: { ui: { notify: (msg: string, type: string) => void } }) {
     ctx.ui.notify(formatInstalledAgentsText(readInstalledAgents()), "info");
   }
-
   function handleInstall(
     ctx: { ui: { notify: (msg: string, type: string) => void }; cwd: string },
     ref: string,
@@ -554,6 +579,7 @@ export default function piGitagent(pi: ExtensionAPI) {
             return `  ${record.name} -> ${record.dir} (${mode})`;
           }),
           `Registry updated: ${getRegistryPath()}`,
+          "They now show up in /gitagent list and can be loaded by name.",
         ].join("\n"),
         "info",
       );
@@ -603,6 +629,61 @@ export default function piGitagent(pi: ExtensionAPI) {
     };
   }
 
+  async function handleRemove(ctx: Pick<UiContext, "ui">, target: string): Promise<void> {
+    const requested = [...new Set(target.split(/\s+/).map((part) => part.trim()).filter(Boolean))];
+    if (requested.length === 0) {
+      ctx.ui.notify("Usage: /gitagent remove <name|all>", "error");
+      return;
+    }
+
+    const removeAll = requested.length === 1 && ["all", "*"].includes(requested[0]?.toLowerCase() ?? "");
+    const installed = readInstalledAgents();
+    if (installed.length === 0) {
+      ctx.ui.notify("No installed agents to remove.", "info");
+      return;
+    }
+
+    let removed: InstalledAgentRecord[] = [];
+    if (removeAll) {
+      const confirmed = await ctx.ui.confirm(
+        "Remove all installed agents?",
+        [
+          `This will remove ${installed.length} installed agent${installed.length === 1 ? "" : "s"} from ${getRegistryPath()}.`,
+          "Cached remote repos and agent memory are left untouched.",
+        ].join("\n\n"),
+      );
+      if (!confirmed) {
+        ctx.ui.notify("Cancelled removing installed agents.", "info");
+        return;
+      }
+      removed = clearInstalledAgents();
+    } else {
+      removed = removeInstalledAgents(requested);
+      if (removed.length === 0) {
+        ctx.ui.notify(`No installed agents matched: ${requested.join(", ")}`, "info");
+        return;
+      }
+    }
+
+    const removedNames = new Set(removed.map((record) => record.name));
+    const unloaded = state.currentRef && removedNames.has(state.currentRef) ? unloadActiveAgent(ctx) : null;
+    const missing = removeAll ? [] : requested.filter((name) => !removedNames.has(name));
+    ctx.ui.notify(
+      [
+        removeAll
+          ? `Removed all ${removed.length} installed agent${removed.length === 1 ? "" : "s"}.`
+          : `Removed ${removed.length} installed agent${removed.length === 1 ? "" : "s"}.`,
+        ...removed.map((record) => `  ${record.name}`),
+        missing.length > 0 ? `Not installed: ${missing.join(", ")}` : "",
+        unloaded ? `Unloaded ${unloaded} because its installed alias was removed.` : "",
+        `Registry: ${getRegistryPath()}`,
+        "Cached remote repos and agent memory were left untouched.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      "info",
+    );
+  }
   function showAgentInfo(
     ctx: { ui: { notify: (msg: string, type: string) => void } },
     agent: LoadedAgent,
@@ -610,21 +691,23 @@ export default function piGitagent(pi: ExtensionAPI) {
     ctx.ui.notify(formatAgentInfoText(agent), "info");
   }
 
-  function getAgentList(ref: string, cwd: string): string[] {
-    const dir = ref === cwd ? cwd : resolveDir(ref, { cwd });
-    const agents = listAgentsInDir(dir);
-    if (existsSync(join(dir, "agent.yaml"))) {
-      agents.unshift(". (root agent)");
+  function getAgentList(ref: string | undefined, cwd: string): AgentListResult {
+    if (ref) {
+      const dir = ref === cwd ? cwd : resolveDir(ref, { cwd });
+      return { installed: [], directory: listAgentsForDirectory(dir), ref };
     }
-    return agents;
-  }
 
+    return {
+      installed: readInstalledAgents().map((record) => record.name),
+      directory: listAgentsForDirectory(cwd),
+    };
+  }
   function handleList(
     ctx: { ui: { notify: (msg: string, type: string) => void }; cwd: string },
     ref?: string,
   ) {
     try {
-      ctx.ui.notify(formatAgentListText(getAgentList(ref ?? ctx.cwd, ctx.cwd)), "info");
+      ctx.ui.notify(formatAgentListText(getAgentList(ref, ctx.cwd)), "info");
     } catch (error) {
       ctx.ui.notify(`${(error as Error).message}`, "error");
     }
@@ -958,12 +1041,12 @@ export default function piGitagent(pi: ExtensionAPI) {
   unsafePi.registerTool({
     name: "gitagent_list",
     label: "List Agents",
-    description: "List available gitagent agents in a directory or GitHub repo.",
-    promptSnippet: "List available gitagent agents in a local directory or GitHub repo.",
+    description: "List available gitagent agents from the installed registry, a directory, or a GitHub repo.",
+    promptSnippet: "List available gitagent agents from installed aliases, a local directory, or a GitHub repo.",
     parameters: Type.Object({
       ref: Type.Optional(
         Type.String({
-          description: "Directory or GitHub reference to list. Defaults to current working directory.",
+          description: "Directory or GitHub reference to list. Defaults to installed aliases plus the current working directory.",
         }),
       ),
     }),
@@ -975,10 +1058,15 @@ export default function piGitagent(pi: ExtensionAPI) {
       ctx: UiContext,
     ) {
       try {
-        const agents = getAgentList(params.ref ?? ctx.cwd, ctx.cwd);
+        const agents = getAgentList(params.ref, ctx.cwd);
         return {
           content: [{ type: "text", text: formatAgentListText(agents) }],
-          details: agents.length === 0 ? {} : { agents },
+          details: {
+            agents: [...agents.installed, ...agents.directory],
+            installed: agents.installed,
+            directory: agents.directory,
+            ref: params.ref ?? null,
+          },
         };
       } catch (error) {
         throw new Error(`Failed to list agents: ${(error as Error).message}`);
@@ -1098,6 +1186,11 @@ export default function piGitagent(pi: ExtensionAPI) {
 
         case "installed": {
           handleInstalledList(ctx);
+          return;
+        }
+
+        case "remove": {
+          await handleRemove(ctx, rest);
           return;
         }
 

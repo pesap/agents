@@ -46,6 +46,7 @@ That adds `/gitagent` to your pi sessions.
 
 # Install every agent from a remote multi-agent repo
 /gitagent install gh:pesap/agents
+/gitagent list
 /gitagent installed
 
 # Load directly from a local path or GitHub ref
@@ -61,6 +62,10 @@ That adds `/gitagent` to your pi sessions.
 
 # Create a new agent via architect
 /gitagent new "a code reviewer specialized in Rust unsafe blocks"
+
+# Remove one installed alias, or wipe the registry
+/gitagent remove code-reviewer
+/gitagent remove all
 ```
 
 Loaded agents persist across restarts of the same pi session file.
@@ -69,6 +74,7 @@ Loaded agents persist across restarts of the same pi session file.
 
 - Loads agents from local paths, installed aliases, GitHub shorthand, or GitHub URLs.
 - Installs aliases into `~/.pi/gitagent/installed.json`.
+- Shows installed aliases in `/gitagent list` by default, alongside agents in your current working directory.
 - Caches remote repos under `~/.pi/gitagent/cache/github/<owner>/<repo>/<branch>/`.
 - Stores remote-agent memory under `~/.pi/gitagent/memory/<agent-name>/MEMORY.md`.
 - Keeps local-agent memory in the agent's own `memory/` directory.
@@ -83,10 +89,11 @@ Loaded agents persist across restarts of the same pi session file.
 |---|---|
 | `/gitagent install <ref>` | Install one agent, or all agents in a repo/path, into the local registry |
 | `/gitagent installed` | List installed agents |
+| `/gitagent remove <name\|all>` | Remove installed agents from the local registry |
 | `/gitagent load <ref>` | Load an agent into the current session |
 | `/gitagent run <ref> -- <task>` | Run one agent without changing the saved session agent |
 | `/gitagent chain <a> <b> -- <task>` | Run multiple agents in sequence |
-| `/gitagent list [ref]` | List agents in a local directory or repo |
+| `/gitagent list [ref]` | List installed aliases plus current-directory agents, or agents in a specific local directory/repo |
 | `/gitagent recommend <task>` | Suggest the best bundled agent for a task |
 | `/gitagent doctor [ref]` | Validate runtime, cache, memory, and model wiring |
 | `/gitagent policy [ref]` | Show the active or target agent's runtime policy |
@@ -103,7 +110,7 @@ Loaded agents persist across restarts of the same pi session file.
 | `gitagent_load` | Load an agent and optionally queue a follow-up task |
 | `gitagent_unload` | Remove the loaded agent context |
 | `gitagent_info` | Show the currently loaded agent |
-| `gitagent_list` | List available agents in a directory or repo |
+| `gitagent_list` | List installed aliases plus current-directory agents, or agents in a specific directory/repo |
 | `gitagent_remember` | Save a learning to the agent's memory |
 
 ## Memory behavior

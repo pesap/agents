@@ -70,3 +70,23 @@ export function upsertInstalledAgents(records: InstalledAgentRecord[]): Installe
   saveInstalledAgents(merged);
   return merged;
 }
+
+export function removeInstalledAgents(names: string[]): InstalledAgentRecord[] {
+  const wanted = new Set(names.map((name) => name.trim()).filter(Boolean));
+  if (wanted.size === 0) return [];
+
+  const current = readInstalledAgents();
+  const removed = current.filter((record) => wanted.has(record.name));
+  if (removed.length === 0) return [];
+
+  saveInstalledAgents(current.filter((record) => !wanted.has(record.name)));
+  return sortRecords(removed);
+}
+
+export function clearInstalledAgents(): InstalledAgentRecord[] {
+  const current = readInstalledAgents();
+  if (current.length === 0) return [];
+
+  saveInstalledAgents([]);
+  return current;
+}
