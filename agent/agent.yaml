@@ -16,10 +16,12 @@ skills:
   - feature-delivery
   - skill-creator
   - github
+  - python-developer
   - simplify
   - caveman
   - surgical-dev
   - create-pisubagents
+  - arco-optimization
 pi:
   scope: project
   tools: "read,edit,write,grep,ast_search,nu,bash,subagent,gitagent_remember"
