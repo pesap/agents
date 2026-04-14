@@ -99,6 +99,8 @@ const BLOCKED_COMMAND_PATTERNS = {
   pythonVenv: /(?:^|\n|[;|&]{1,2})\s*(?:\S+\/)?python(?:3(?:\.\d+)?)?\b[^\n;|&]*(?:\s-m\s*venv\b|\s-mvenv\b)/m,
   pythonPyCompile:
     /(?:^|\n|[;|&]{1,2})\s*(?:\S+\/)?python(?:3(?:\.\d+)?)?\b[^\n;|&]*(?:\s-m\s*py_compile\b|\s-mpy_compile\b)/m,
+  pythonExplicitPath:
+    /(?:^|\n|[;|&]{1,2})\s*(?:(?:env(?:\s+-\S+(?:\s+\S+)?)?(?:\s+[A-Za-z_][A-Za-z0-9_]*=\S+)*\s+)|(?:command|builtin|exec|nohup|time)(?:\s+-\S+(?:\s+\S+)?)*\s+)*(?:[A-Za-z_][A-Za-z0-9_]*=\S+\s+)*(?:\S+\/)python(?:3(?:\.\d+)?)?\b(?=\s|$)/m,
 };
 
 const UV_INSTALL_GUIDANCE = [
@@ -141,6 +143,16 @@ function getBlockedCommandMessage(command: string): string | null {
     return formatBlockedCommandMessage(
       "Error: 'python -m py_compile' is disabled while pesap-agent is active because it writes .pyc files to __pycache__.",
       ["To verify syntax without bytecode output: uv run python -m ast path/to/file.py >/dev/null"],
+    );
+  }
+
+  if (BLOCKED_COMMAND_PATTERNS.pythonExplicitPath.test(command)) {
+    return formatBlockedCommandMessage(
+      "Error: Direct path-qualified Python executables (for example `/usr/bin/python3`) are disabled while pesap-agent is active.",
+      [
+        "Use `python` or `python3` so pesap-agent can route through uv.",
+        "For explicit interpreter control, run: uv run python ...",
+      ],
     );
   }
   return null;

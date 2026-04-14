@@ -30,8 +30,9 @@ pi -e https://github.com/pesap/agents
 When pesap-agent is enabled (`/start-agent`, or auto-enabled by workflow commands), the extension wraps the `bash` tool and intercepts Python packaging commands inspired by https://github.com/mitsuhiko/agent-stuff:
 
 - `pip`, `pip3`, `poetry` → blocked with `uv` replacement guidance
-- `python`, `python3` → routed through `uv run` wrappers
+- `python`, `python3` → routed through `uv run` wrappers when invoked by command name
 - `python -m pip|venv|py_compile` → blocked with actionable alternatives
+- path-qualified Python executables (e.g. `/usr/bin/python3`, `.venv/bin/python`) → blocked to prevent interception bypass
 
 Run `/end-agent` to disable this interception for the current session.
 ## Self-learning storage
