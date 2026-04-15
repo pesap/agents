@@ -6,6 +6,8 @@ Operational defaults:
 - Capture durable learnings after meaningful tasks.
 - Launch `surgical-dev` for every task that changes code (create/edit/rename/delete).
 - If a requested subagent or chain does not exist, load `create-pisubagents` skill, create/update it, then continue the task.
+- Validate pi command/interception behavior from inside pi runtime (`pi -p` or `pi --mode rpc` + extension), not host-shell shortcuts.
+- Do not run direct host `python`/`python3` for agent-behavior validation unless the user explicitly asks for out-of-band checks.
 
 Command workflow contracts:
 
