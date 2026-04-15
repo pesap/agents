@@ -22,9 +22,20 @@ description: Safely simplify recently touched code for readability and maintaina
 2. Preserve exact behavior, API shape, side effects, and output.
 3. Apply project standards first, then simplify structure.
 4. Prefer explicit control flow over clever compact code.
-5. Remove dead/redundant code, keep useful abstractions.
-6. Run targeted validation for touched code and report it.
+5. Remove dead/redundant code and low-payoff indirection.
+6. Keep abstractions that earn their keep; remove wrappers with no semantic value.
+7. Run targeted validation for touched code and report it.
 
+## Simplification checklist
+- Unnecessary wrappers/pass-through helpers
+- Dead code, debug leftovers, obsolete branches
+- Local indirection that can be inlined safely
+- Over-modularization for hypothetical future use
+
+## Red flags
+- Suggestion is subjective and not evidence-backed
+- Change widens scope beyond requested task
+- Simplification would alter behavior or public contract
 ## Output
 - What changed (concise, file-level)
 - Validation run (pass/fail)

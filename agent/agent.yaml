@@ -12,16 +12,30 @@ model:
     temperature: 0.2
     max_tokens: 8192
 skills:
-  - debug-investigation
-  - feature-delivery
-  - skill-creator
-  - github
-  - python-developer
-  - simplify
-  - caveman
   - surgical-dev
-  - create-pisubagents
+  - feature-delivery
+  - debug-investigation
+  - simplify
+  - code-review
+  - security-audit
+  - python-developer
+  - testing-pytest
+  - uv
+  - github
+  - gitlab
+  - docs-authoring
+  - academic-review
   - arco-optimization
+  - skill-creator
+  - create-pisubagents
+  - caveman
+  - infrasys-integration
+  - component-modeling
+  - cost-curves
+  - system-design
+  - storage-backends
+  - time-series-mastery
+  - serialization-migration
 pi:
   scope: project
   tools: "read,edit,write,grep,ast_search,nu,bash,subagent,gitagent_remember"

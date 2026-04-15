@@ -45,6 +45,7 @@ description: Python implementation workflow aligned with the python-developer su
 - Avoid class-based tests unless framework constraints require them.
 - Add regression tests for bug fixes.
 - Run targeted tests for touched paths unless full-suite is requested.
+- For deep pytest strategy (fixtures/plugins/parametrize/property/snapshot/perf/CI), load `testing-pytest`.
 
 6) Communication
 - Be concise and direct.
