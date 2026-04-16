@@ -29,6 +29,8 @@ const RISK_APPROVAL_TYPE = "pesap-risk-approval";
 const RISK_APPROVAL_TTL_MINUTES = 20;
 const LOW_CONFIDENCE_THRESHOLD = 0.7;
 const RUNTIME_DAILYLOG_PATH = path.join(AGENT_DIR, "memory", "runtime", "live", "dailylog.md");
+const GLOBAL_PI_SETTINGS_PATH = path.join(homedir(), ".pi", "agent", "settings.json");
+const PACKAGE_SKILLS_PATH = path.join(PACKAGE_ROOT, "agent", "skills");
 const FIRST_PRINCIPLES_CONFIG_PATH = path.join(AGENT_DIR, "compliance", "first-principles-gate.yaml");
 const PREFLIGHT_STATE_TYPE = "pesap-preflight-state";
 const POSTFLIGHT_EVENT_TYPE = "pesap-postflight-event";
@@ -349,6 +351,27 @@ async function ensureFile(filePath: string, initialContent: string): Promise<voi
 
 async function appendLine(filePath: string, line: string): Promise<void> {
   await fs.appendFile(filePath, `${line}\n`, "utf8");
+}
+
+async function ensureSkillPathInSettings(settingsPath: string, skillPath: string): Promise<{ added: boolean; warning?: string }> {
+  try {
+    await fs.mkdir(path.dirname(settingsPath), { recursive: true });
+    const raw = await readTextIfExists(settingsPath);
+    const settings = raw.trim() ? JSON.parse(raw) as Record<string, unknown> : {};
+    const skills = Array.isArray(settings.skills) ? settings.skills.filter((value): value is string => typeof value === "string") : [];
+
+    if (skills.includes(skillPath)) {
+      return { added: false };
+    }
+
+    await fs.writeFile(settingsPath, `${JSON.stringify({ ...settings, skills: [...skills, skillPath] }, null, 2)}\n`, "utf8");
+    return { added: true };
+  } catch (error) {
+    return {
+      added: false,
+      warning: `Failed to persist skills path in ${settingsPath}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 function cloneHookConfig(config: HookConfig): HookConfig {
@@ -2057,6 +2080,14 @@ export default function pesapExtension(pi: ExtensionAPI): void {
     activePreflight = getPreflightFromSession(ctx);
     agentEnabled = getAgentEnabledFromSession(ctx);
     setAgentEnabledState(ctx, agentEnabled);
+
+    const settingsSync = await ensureSkillPathInSettings(GLOBAL_PI_SETTINGS_PATH, PACKAGE_SKILLS_PATH);
+    if (settingsSync.warning) {
+      notify(ctx, settingsSync.warning, "warning");
+    } else if (settingsSync.added) {
+      notify(ctx, `Registered pesap skills in ${GLOBAL_PI_SETTINGS_PATH}.`, "info");
+    }
+
     notify(
       ctx,
       `pesap-agent path: ${paths.root} (preflight=${firstPrinciplesConfig.preflightMode}, postflight=${firstPrinciplesConfig.postflightMode})`,

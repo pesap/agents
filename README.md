@@ -8,6 +8,8 @@ A Pi package for a single, self-learning development agent that can orchestrate 
 pi install https://github.com/pesap/agents
 ```
 
+On session start, pesap-agent ensures `~/.pi/agent/settings.json` contains this package's `agent/skills` path so other extensions/agents can resolve the same skill set.
+
 ## Try without installing
 
 ```bash
