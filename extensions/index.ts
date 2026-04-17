@@ -1,22 +1,25 @@
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { createBashTool } from "@mariozechner/pi-coding-agent";
+import type {
+  AgentEndEvent,
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ExtensionContext,
+  ToolCallEvent,
+} from "@mariozechner/pi-coding-agent";
+import { createBashTool, isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import type { AssistantMessage, TextContent } from "@mariozechner/pi-ai";
 import { randomUUID } from "node:crypto";
 import { existsSync, promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const AGENT_DIR = resolveAgentDir(PACKAGE_ROOT);
+const AGENT_DIR = path.join(PACKAGE_ROOT, "agent");
 const SKILLFLOWS_DIR = path.join(AGENT_DIR, "skillflows");
 const COMMANDS_DIR = path.join(PACKAGE_ROOT, "commands");
 const INTERCEPTED_COMMANDS_DIR = path.join(PACKAGE_ROOT, "intercepted-commands");
-
 const AGENT_STATE_TYPE = "pesap-agent-state";
-
 const DEFAULT_DEBUG_PARALLEL = 3;
 const DEFAULT_FEATURE_PARALLEL = 2;
-
 const LEARNING_STORE_DIRNAME = "pesap-agent";
 const LEARNING_VERSION = 1;
 const MEMORY_TAIL_LINES = 20;
@@ -35,40 +38,57 @@ const FIRST_PRINCIPLES_CONFIG_PATH = path.join(AGENT_DIR, "compliance", "first-p
 const PREFLIGHT_STATE_TYPE = "pesap-preflight-state";
 const POSTFLIGHT_EVENT_TYPE = "pesap-postflight-event";
 const POLICY_EVENT_TYPE = "pesap-policy-event";
-
 type WorkflowType = "debug" | "feature" | "review" | "git-review" | "simplify" | "learn-skill";
 type WorkflowOutcome = "success" | "partial" | "failed";
-
-const REVIEW_COMMAND_SOURCE = "https://github.com/earendil-works/pi-review";
-const GIT_REVIEW_COMMAND_SOURCE = "https://piechowski.io/post/git-commands-before-reading-code/";
-const SIMPLIFY_COMMAND_SOURCE = "https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-simplifier/agents/code-simplifier.md";
-
-type ReviewMode = "uncommitted" | "branch" | "commit" | "pr" | "folder";
+type WorkflowFlagValue = string | number | boolean | null | string[];
+type WorkflowFlags = Record<string, WorkflowFlagValue>;
+type LearningHintKind = "promote" | "improve";
 type HookLifecycle = "on_session_start" | "pre_risky_action" | "on_session_end";
 type HookType = "markdown" | "policy";
 type RiskCategory = "destructive_operation" | "secret_or_pii_exposure_risk";
+type PolicyMode = "monitor" | "warn" | "enforce";
+type PolicyPhase = "preflight" | "postflight";
+type PolicyOutcome = "allow" | "warn" | "block";
+type PreflightClarify = "yes" | "no";
+type PreflightSource = "manual" | "auto";
+type PostflightResult = "pass" | "fail" | "not-run";
+const REVIEW_COMMAND_SOURCE = "https://github.com/earendil-works/pi-review";
+const GIT_REVIEW_COMMAND_SOURCE = "https://piechowski.io/post/git-commands-before-reading-code/";
+const SIMPLIFY_COMMAND_SOURCE = "https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-simplifier/agents/code-simplifier.md";
+type ParsedReviewArgs =
+  | { mode: "uncommitted"; extraInstruction?: string }
+  | { mode: "branch"; branch: string; extraInstruction?: string }
+  | { mode: "commit"; commit: string; extraInstruction?: string }
+  | { mode: "pr"; pr: string; extraInstruction?: string }
+  | { mode: "folder"; paths: string[]; extraInstruction?: string };
 
-interface ParsedReviewArgs {
-  mode: ReviewMode;
-  branch?: string;
-  commit?: string;
-  pr?: string;
-  paths?: string[];
-  extraInstruction?: string;
-  error?: string;
+interface ParsedReviewArgsError {
+  error: string;
 }
 
+type ParsedReviewArgsResult = ParsedReviewArgs | ParsedReviewArgsError;
+interface ScopedTarget {
+  summary: string;
+  instruction: string;
+  flags: WorkflowFlags;
+}
 interface PendingWorkflow {
   id: string;
   type: WorkflowType;
   input: string;
-  flags: Record<string, unknown>;
+  flags: WorkflowFlags;
   startedAt: string;
   runFile: string;
   mutationCount: number;
   policyWarnings: string[];
 }
 
+interface LearningHint {
+  kind: LearningHintKind;
+  sampleSize: number;
+  scoreRate: number;
+  at: string;
+}
 interface LearningPaths {
   root: string;
   memoryDir: string;
@@ -79,56 +99,46 @@ interface LearningPaths {
   promotionQueue: string;
   stateJson: string;
 }
-
 interface LearningObservation {
   version: number;
   id: string;
   timestamp: string;
   taskType: WorkflowType;
   input: string;
-  flags: Record<string, unknown>;
+  flags: WorkflowFlags;
   outcome: WorkflowOutcome;
   confidence: number;
   evidenceSnippet: string;
   workflowId: string;
 }
-
 interface LearningState {
-  hints: Record<
-    string,
-    {
-      kind: "promote" | "improve";
-      sampleSize: number;
-      scoreRate: number;
-      at: string;
-    }
-  >;
+  hints: Record<string, LearningHint>;
 }
-
 interface HookEntry {
   type: HookType;
   path?: string;
   policy?: string;
   description?: string;
 }
-
 interface HookConfig {
   on_session_start: HookEntry[];
   pre_risky_action: HookEntry[];
   on_session_end: HookEntry[];
 }
-
 interface HookConfigLoadResult {
   config: HookConfig;
   warnings: string[];
 }
-
 interface RiskApproval {
   reason: string;
   approvedAt: string;
   expiresAt: string;
 }
 
+interface ClassifiedRisk {
+  category: RiskCategory;
+  detail: string;
+}
 interface RiskEvent {
   at: string;
   command: string;
@@ -136,39 +146,44 @@ interface RiskEvent {
   detail: string;
   approved: boolean;
 }
-
-type PolicyMode = "monitor" | "warn" | "enforce";
-
-type PolicyPhase = "preflight" | "postflight";
-
 interface FirstPrinciplesConfig {
   preflightMode: PolicyMode;
   postflightMode: PolicyMode;
 }
-
 interface PreflightRecord {
   at: string;
   skill: string;
   reason: string;
-  clarify: "yes" | "no";
+  clarify: PreflightClarify;
   raw: string;
-  source: "manual" | "auto";
+  source: PreflightSource;
 }
-
 interface PostflightRecord {
   at: string;
   verify: string;
-  result: "pass" | "fail" | "not-run";
+  result: PostflightResult;
   raw: string;
 }
-
 interface PolicyEvent {
   at: string;
   phase: PolicyPhase;
   mode: PolicyMode;
-  outcome: "allow" | "warn" | "block";
+  outcome: PolicyOutcome;
   detail: string;
   toolName?: string;
+}
+
+interface ParseRecordResult<T> {
+  record?: T;
+  error?: string;
+}
+
+interface LowConfidenceEvent {
+  at: string;
+  workflowId: string;
+  workflowType: WorkflowType;
+  confidence: number;
+  outcome: WorkflowOutcome;
 }
 
 let pendingWorkflow: PendingWorkflow | null = null;
@@ -182,7 +197,7 @@ const DEFAULT_HOOK_CONFIG: HookConfig = {
 let activeHookConfig: HookConfig = DEFAULT_HOOK_CONFIG;
 let riskApproval: RiskApproval | null = null;
 let riskEvents: RiskEvent[] = [];
-let lowConfidenceEvents: Array<{ at: string; workflowId: string; workflowType: WorkflowType; confidence: number; outcome: WorkflowOutcome }> = [];
+let lowConfidenceEvents: LowConfidenceEvent[] = [];
 let firstPrinciplesConfig: FirstPrinciplesConfig = { preflightMode: "warn", postflightMode: "warn" };
 let activePreflight: PreflightRecord | null = null;
 let latestPostflight: PostflightRecord | null = null;
@@ -192,6 +207,7 @@ const PREFLIGHT_LINE_REGEX = /^Preflight:\s+skill=([a-zA-Z0-9_.-]+|none)\s+reaso
 const POSTFLIGHT_LINE_REGEX = /^Postflight:\s+verify="([^"]{1,280})"\s+result=(pass|fail|not-run)\s*$/;
 const MUTATION_BASH_PATTERN = /(?:^|\n|[;|&]{1,2})\s*(?:git\s+(?:add|apply|am|commit|checkout|switch|merge|rebase|cherry-pick|revert|reset|restore|clean|stash|tag|branch|push|pull)|rm\b|mv\b|cp\b|mkdir\b|rmdir\b|touch\b|chmod\b|chown\b|sed\b[^\n;|&]*\s-i\b|perl\b[^\n;|&]*\s-i\b|tee\b|truncate\b|dd\b)/m;
 const POSTFLIGHT_INSTRUCTION = "Instruction: If you ran any mutation tool (edit/write/mutating bash), include exactly one line: `Postflight: verify=\"<command_or_check>\" result=<pass|fail|not-run>`.";
+const REQUIRED_WORKFLOW_FOOTER_INSTRUCTION = "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`. Missing either line is treated as failed.";
 
 const BLOCKED_COMMAND_PATTERNS = {
   pip: /(?:^|\n|[;|&]{1,2})\s*(?:\S+\/)?pip\s*(?:$|\s)/m,
@@ -303,11 +319,6 @@ function slugify(value: string): string {
   return normalized || "new-skill";
 }
 
-function resolveAgentDir(packageRoot: string): string {
-  const candidates = ["agent", "pesap-agent"].map((name) => path.join(packageRoot, name));
-  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
-}
-
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -323,6 +334,182 @@ function clampConfidence(value: number): number {
   return value;
 }
 
+interface RiskApprovalEntryData {
+  approved?: boolean;
+  reason?: string;
+  approvedAt?: string;
+  expiresAt?: string;
+}
+
+interface PreflightStateEntryData {
+  at?: string;
+  skill?: string;
+  reason?: string;
+  clarify?: string;
+  raw?: string;
+  source?: string;
+}
+
+interface AgentStateEntryData {
+  enabled?: boolean;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isWorkflowFlagValue(value: unknown): value is WorkflowFlagValue {
+  return value === null
+    || typeof value === "string"
+    || typeof value === "number"
+    || typeof value === "boolean"
+    || isStringArray(value);
+}
+
+function isWorkflowFlags(value: unknown): value is WorkflowFlags {
+  if (!isRecord(value)) return false;
+  return Object.values(value).every((entry) => isWorkflowFlagValue(entry));
+}
+
+function isWorkflowType(value: unknown): value is WorkflowType {
+  return value === "debug"
+    || value === "feature"
+    || value === "review"
+    || value === "git-review"
+    || value === "simplify"
+    || value === "learn-skill";
+}
+
+function isWorkflowOutcome(value: unknown): value is WorkflowOutcome {
+  return value === "success" || value === "partial" || value === "failed";
+}
+
+function isPreflightClarify(value: unknown): value is PreflightClarify {
+  return value === "yes" || value === "no";
+}
+
+function isPreflightSource(value: unknown): value is PreflightSource {
+  return value === "manual" || value === "auto";
+}
+
+function isPostflightResult(value: unknown): value is PostflightResult {
+  return value === "pass" || value === "fail" || value === "not-run";
+}
+
+function getErrorCode(error: unknown): string | null {
+  if (!isRecord(error)) return null;
+  const code = error.code;
+  return typeof code === "string" ? code : null;
+}
+
+function hasErrorCode(error: unknown, codes: readonly string[]): boolean {
+  const code = getErrorCode(error);
+  return code !== null && codes.includes(code);
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return hasErrorCode(error, ["ENOENT", "ENOTDIR"]);
+}
+
+function isRecoverableLearningStoreError(error: unknown): boolean {
+  return hasErrorCode(error, ["EACCES", "EPERM", "EROFS", "ENOENT", "ENOTDIR"]);
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function parseRiskApprovalEntryData(value: unknown): RiskApprovalEntryData | null {
+  return isRecord(value) ? value : null;
+}
+
+function parsePreflightStateEntryData(value: unknown): PreflightStateEntryData | null {
+  return isRecord(value) ? value : null;
+}
+
+function parseAgentStateEntryData(value: unknown): AgentStateEntryData | null {
+  return isRecord(value) ? value : null;
+}
+
+function parseLearningHint(value: unknown): LearningHint | null {
+  if (!isRecord(value)) return null;
+
+  const kind = value.kind;
+  const sampleSize = value.sampleSize;
+  const scoreRate = value.scoreRate;
+  const at = value.at;
+
+  if ((kind !== "promote" && kind !== "improve")
+    || typeof sampleSize !== "number"
+    || !Number.isFinite(sampleSize)
+    || typeof scoreRate !== "number"
+    || !Number.isFinite(scoreRate)
+    || typeof at !== "string") {
+    return null;
+  }
+
+  return { kind, sampleSize, scoreRate, at };
+}
+
+function parseLearningHints(value: unknown): Record<string, LearningHint> {
+  if (!isRecord(value)) return {};
+
+  const hints: Record<string, LearningHint> = {};
+  for (const [key, hintValue] of Object.entries(value)) {
+    const parsed = parseLearningHint(hintValue);
+    if (parsed) hints[key] = parsed;
+  }
+
+  return hints;
+}
+
+function parseLearningObservation(value: unknown): LearningObservation | null {
+  if (!isRecord(value)) return null;
+
+  const version = value.version;
+  const id = value.id;
+  const timestamp = value.timestamp;
+  const taskType = value.taskType;
+  const input = value.input;
+  const flags = value.flags;
+  const outcome = value.outcome;
+  const confidence = value.confidence;
+  const evidenceSnippet = value.evidenceSnippet;
+  const workflowId = value.workflowId;
+
+  if (typeof version !== "number"
+    || !Number.isFinite(version)
+    || typeof id !== "string"
+    || typeof timestamp !== "string"
+    || !isWorkflowType(taskType)
+    || typeof input !== "string"
+    || !isWorkflowFlags(flags)
+    || !isWorkflowOutcome(outcome)
+    || typeof confidence !== "number"
+    || !Number.isFinite(confidence)
+    || typeof evidenceSnippet !== "string"
+    || typeof workflowId !== "string") {
+    return null;
+  }
+
+  return {
+    version,
+    id,
+    timestamp,
+    taskType,
+    input,
+    flags,
+    outcome,
+    confidence,
+    evidenceSnippet,
+    workflowId,
+  };
+}
+
 async function readText(filePath: string): Promise<string> {
   return fs.readFile(filePath, "utf8");
 }
@@ -330,17 +517,27 @@ async function readText(filePath: string): Promise<string> {
 async function readTextIfExists(filePath: string): Promise<string> {
   try {
     return await readText(filePath);
-  } catch {
-    return "";
+  } catch (error) {
+    if (isMissingPathError(error)) return "";
+    throw new Error(`Failed to read ${filePath}: ${formatErrorMessage(error)}`);
   }
 }
-
 async function exists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (isMissingPathError(error)) return false;
+    throw new Error(`Failed to check whether ${filePath} exists: ${formatErrorMessage(error)}`);
+  }
+}
+
+async function statIfExists(filePath: string): Promise<import("node:fs").Stats | null> {
+  try {
+    return await fs.stat(filePath);
+  } catch (error) {
+    if (isMissingPathError(error)) return null;
+    throw new Error(`Failed to stat ${filePath}: ${formatErrorMessage(error)}`);
   }
 }
 
@@ -357,8 +554,14 @@ async function ensureSkillPathInSettings(settingsPath: string, skillPath: string
   try {
     await fs.mkdir(path.dirname(settingsPath), { recursive: true });
     const raw = await readTextIfExists(settingsPath);
-    const settings = raw.trim() ? JSON.parse(raw) as Record<string, unknown> : {};
-    const skills = Array.isArray(settings.skills) ? settings.skills.filter((value): value is string => typeof value === "string") : [];
+    const parsed = raw.trim() ? JSON.parse(raw) : {};
+    const settings = isRecord(parsed) ? parsed : {};
+    const existingSkills = settings.skills;
+    const skills = isStringArray(existingSkills)
+      ? existingSkills
+      : Array.isArray(existingSkills)
+        ? existingSkills.filter((value): value is string => typeof value === "string")
+        : [];
 
     if (skills.includes(skillPath)) {
       return { added: false };
@@ -445,8 +648,10 @@ function parseHooksConfig(raw: string): HookConfigLoadResult {
 
     const propertyMatch = line.match(/^\s{6}(path|policy|description):\s+(.+)\s*$/);
     if (propertyMatch && currentEntry) {
-      const key = propertyMatch[1] as "path" | "policy" | "description";
-      currentEntry[key] = stripOuterQuotes(propertyMatch[2]);
+      const key = propertyMatch[1];
+      if (key === "path" || key === "policy" || key === "description") {
+        currentEntry[key] = stripOuterQuotes(propertyMatch[2]);
+      }
     }
   }
 
@@ -528,66 +733,61 @@ function hasValidRiskApproval(): boolean {
 
 function getRiskApprovalFromSession(ctx: ExtensionContext): RiskApproval | null {
   let approval: RiskApproval | null = null;
+
   for (const entry of ctx.sessionManager.getEntries()) {
-    if (entry.type !== "custom") continue;
-    const custom = entry as { customType?: string; data?: { approved?: unknown; reason?: unknown; approvedAt?: unknown; expiresAt?: unknown } };
-    if (custom.customType !== RISK_APPROVAL_TYPE) continue;
-    if (custom.data?.approved !== true) {
+    if (entry.type !== "custom" || entry.customType !== RISK_APPROVAL_TYPE) continue;
+
+    const data = parseRiskApprovalEntryData(entry.data);
+    if (!data || data.approved !== true) {
       approval = null;
       continue;
     }
+
     if (
-      typeof custom.data.reason === "string"
-      && typeof custom.data.approvedAt === "string"
-      && typeof custom.data.expiresAt === "string"
+      typeof data.reason === "string"
+      && typeof data.approvedAt === "string"
+      && typeof data.expiresAt === "string"
     ) {
       approval = {
-        reason: custom.data.reason,
-        approvedAt: custom.data.approvedAt,
-        expiresAt: custom.data.expiresAt,
+        reason: data.reason,
+        approvedAt: data.approvedAt,
+        expiresAt: data.expiresAt,
       };
     }
   }
+
   if (!approval) return null;
   return Date.parse(approval.expiresAt) > Date.now() ? approval : null;
 }
 
 function getPreflightFromSession(ctx: ExtensionContext): PreflightRecord | null {
   let record: PreflightRecord | null = null;
+
   for (const entry of ctx.sessionManager.getEntries()) {
-    if (entry.type !== "custom") continue;
-    const custom = entry as {
-      customType?: string;
-      data?: {
-        at?: unknown;
-        skill?: unknown;
-        reason?: unknown;
-        clarify?: unknown;
-        raw?: unknown;
-        source?: unknown;
-      };
-    };
-    if (custom.customType !== PREFLIGHT_STATE_TYPE) continue;
-    if (!custom.data) continue;
+    if (entry.type !== "custom" || entry.customType !== PREFLIGHT_STATE_TYPE) continue;
+
+    const data = parsePreflightStateEntryData(entry.data);
+    if (!data) continue;
 
     if (
-      typeof custom.data.at === "string"
-      && typeof custom.data.skill === "string"
-      && typeof custom.data.reason === "string"
-      && (custom.data.clarify === "yes" || custom.data.clarify === "no")
-      && typeof custom.data.raw === "string"
-      && (custom.data.source === "manual" || custom.data.source === "auto")
+      typeof data.at === "string"
+      && typeof data.skill === "string"
+      && typeof data.reason === "string"
+      && isPreflightClarify(data.clarify)
+      && typeof data.raw === "string"
+      && isPreflightSource(data.source)
     ) {
       record = {
-        at: custom.data.at,
-        skill: custom.data.skill,
-        reason: custom.data.reason,
-        clarify: custom.data.clarify,
-        raw: custom.data.raw,
-        source: custom.data.source,
+        at: data.at,
+        skill: data.skill,
+        reason: data.reason,
+        clarify: data.clarify,
+        raw: data.raw,
+        source: data.source,
       };
     }
   }
+
   return record;
 }
 
@@ -595,7 +795,7 @@ function requiresCheckerForHighRisk(config: HookConfig): boolean {
   return config.pre_risky_action.some((entry) => entry.type === "policy" && entry.policy === "require_human_checker_for_high_risk");
 }
 
-function classifyRiskyCommand(command: string): { category: RiskCategory; detail: string } | null {
+function classifyRiskyCommand(command: string): ClassifiedRisk | null {
   for (const entry of DESTRUCTIVE_COMMAND_PATTERNS) {
     if (entry.pattern.test(command)) {
       return {
@@ -615,7 +815,7 @@ function classifyRiskyCommand(command: string): { category: RiskCategory; detail
   return null;
 }
 
-function buildRiskApprovalRequiredMessage(risk: { category: RiskCategory; detail: string }): string {
+function buildRiskApprovalRequiredMessage(risk: ClassifiedRisk): string {
   return [
     `Error: High-risk command blocked (${risk.category}; ${risk.detail}).`,
     "Checker approval is required before executing high-risk actions.",
@@ -627,7 +827,7 @@ function buildRiskApprovalRequiredMessage(risk: { category: RiskCategory; detail
   ].join("\n");
 }
 
-function recordRiskEvent(command: string, risk: { category: RiskCategory; detail: string }, approved: boolean, at: string): void {
+function recordRiskEvent(command: string, risk: ClassifiedRisk, approved: boolean, at: string): void {
   riskEvents.push({
     at,
     command: summarizeEvidence(command, 200),
@@ -674,7 +874,7 @@ function parseApproveRiskArgs(args: string): { reason: string; ttlMinutes: numbe
   };
 }
 
-function parsePreflightArgs(args: string): { record?: PreflightRecord; error?: string } {
+function parsePreflightArgs(args: string): ParseRecordResult<PreflightRecord> {
   const candidate = args.trim();
   if (!candidate) {
     return {
@@ -692,7 +892,7 @@ function parsePreflightArgs(args: string): { record?: PreflightRecord; error?: s
   return { record: parsed };
 }
 
-function parsePostflightArgs(args: string): { record?: PostflightRecord; error?: string } {
+function parsePostflightArgs(args: string): ParseRecordResult<PostflightRecord> {
   const candidate = args.trim();
   if (!candidate) {
     return {
@@ -731,8 +931,8 @@ async function buildLifecycleHookMarkdown(lifecycle: HookLifecycle): Promise<str
 async function appendRuntimeDailyLog(line: string): Promise<void> {
   try {
     await appendLine(RUNTIME_DAILYLOG_PATH, line);
-  } catch {
-    // best-effort only
+  } catch (error) {
+    console.warn(`Failed to append runtime log line to ${RUNTIME_DAILYLOG_PATH}: ${formatErrorMessage(error)}`);
   }
 }
 
@@ -773,18 +973,18 @@ async function runSessionEndHooks(pi: ExtensionAPI, ctx: Pick<ExtensionContext, 
 
 function getAgentEnabledFromSession(ctx: ExtensionContext): boolean {
   let enabled = false;
+
   for (const entry of ctx.sessionManager.getEntries()) {
-    if (entry.type !== "custom") continue;
-    const custom = entry as { customType?: string; data?: { enabled?: unknown; initialized?: unknown } };
-    if (custom.customType !== AGENT_STATE_TYPE) continue;
-    if (typeof custom.data?.initialized === "boolean") {
-      enabled = custom.data.initialized;
-      continue;
-    }
-    if (typeof custom.data?.enabled === "boolean") {
-      enabled = custom.data.enabled;
+    if (entry.type !== "custom" || entry.customType !== AGENT_STATE_TYPE) continue;
+
+    const data = parseAgentStateEntryData(entry.data);
+    if (!data) continue;
+
+    if (typeof data.enabled === "boolean") {
+      enabled = data.enabled;
     }
   }
+
   return enabled;
 }
 
@@ -801,7 +1001,6 @@ function ensureAgentEnabledForCommand(
   if (agentEnabled) return;
   setAgentEnabledState(ctx, true);
   pi.appendEntry(AGENT_STATE_TYPE, {
-    initialized: true,
     enabled: true,
     source,
     at: nowIso(),
@@ -945,168 +1144,165 @@ function isResolvableReviewPath(entry: string, cwd: string): boolean {
   );
 }
 
-function parseReviewArgs(args: string, cwd: string, commandName = "review"): ParsedReviewArgs {
+function parseReviewArgs(args: string, cwd: string, commandName = "review"): ParsedReviewArgsResult {
   const usage = `Usage: /${commandName} [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`;
   const trimmed = args.trim();
   if (!trimmed) {
     return { mode: "uncommitted" };
   }
+
   const tokens = tokenizeArgs(trimmed);
   const positional: string[] = [];
   let extraInstruction: string | undefined;
+
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
     if (token === "--extra") {
       const extra = tokens.slice(i + 1).join(" ").trim();
       if (!extra) {
-        return { mode: "uncommitted", error: usage };
+        return { error: usage };
       }
+
       extraInstruction = extra;
       break;
     }
+
     positional.push(token);
   }
+
   if (positional.length === 0) {
     return { mode: "uncommitted", extraInstruction };
   }
+
   const [modeToken, ...rest] = positional;
   const mode = modeToken.toLowerCase();
+
   if (mode === "uncommitted") {
     if (rest.length > 0) {
-      return { mode: "uncommitted", error: "`uncommitted` does not accept additional arguments." };
+      return { error: "`uncommitted` does not accept additional arguments." };
     }
+
     return { mode: "uncommitted", extraInstruction };
   }
+
   if (mode === "branch") {
     const branch = rest[0]?.trim();
     if (!branch || rest.length !== 1) {
-      return { mode: "branch", error: `Usage: /${commandName} branch <base-branch> [--extra "focus"]` };
+      return { error: `Usage: /${commandName} branch <base-branch> [--extra "focus"]` };
     }
+
     return { mode: "branch", branch, extraInstruction };
   }
+
   if (mode === "commit") {
     const commit = rest[0]?.trim();
     if (!commit || rest.length !== 1) {
-      return { mode: "commit", error: `Usage: /${commandName} commit <sha> [--extra "focus"]` };
+      return { error: `Usage: /${commandName} commit <sha> [--extra "focus"]` };
     }
+
     return { mode: "commit", commit, extraInstruction };
   }
+
   if (mode === "pr") {
     const pr = rest[0]?.trim();
     if (!pr || rest.length !== 1) {
-      return { mode: "pr", error: `Usage: /${commandName} pr <number|url> [--extra "focus"]` };
+      return { error: `Usage: /${commandName} pr <number|url> [--extra "focus"]` };
     }
+
     return { mode: "pr", pr, extraInstruction };
   }
+
   if (mode === "folder" || mode === "file") {
     const paths = rest.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
     if (paths.length === 0) {
-      return { mode: "folder", error: `Usage: /${commandName} ${mode} <path ...> [--extra "focus"]` };
+      return { error: `Usage: /${commandName} ${mode} <path ...> [--extra "focus"]` };
     }
+
     return { mode: "folder", paths, extraInstruction };
   }
+
   const directPaths = positional.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
   if (directPaths.length > 0 && directPaths.every((entry) => isResolvableReviewPath(entry, cwd))) {
     return { mode: "folder", paths: directPaths, extraInstruction };
   }
-  return {
-    mode: "uncommitted",
-    error: usage,
-  };
+
+  return { error: usage };
 }
 
-function buildReviewTarget(parsed: ParsedReviewArgs): { summary: string; instruction: string; flags: Record<string, unknown> } {
+function buildScopedTarget(
+  parsed: ParsedReviewArgs,
+  copy: {
+    branch: (branch: string) => string;
+    commit: (commit: string) => string;
+    pr: (pr: string) => string;
+    folder: (paths: string[]) => string;
+    uncommitted: string;
+  },
+): ScopedTarget {
   if (parsed.mode === "branch") {
     return {
       summary: `branch ${parsed.branch}`,
-      instruction: [
-        `Review changes against base branch \`${parsed.branch}\`.`,
-        `Find merge base first, e.g. \`git merge-base HEAD ${parsed.branch}\`, then inspect diff from that SHA.`,
-      ].join(" "),
+      instruction: copy.branch(parsed.branch),
       flags: { mode: "branch", branch: parsed.branch },
     };
   }
-
   if (parsed.mode === "commit") {
     return {
       summary: `commit ${parsed.commit}`,
-      instruction: `Review only changes introduced by commit \`${parsed.commit}\` (use \`git show ${parsed.commit}\` or equivalent).`,
+      instruction: copy.commit(parsed.commit),
       flags: { mode: "commit", commit: parsed.commit },
     };
   }
-
   if (parsed.mode === "pr") {
     return {
       summary: `pull request ${parsed.pr}`,
-      instruction: [
-        `Review pull request reference \`${parsed.pr}\`.`,
-        "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch before reviewing.",
-      ].join(" "),
+      instruction: copy.pr(parsed.pr),
       flags: { mode: "pr", pr: parsed.pr },
     };
   }
-
   if (parsed.mode === "folder") {
-    const paths = parsed.paths ?? [];
     return {
-      summary: `paths ${paths.join(", ")}`,
-      instruction: `Snapshot review only for files/folders in: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
-      flags: { mode: "folder", paths },
+      summary: `paths ${parsed.paths.join(", ")}`,
+      instruction: copy.folder(parsed.paths),
+      flags: { mode: "folder", paths: parsed.paths },
     };
   }
 
   return {
     summary: "uncommitted changes",
-    instruction: "Review staged, unstaged, and untracked changes in the current workspace.",
+    instruction: copy.uncommitted,
     flags: { mode: "uncommitted" },
   };
 }
-
-function buildSimplifyTarget(parsed: ParsedReviewArgs): { summary: string; instruction: string; flags: Record<string, unknown> } {
-  if (parsed.mode === "branch") {
-    return {
-      summary: `branch ${parsed.branch}`,
-      instruction: [
-        `Simplify code changed against base branch \`${parsed.branch}\` while preserving exact behavior.`,
-        `Find merge base first, e.g. \`git merge-base HEAD ${parsed.branch}\`, then work from that diff scope.`,
-      ].join(" "),
-      flags: { mode: "branch", branch: parsed.branch },
-    };
-  }
-
-  if (parsed.mode === "commit") {
-    return {
-      summary: `commit ${parsed.commit}`,
-      instruction: `Simplify only code introduced by commit \`${parsed.commit}\` while keeping output and API behavior unchanged.`,
-      flags: { mode: "commit", commit: parsed.commit },
-    };
-  }
-
-  if (parsed.mode === "pr") {
-    return {
-      summary: `pull request ${parsed.pr}`,
-      instruction: [
-        `Simplify code in pull request reference \`${parsed.pr}\` with no behavior drift.`,
-        "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch first.",
-      ].join(" "),
-      flags: { mode: "pr", pr: parsed.pr },
-    };
-  }
-
-  if (parsed.mode === "folder") {
-    const paths = parsed.paths ?? [];
-    return {
-      summary: `paths ${paths.join(", ")}`,
-      instruction: `Simplify code only in these files/folders: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
-      flags: { mode: "folder", paths },
-    };
-  }
-
-  return {
-    summary: "uncommitted changes",
-    instruction: "Simplify staged, unstaged, and untracked code in the current workspace while preserving exact functionality.",
-    flags: { mode: "uncommitted" },
-  };
+function buildReviewTarget(parsed: ParsedReviewArgs): ScopedTarget {
+  return buildScopedTarget(parsed, {
+    branch: (branch) => [
+      `Review changes against base branch \`${branch}\`.`,
+      `Find merge base first, e.g. \`git merge-base HEAD ${branch}\`, then inspect diff from that SHA.`,
+    ].join(" "),
+    commit: (commit) => `Review only changes introduced by commit \`${commit}\` (use \`git show ${commit}\` or equivalent).`,
+    pr: (pr) => [
+      `Review pull request reference \`${pr}\`.`,
+      "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch before reviewing.",
+    ].join(" "),
+    folder: (paths) => `Snapshot review only for files/folders in: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
+    uncommitted: "Review staged, unstaged, and untracked changes in the current workspace.",
+  });
+}
+function buildSimplifyTarget(parsed: ParsedReviewArgs): ScopedTarget {
+  return buildScopedTarget(parsed, {
+    branch: (branch) => [
+      `Simplify code changed against base branch \`${branch}\` while preserving exact behavior.`,
+      `Find merge base first, e.g. \`git merge-base HEAD ${branch}\`, then work from that diff scope.`,
+    ].join(" "),
+    commit: (commit) => `Simplify only code introduced by commit \`${commit}\` while keeping output and API behavior unchanged.`,
+    pr: (pr) => [
+      `Simplify code in pull request reference \`${pr}\` with no behavior drift.`,
+      "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch first.",
+    ].join(" "),
+    folder: (paths) => `Simplify code only in these files/folders: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
+    uncommitted: "Simplify staged, unstaged, and untracked code in the current workspace while preserving exact functionality.",
+  });
 }
 function hasSubagentTool(pi: ExtensionAPI): boolean {
   return pi.getAllTools().some((tool) => tool.name === "subagent");
@@ -1137,26 +1333,19 @@ function buildSkillTemplate(skillName: string, topic: string): string {
   ].join("\n");
 }
 
-function extractTextFromContent(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-
-  const parts: string[] = [];
-  for (const item of content) {
-    if (!item || typeof item !== "object") continue;
-    const maybeText = (item as { type?: string; text?: string }).type === "text" ? (item as { text?: string }).text : null;
-    if (typeof maybeText === "string") parts.push(maybeText);
-  }
-
+function extractTextFromAssistantContent(content: AssistantMessage["content"]): string {
+  const parts = content
+    .filter((item): item is TextContent => item.type === "text")
+    .map((item) => item.text);
   return parts.join("\n").trim();
 }
 
-function extractLastAssistantText(messages: unknown): string {
-  if (!Array.isArray(messages)) return "";
+function extractLastAssistantText(messages: AgentEndEvent["messages"]): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i] as { role?: string; content?: unknown };
-    if (message?.role !== "assistant") continue;
-    const text = extractTextFromContent(message.content);
+    const message = messages[i];
+    if (message.role !== "assistant") continue;
+
+    const text = extractTextFromAssistantContent(message.content);
     if (text) return text;
   }
   return "";
@@ -1165,11 +1354,12 @@ function extractLastAssistantText(messages: unknown): string {
 function inferOutcomeFromText(text: string): { outcome: WorkflowOutcome; confidence: number; strictViolation?: string } {
   const resultMatch = text.match(/(?:^|\n)\s*Result\s*:\s*(success|partial|failed)\b/i);
   const confidenceMatch = text.match(/(?:^|\n)\s*Confidence\s*:\s*([0-9]{1,3}(?:\.[0-9]+)?%?)/i);
-  const missingFields: string[] = [];
-  if (!resultMatch) missingFields.push("Result");
-  if (!confidenceMatch) missingFields.push("Confidence");
 
-  if (missingFields.length > 0) {
+  if (!resultMatch || !confidenceMatch) {
+    const missingFields: string[] = [];
+    if (!resultMatch) missingFields.push("Result");
+    if (!confidenceMatch) missingFields.push("Confidence");
+
     return {
       outcome: "failed",
       confidence: 0,
@@ -1177,7 +1367,16 @@ function inferOutcomeFromText(text: string): { outcome: WorkflowOutcome; confide
     };
   }
 
-  const outcome = resultMatch[1].toLowerCase() as WorkflowOutcome;
+  const outcomeCandidate = resultMatch[1].toLowerCase();
+  if (!isWorkflowOutcome(outcomeCandidate)) {
+    return {
+      outcome: "failed",
+      confidence: 0,
+      strictViolation: `Invalid Result value '${resultMatch[1]}'. Use success|partial|failed.`,
+    };
+  }
+
+  const outcome = outcomeCandidate;
   const raw = confidenceMatch[1] ?? "";
   let confidence: number;
   if (raw.endsWith("%")) {
@@ -1194,6 +1393,7 @@ function inferOutcomeFromText(text: string): { outcome: WorkflowOutcome; confide
       strictViolation: "Invalid Confidence value. Use a numeric value like `0.82`.",
     };
   }
+
   return { outcome, confidence: clampConfidence(confidence) };
 }
 
@@ -1206,11 +1406,13 @@ function summarizeEvidence(text: string, max = 280): string {
 function parsePreflightLine(line: string): PreflightRecord | null {
   const match = line.trim().match(PREFLIGHT_LINE_REGEX);
   if (!match) return null;
+  const clarify = match[3];
+  if (!isPreflightClarify(clarify)) return null;
   return {
     at: nowIso(),
     skill: match[1],
     reason: match[2],
-    clarify: match[3] as "yes" | "no",
+    clarify,
     raw: line.trim(),
     source: "manual",
   };
@@ -1219,10 +1421,12 @@ function parsePreflightLine(line: string): PreflightRecord | null {
 function parsePostflightLine(line: string): PostflightRecord | null {
   const match = line.trim().match(POSTFLIGHT_LINE_REGEX);
   if (!match) return null;
+  const result = match[2];
+  if (!isPostflightResult(result)) return null;
   return {
     at: nowIso(),
     verify: match[1],
-    result: match[2] as "pass" | "fail" | "not-run",
+    result,
     raw: line.trim(),
   };
 }
@@ -1239,14 +1443,13 @@ function isMutationCapableBash(command: string): boolean {
   return MUTATION_BASH_PATTERN.test(command);
 }
 
-function isMutationToolCall(toolName: string, input: Record<string, unknown>): boolean {
-  if (toolName === "edit" || toolName === "write") return true;
-  if (toolName !== "bash") return false;
-  const command = typeof input.command === "string" ? input.command : "";
-  return isMutationCapableBash(command);
+function isMutationToolCall(event: ToolCallEvent): boolean {
+  if (isToolCallEventType("edit", event) || isToolCallEventType("write", event)) return true;
+  if (!isToolCallEventType("bash", event)) return false;
+  return isMutationCapableBash(event.input.command);
 }
 
-function modeOutcome(mode: PolicyMode, violation: boolean): "allow" | "warn" | "block" {
+function modeOutcome(mode: PolicyMode, violation: boolean): PolicyOutcome {
   if (!violation) return "allow";
   if (mode === "enforce") return "block";
   if (mode === "warn") return "warn";
@@ -1269,7 +1472,13 @@ function setStatus(ctx: Pick<ExtensionContext, "hasUI" | "ui">, label?: string):
 
 function notify(ctx: Pick<ExtensionContext, "hasUI" | "ui">, message: string, type: "info" | "error" | "warning" | "success"): void {
   if (!ctx.hasUI) return;
-  ctx.ui.notify(message, type);
+  ctx.ui.notify(message, type === "success" ? "info" : type);
+}
+
+function ensureWorkflowSlotAvailable(ctx: ExtensionCommandContext): boolean {
+  if (!pendingWorkflow) return true;
+  notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
+  return false;
 }
 
 function buildLearningPaths(root: string): LearningPaths {
@@ -1311,11 +1520,13 @@ async function initializeLearningStore(paths: LearningPaths): Promise<void> {
 }
 async function ensureLearningStore(cwd: string): Promise<LearningPaths> {
   const primary = await resolveLearningPaths(cwd);
-
   try {
     await initializeLearningStore(primary);
     return primary;
-  } catch {
+  } catch (error) {
+    if (!isRecoverableLearningStoreError(error)) {
+      throw new Error(`Failed to initialize learning store at ${primary.root}: ${formatErrorMessage(error)}`);
+    }
     const fallback = getGlobalLearningPaths();
     await initializeLearningStore(fallback);
     learningPathCache.set(cwd, fallback);
@@ -1341,18 +1552,14 @@ async function loadProjectReviewGuidelines(cwd: string): Promise<string | null> 
     const piDir = path.join(currentDir, ".pi");
     const guidelinesPath = path.join(currentDir, "REVIEW_GUIDELINES.md");
 
-    const piStats = await fs.stat(piDir).catch(() => null);
+    const piStats = await statIfExists(piDir);
     if (piStats?.isDirectory()) {
-      const guidelineStats = await fs.stat(guidelinesPath).catch(() => null);
+      const guidelineStats = await statIfExists(guidelinesPath);
       if (!guidelineStats?.isFile()) return null;
 
-      try {
-        const content = await fs.readFile(guidelinesPath, "utf8");
-        const trimmed = content.trim();
-        return trimmed || null;
-      } catch {
-        return null;
-      }
+      const content = await readTextIfExists(guidelinesPath);
+      const trimmed = content.trim();
+      return trimmed || null;
     }
 
     const parentDir = path.dirname(currentDir);
@@ -1379,8 +1586,9 @@ async function getLearnedSkillsList(cwd: string): Promise<string[]> {
   try {
     const entries = await fs.readdir(paths.skillsDir, { withFileTypes: true });
     return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
-  } catch {
-    return [];
+  } catch (error) {
+    if (isMissingPathError(error)) return [];
+    throw new Error(`Failed to list learned skills in ${paths.skillsDir}: ${formatErrorMessage(error)}`);
   }
 }
 
@@ -1403,22 +1611,17 @@ async function getBootstrapPayload(cwd: string): Promise<string> {
     "",
     "[RULES]",
     rules.trim(),
-    duties.trim() ? "" : "",
     duties.trim() ? "[DUTIES]" : "",
     duties.trim(),
     "",
     "[INSTRUCTIONS]",
     instructions.trim(),
-    complianceProfile.trim() ? "" : "",
     complianceProfile.trim() ? "[COMPLIANCE PROFILE]" : "",
     complianceProfile.trim(),
-    startupHooks.trim() ? "" : "",
     startupHooks.trim() ? "[LIFECYCLE HOOKS: on_session_start]" : "",
     startupHooks.trim(),
-    memoryTail ? "" : "",
     memoryTail ? "[LEARNING MEMORY TAIL]" : "",
     memoryTail,
-    learnedSkills.length > 0 ? "" : "",
     learnedSkills.length > 0 ? `[LEARNED SKILLS] ${learnedSkills.join(", ")}` : "",
   ]
     .filter((line) => line.length > 0)
@@ -1455,7 +1658,7 @@ async function beginWorkflowTracking(
   ctx: ExtensionCommandContext,
   type: WorkflowType,
   input: string,
-  flags: Record<string, unknown>,
+  flags: WorkflowFlags,
 ): Promise<PendingWorkflow> {
   const paths = await ensureLearningStore(ctx.cwd);
   const id = makeId(type);
@@ -1494,13 +1697,20 @@ async function beginWorkflowTracking(
 }
 
 async function readLearningState(paths: LearningPaths): Promise<LearningState> {
+  const raw = await readTextIfExists(paths.stateJson);
+  if (!raw.trim()) return { hints: {} };
+
+  let parsed: unknown;
   try {
-    const raw = await readText(paths.stateJson);
-    const parsed = JSON.parse(raw) as Partial<LearningState>;
-    return { hints: parsed.hints ?? {} };
-  } catch {
-    return { hints: {} };
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Invalid learning state JSON in ${paths.stateJson}: ${formatErrorMessage(error)}`);
   }
+
+  if (!isRecord(parsed)) {
+    throw new Error(`Invalid learning state in ${paths.stateJson}: expected a top-level object.`);
+  }
+  return { hints: parseLearningHints(parsed.hints) };
 }
 
 async function writeLearningState(paths: LearningPaths, state: LearningState): Promise<void> {
@@ -1510,16 +1720,22 @@ async function writeLearningState(paths: LearningPaths, state: LearningState): P
 async function readLearningEntries(paths: LearningPaths): Promise<LearningObservation[]> {
   const raw = await readTextIfExists(paths.learningJsonl);
   if (!raw.trim()) return [];
-
   const entries: LearningObservation[] = [];
-  for (const line of raw.split(/\r?\n/)) {
+  const lines = raw.split(/\r?\n/);
+
+  for (const [index, line] of lines.entries()) {
     const trimmed = line.trim();
     if (!trimmed) continue;
+    let jsonValue: unknown;
     try {
-      entries.push(JSON.parse(trimmed) as LearningObservation);
-    } catch {
-      // ignore malformed lines
+      jsonValue = JSON.parse(trimmed);
+    } catch (error) {
+      if (error instanceof SyntaxError) continue;
+      throw new Error(`Failed to parse learning entry at ${paths.learningJsonl}:${index + 1}: ${formatErrorMessage(error)}`);
     }
+
+    const parsed = parseLearningObservation(jsonValue);
+    if (parsed) entries.push(parsed);
   }
   return entries;
 }
@@ -1541,7 +1757,7 @@ async function maybeEmitPromotionHint(
   }, 0);
 
   const scoreRate = score / relevant.length;
-  const kind: "promote" | "improve" | null =
+  const kind: LearningHintKind | null =
     scoreRate >= PROMOTION_SUCCESS_THRESHOLD
       ? "promote"
       : scoreRate <= PROMOTION_IMPROVEMENT_THRESHOLD
@@ -1723,10 +1939,7 @@ async function completeWorkflowTracking(
 
 async function handleDebug(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const parsed = parseDebugArgs(args);
-  if (pendingWorkflow) {
-    notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
-    return;
-  }
+  if (!ensureWorkflowSlotAvailable(ctx)) return;
   if (!parsed.problem) {
     notify(ctx, "Usage: /debug <problem> [--parallel N] [--fix]", "error");
     return;
@@ -1753,7 +1966,7 @@ async function handleDebug(pi: ExtensionAPI, args: string, ctx: ExtensionCommand
     "",
     debugInstruction,
     POSTFLIGHT_INSTRUCTION,
-    "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`. Missing either line is treated as failed.",
+    REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
   ]);
   pi.appendEntry("pesap-debug-command", {
     problem: parsed.problem,
@@ -1771,10 +1984,7 @@ async function handleDebug(pi: ExtensionAPI, args: string, ctx: ExtensionCommand
 
 async function handleFeature(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const parsed = parseFeatureArgs(args);
-  if (pendingWorkflow) {
-    notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
-    return;
-  }
+  if (!ensureWorkflowSlotAvailable(ctx)) return;
   if (!parsed.request) {
     notify(ctx, "Usage: /feature <request> [--parallel N] [--ship]", "error");
     return;
@@ -1797,7 +2007,7 @@ async function handleFeature(pi: ExtensionAPI, args: string, ctx: ExtensionComma
       ? "Instruction: Use parallel subagents for implementation/tests/docs when that reduces delivery time or risk."
       : "Instruction: pi-subagents is not installed in this session, run implementation/tests/docs sequentially without subagent delegation.",
     POSTFLIGHT_INSTRUCTION,
-    "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`. Missing either line is treated as failed.",
+    REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
   ]);
   pi.appendEntry("pesap-feature-command", {
     request: parsed.request,
@@ -1820,12 +2030,9 @@ async function handleFeature(pi: ExtensionAPI, args: string, ctx: ExtensionComma
 
 async function handleReview(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const parsed = parseReviewArgs(args, ctx.cwd);
-  if (pendingWorkflow) {
-    notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
-    return;
-  }
+  if (!ensureWorkflowSlotAvailable(ctx)) return;
 
-  if (parsed.error) {
+  if ("error" in parsed) {
     notify(ctx, parsed.error, "error");
     return;
   }
@@ -1859,7 +2066,7 @@ async function handleReview(pi: ExtensionAPI, args: string, ctx: ExtensionComman
       : "",
     "Instruction: Prioritize correctness, security, performance, and maintainability findings with concrete evidence.",
     POSTFLIGHT_INSTRUCTION,
-    "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`. Missing either line is treated as failed.",
+    REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
   ]);
 
   pi.appendEntry("pesap-review-command", {
@@ -1875,10 +2082,7 @@ async function handleReview(pi: ExtensionAPI, args: string, ctx: ExtensionComman
 
 async function handleGitReview(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const extraFocus = normalizeWhitespace(args ?? "");
-  if (pendingWorkflow) {
-    notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
-    return;
-  }
+  if (!ensureWorkflowSlotAvailable(ctx)) return;
 
   ensureAgentEnabledForCommand(pi, ctx, "git-review");
 
@@ -1896,7 +2100,7 @@ async function handleGitReview(pi: ExtensionAPI, args: string, ctx: ExtensionCom
     extraFocus ? `Additional focus: ${extraFocus}` : "",
     "Instruction: Compare churn, authorship, bug clusters, velocity, and firefighting signals.",
     POSTFLIGHT_INSTRUCTION,
-    "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`. Missing either line is treated as failed.",
+    REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
   ]);
 
   pi.appendEntry("pesap-git-review-command", {
@@ -1910,12 +2114,9 @@ async function handleGitReview(pi: ExtensionAPI, args: string, ctx: ExtensionCom
 
 async function handleSimplify(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const parsed = parseReviewArgs(args, ctx.cwd, "simplify");
-  if (pendingWorkflow) {
-    notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
-    return;
-  }
+  if (!ensureWorkflowSlotAvailable(ctx)) return;
 
-  if (parsed.error) {
+  if ("error" in parsed) {
     notify(ctx, parsed.error, "error");
     return;
   }
@@ -1939,7 +2140,7 @@ async function handleSimplify(pi: ExtensionAPI, args: string, ctx: ExtensionComm
     parsed.extraInstruction ? `Additional focus: ${parsed.extraInstruction}` : "",
     "Instruction: Preserve exact behavior, API shape, and outputs. Ask before any semantic change.",
     POSTFLIGHT_INSTRUCTION,
-    "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`. Missing either line is treated as failed.",
+    REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
   ]);
 
   pi.appendEntry("pesap-simplify-command", {
@@ -1955,10 +2156,7 @@ async function handleSimplify(pi: ExtensionAPI, args: string, ctx: ExtensionComm
 
 async function handleLearnSkill(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const parsed = parseLearnSkillArgs(args);
-  if (pendingWorkflow) {
-    notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
-    return;
-  }
+  if (!ensureWorkflowSlotAvailable(ctx)) return;
   if (!parsed.topic && !parsed.fromFile && !parsed.fromUrl) {
     notify(ctx, "Usage: /learn-skill <topic> [--from <path|url>] [--from-file path] [--from-url url] [--dry-run]", "error");
     return;
@@ -2018,7 +2216,7 @@ async function handleLearnSkill(pi: ExtensionAPI, args: string, ctx: ExtensionCo
     "",
     "Instruction: Keep the skill concise and include explicit 'Use when' and 'Avoid when' sections.",
     POSTFLIGHT_INSTRUCTION,
-    "Instruction: End your final response with `Result: success|partial|failed` and `Confidence: <0..1>`. Missing either line is treated as failed.",
+    REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
   ]);
 
   pi.appendEntry("pesap-learn-skill-command", {
@@ -2132,16 +2330,16 @@ export default function pesapExtension(pi: ExtensionAPI): void {
   pi.on("tool_call", async (event, ctx) => {
     if (!agentEnabled) return;
 
-    const input = event.input as Record<string, unknown>;
-    if (!isMutationToolCall(event.toolName, input)) return;
+    if (!isMutationToolCall(event)) return;
 
     if (pendingWorkflow) pendingWorkflow.mutationCount += 1;
 
-    const violation = !activePreflight;
+    const preflight = activePreflight;
+    const violation = !preflight;
     const outcome = modeOutcome(firstPrinciplesConfig.preflightMode, violation);
     const detail = violation
       ? "Missing valid preflight before mutation."
-      : `Using ${activePreflight.source} preflight: ${buildPreflightRawLine(activePreflight)}`;
+      : `Using ${preflight.source} preflight: ${buildPreflightRawLine(preflight)}`;
 
     addPolicyEvent(pi, {
       at: nowIso(),
@@ -2178,7 +2376,7 @@ export default function pesapExtension(pi: ExtensionAPI): void {
     if (!workflow) return;
     pendingWorkflow = null;
 
-    const text = extractLastAssistantText((event as { messages?: unknown }).messages) || "No assistant output captured.";
+    const text = extractLastAssistantText(event.messages) || "No assistant output captured.";
     await completeWorkflowTracking(pi, ctx, workflow, text);
   });
 
@@ -2190,7 +2388,7 @@ export default function pesapExtension(pi: ExtensionAPI): void {
         return;
       }
       setAgentEnabledState(ctx, true);
-      pi.appendEntry(AGENT_STATE_TYPE, { initialized: true, enabled: true, at: nowIso() });
+      pi.appendEntry(AGENT_STATE_TYPE, { enabled: true, at: nowIso() });
       notify(ctx, "pesap-agent initialized.", "success");
     },
   });
@@ -2204,7 +2402,7 @@ export default function pesapExtension(pi: ExtensionAPI): void {
       pendingWorkflow = null;
       await runSessionEndHooks(pi, ctx);
       setAgentEnabledState(ctx, false);
-      pi.appendEntry(AGENT_STATE_TYPE, { initialized: false, enabled: false, at: nowIso() });
+      pi.appendEntry(AGENT_STATE_TYPE, { enabled: false, at: nowIso() });
     },
   });
   pi.registerCommand("approve-risk", {
@@ -2294,13 +2492,6 @@ export default function pesapExtension(pi: ExtensionAPI): void {
     description: "Run the pesap code simplification workflow",
     handler: async (args, ctx) => {
       await handleSimplify(pi, args ?? "", ctx);
-    },
-  });
-
-  pi.registerCommand("reaview", {
-    description: "Alias for /review",
-    handler: async (args, ctx) => {
-      await handleReview(pi, args ?? "", ctx);
     },
   });
 
