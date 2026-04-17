@@ -30,8 +30,9 @@ pi -e https://github.com/pesap/agents
 - `/git-review` - run git-history diagnostics before reading code (churn, authorship, bug clusters, velocity, firefighting)
 - `/simplify [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]` (code simplification workflow, behavior-preserving)
 - `/remove-slop [scope] [--parallel N]` (parallel code-quality cleanup workflow with mandatory safety/NASA guardrails and language-aware skill selection)
+- `/domain-model <plan_or_topic>` (domain-model grilling workflow that aligns terminology with code and updates CONTEXT/ADR docs lazily)
 
-### Run review/simplify/remove-slop outside the REPL
+### Run review/simplify/remove-slop/domain-model outside the REPL
 
 These commands also work in non-interactive runs (print mode or RPC), not only in the TUI REPL.
 
@@ -40,6 +41,7 @@ pi -e https://github.com/pesap/agents -p "/review README.md --extra 'focus on co
 pi -e https://github.com/pesap/agents -p "/review folder src docs"
 pi -e https://github.com/pesap/agents -p "/simplify src/commands/review.ts"
 pi -e https://github.com/pesap/agents -p "/remove-slop src --parallel 8"
+pi -e https://github.com/pesap/agents -p "/domain-model 'Split billing and ordering contexts with async events'"
 ```
 ## Intercepted shell commands (active agent only)
 

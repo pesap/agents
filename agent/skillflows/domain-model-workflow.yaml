@@ -1,0 +1,20 @@
+name: domain-model-workflow
+version: 1
+objective: Stress-test a plan against project domain language and capture decisions in CONTEXT/ADR docs
+steps:
+  - id: intake
+    action: capture_plan_and_scope
+  - id: discover
+    action: locate_context_docs_and_relevant_code
+  - id: question-loop
+    action: ask_one_question_at_a_time_and_wait
+  - id: reconcile
+    action: resolve_terminology_conflicts_and_code_contradictions
+  - id: update-context
+    action: update_context_docs_inline_as_terms_resolve
+  - id: adr
+    action: propose_or_write_adrs_only_when_criteria_met
+  - id: summarize
+    action: list_resolved_terms_open_questions_and_risks
+  - id: learn
+    action: persist_learnings

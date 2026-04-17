@@ -39,7 +39,7 @@ const FIRST_PRINCIPLES_CONFIG_PATH = path.join(AGENT_DIR, "compliance", "first-p
 const PREFLIGHT_STATE_TYPE = "pesap-preflight-state";
 const POSTFLIGHT_EVENT_TYPE = "pesap-postflight-event";
 const POLICY_EVENT_TYPE = "pesap-policy-event";
-type WorkflowType = "debug" | "feature" | "review" | "git-review" | "simplify" | "learn-skill" | "remove-slop";
+type WorkflowType = "debug" | "feature" | "review" | "git-review" | "simplify" | "learn-skill" | "remove-slop" | "domain-model";
 type WorkflowOutcome = "success" | "partial" | "failed";
 type WorkflowFlagValue = string | number | boolean | null | string[];
 type WorkflowFlags = Record<string, WorkflowFlagValue>;
@@ -56,6 +56,7 @@ type PostflightResult = "pass" | "fail" | "not-run";
 const REVIEW_COMMAND_SOURCE = "https://github.com/earendil-works/pi-review";
 const GIT_REVIEW_COMMAND_SOURCE = "https://piechowski.io/post/git-commands-before-reading-code/";
 const SIMPLIFY_COMMAND_SOURCE = "https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-simplifier/agents/code-simplifier.md";
+const DOMAIN_MODEL_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/domain-model";
 type ParsedReviewArgs =
   | { mode: "uncommitted"; extraInstruction?: string }
   | { mode: "branch"; branch: string; extraInstruction?: string }
@@ -383,7 +384,7 @@ function isWorkflowType(value: unknown): value is WorkflowType {
     || value === "review"
     || value === "git-review"
     || value === "simplify"
-    || value === "learn-skill" || value === "remove-slop";
+    || value === "learn-skill" || value === "remove-slop" || value === "domain-model";
 }
 
 function isWorkflowOutcome(value: unknown): value is WorkflowOutcome {
@@ -1064,6 +1065,9 @@ function parseRemoveSlopArgs(args: string): { scope: string; parallel: number } 
   };
 }
 
+function parseDomainModelArgs(args: string): { plan: string } {
+  return { plan: normalizeWhitespace(args) };
+}
 function parseLearnSkillArgs(args: string): {
   topic: string;
   fromFile?: string;
@@ -2217,6 +2221,39 @@ async function handleRemoveSlop(pi: ExtensionAPI, args: string, ctx: ExtensionCo
   );
 }
 
+async function handleDomainModel(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
+  const parsed = parseDomainModelArgs(args);
+  if (!ensureWorkflowSlotAvailable(ctx)) return;
+  if (!parsed.plan) {
+    notify(ctx, "Usage: /domain-model <plan_or_topic>", "error");
+    return;
+  }
+
+  ensureAgentEnabledForCommand(pi, ctx, "domain-model");
+
+  await beginWorkflowTracking(pi, ctx, "domain-model", parsed.plan, {
+    source: DOMAIN_MODEL_COMMAND_SOURCE,
+  });
+
+  await enqueueWorkflow(pi, "domain-model-workflow.md", "domain-model-workflow.yaml", [
+    `Domain plan/topic: ${parsed.plan}`,
+    `Source reference: ${DOMAIN_MODEL_COMMAND_SOURCE}`,
+    "",
+    "Instruction: Ask one question at a time and wait for user feedback before continuing.",
+    "Instruction: If a question can be answered from code/docs, inspect first and continue with the next unresolved question.",
+    "Instruction: Update CONTEXT.md/ADR docs lazily and only when terms/decisions are resolved.",
+    POSTFLIGHT_INSTRUCTION,
+    REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
+  ]);
+
+  pi.appendEntry("pesap-domain-model-command", {
+    plan: parsed.plan,
+    source: DOMAIN_MODEL_COMMAND_SOURCE,
+    at: nowIso(),
+  });
+
+  notify(ctx, `Started domain-model workflow (${parsed.plan}).`, "info");
+}
 async function handleLearnSkill(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const parsed = parseLearnSkillArgs(args);
   if (!ensureWorkflowSlotAvailable(ctx)) return;
@@ -2588,6 +2625,12 @@ export default function pesapExtension(pi: ExtensionAPI): void {
     },
   });
 
+  pi.registerCommand("domain-model", {
+    description: "Run domain-model grilling and context/ADR update workflow",
+    handler: async (args, ctx) => {
+      await handleDomainModel(pi, args ?? "", ctx);
+    },
+  });
   pi.registerCommand("learn-skill", {
     description: "Create and refine a reusable skill",
     handler: async (args, ctx) => {
