@@ -19,7 +19,7 @@ description: Turn current conversation/context into a product requirements docum
 1. Synthesize current context and repo state (no long interview).
 2. Identify candidate modules/interfaces and testing scope.
 3. Confirm key assumptions briefly with user when ambiguous.
-4. Draft PRD with problem, solution, user stories, implementation decisions, testing decisions, out-of-scope.
+4. Draft PRD with problem, solution, implementation decisions, testing decisions, and out-of-scope (add user stories only if explicitly requested).
 5. Create GitHub issue with `gh issue create` (or output PRD markdown if issue creation is unavailable).
 
 ## Output
