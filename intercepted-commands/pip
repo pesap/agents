@@ -1,5 +1,6 @@
 #!/bin/bash
-echo "Error: pip is disabled while pesap-agent is active. Use uv instead:" >&2
+PIP_CMD="${PESAP_PIP_CMD:-$(basename "$0")}"
+echo "Error: ${PIP_CMD} is disabled while pesap-agent is active. Use uv instead:" >&2
 echo "" >&2
 echo "  To install a package for a script: uv run --with PACKAGE python script.py" >&2
 echo "  To add a dependency to the project: uv add PACKAGE" >&2

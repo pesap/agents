@@ -1,61 +1,67 @@
 #!/bin/bash
 
+PYTHON_CMD="${PESAP_PYTHON_CMD:-$(basename "$0")}"
+
+block_python_module() {
+    local module="$1"
+    local error_suffix=""
+    local guidance=""
+
+    case "$module" in
+        pip)
+            error_suffix="-m pip"
+            guidance=$(cat <<'EOF'
+  To install a package for a script: uv run --with PACKAGE python script.py
+  To add a dependency to the project: uv add PACKAGE
+EOF
+)
+            ;;
+        venv)
+            error_suffix="-m venv"
+            guidance=$(cat <<'EOF'
+  To create a virtual environment: uv venv
+EOF
+)
+            ;;
+        py_compile)
+            error_suffix="-m py_compile"
+            guidance=$(cat <<'EOF'
+  To verify syntax without bytecode output: uv run python -m ast path/to/file.py >/dev/null
+EOF
+)
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    echo "Error: '${PYTHON_CMD} ${error_suffix}' is disabled while pesap-agent is active. Use uv instead:" >&2
+    echo "" >&2
+    echo "${guidance}" >&2
+    echo "" >&2
+    exit 1
+}
+
 # Check for disallowed module invocations
 for arg in "$@"; do
     case "$arg" in
-        -mpip|-m\ pip|pip)
-            echo "Error: 'python -m pip' is disabled while pesap-agent is active. Use uv instead:" >&2
-            echo "" >&2
-            echo "  To install a package for a script: uv run --with PACKAGE python script.py" >&2
-            echo "  To add a dependency to the project: uv add PACKAGE" >&2
-            echo "" >&2
-            exit 1
+        -mpip|-m\ pip)
+            block_python_module pip
             ;;
-        -mvenv|-m\ venv|venv)
-            echo "Error: 'python -m venv' is disabled while pesap-agent is active. Use uv instead:" >&2
-            echo "" >&2
-            echo "  To create a virtual environment: uv venv" >&2
-            echo "" >&2
-            exit 1
+        -mvenv|-m\ venv)
+            block_python_module venv
             ;;
-        -mpy_compile|-m\ py_compile|py_compile)
-            echo "Error: 'python -m py_compile' is disabled while pesap-agent is active because it writes .pyc files to __pycache__." >&2
-            echo "" >&2
-            echo "  To verify syntax without bytecode output: uv run python -m ast path/to/file.py >/dev/null" >&2
-            echo "" >&2
-            exit 1
+        -mpy_compile|-m\ py_compile)
+            block_python_module py_compile
             ;;
     esac
 done
 
-# Check for -m flag followed by pip or venv
+# Check for -m flag followed by pip, venv, or py_compile
 prev=""
 for arg in "$@"; do
     if [ "$prev" = "-m" ]; then
-        case "$arg" in
-            pip)
-                echo "Error: 'python -m pip' is disabled while pesap-agent is active. Use uv instead:" >&2
-                echo "" >&2
-                echo "  To install a package for a script: uv run --with PACKAGE python script.py" >&2
-                echo "  To add a dependency to the project: uv add PACKAGE" >&2
-                echo "" >&2
-                exit 1
-                ;;
-            venv)
-                echo "Error: 'python -m venv' is disabled while pesap-agent is active. Use uv instead:" >&2
-                echo "" >&2
-                echo "  To create a virtual environment: uv venv" >&2
-                echo "" >&2
-                exit 1
-                ;;
-            py_compile)
-                echo "Error: 'python -m py_compile' is disabled while pesap-agent is active because it writes .pyc files to __pycache__." >&2
-                echo "" >&2
-                echo "  To verify syntax without bytecode output: uv run python -m ast path/to/file.py >/dev/null" >&2
-                echo "" >&2
-                exit 1
-                ;;
-        esac
+        block_python_module "$arg"
     fi
     prev="$arg"
 done
