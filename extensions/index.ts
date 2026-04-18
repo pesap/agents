@@ -2451,7 +2451,7 @@ async function handleAddressOpenIssues(pi: ExtensionAPI, args: string, ctx: Exte
     "Instruction: Skip issues labeled blocked (or equivalent blocked label) and mark them skipped-blocked.",
     "Instruction: If an issue description is unclear/incomplete, post a clarification comment tagging the issue creator and abort remaining stages for that issue.",
     "Instruction: For well-described issues, run stages in order: triage-issue -> tdd -> review -> simplify -> review -> address review findings.",
-    "Instruction: Re-review after remediation up to 2 loops per issue, then mark blocked if unresolved."
+    "Instruction: Re-review after remediation up to 2 loops per issue, then mark blocked if unresolved.",
     POSTFLIGHT_INSTRUCTION,
     REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
   ]);

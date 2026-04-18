@@ -1,6 +1,6 @@
 ---
 name: address-open-issues
-description: Resolve the caller's open GitHub issues in sequence: triage, TDD implementation, review, simplify, re-review, and remediation. Use when users ask to sweep their open issues and close as many as possible safely.
+description: "Resolve the caller's open GitHub issues in sequence: triage, TDD implementation, review, simplify, re-review, and remediation. Use when users ask to sweep their open issues and close as many as possible safely."
 ---
 
 ## Use when
