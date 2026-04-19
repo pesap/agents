@@ -20,8 +20,9 @@ description: Break a plan/PRD into independently grabbable GitHub issues using t
 2. Explore codebase as needed for realistic boundaries.
 3. Draft thin vertical slices (end-to-end behavior per slice).
 4. Review slice list with user (granularity, dependencies, HITL/AFK labels).
-5. Create issues in dependency order with acceptance criteria and blockers.
+5. Create issues in dependency order with acceptance criteria and explicit blocker references.
 6. Link issues using GitHub's native sub-issues feature (see below).
+7. Add native dependency edges with `addBlockedBy` for every blocker relation (see below).
 
 ## Issue Creation Format
 
@@ -40,7 +41,7 @@ Include:
 - Parent reference (`Parent: #N`)
 - Acceptance criteria
 - Implementation notes (optional)
-- `Blocked by: #N` for dependencies
+- `Blocked by: #N` for human-readable dependencies (also set native blockers via GraphQL)
 
 Exclude:
 - "Label" sections (use `--label` flag instead)
@@ -115,15 +116,71 @@ mutation {
 }'
 ```
 
+## GitHub Native Dependencies (Blocked by)
+
+Use GitHub issue dependency edges in addition to body text references.
+
+### Query blockers (GraphQL)
+```bash
+gh api graphql -f query='
+{
+  repository(owner: "OWNER", name: "REPO") {
+    issue(number: 177) {
+      blockedBy(first: 20) {
+        nodes { number title }
+      }
+    }
+  }
+}'
+```
+
+### Add blocker (GraphQL mutation)
+```bash
+# Get issue node IDs first
+gh api graphql -f query='
+{
+  repository(owner: "OWNER", name: "REPO") {
+    target: issue(number: 177) { id }
+    blocker: issue(number: 176) { id }
+  }
+}'
+
+# Add dependency edge: 177 blocked by 176
+gh api graphql -f query='
+mutation {
+  addBlockedBy(input: {
+    issueId: "TARGET_ISSUE_ID",
+    blockingIssueId: "BLOCKER_ISSUE_ID"
+  }) {
+    issue { number }
+    blockingIssue { number }
+  }
+}'
+```
+
+### Remove blocker
+```bash
+gh api graphql -f query='
+mutation {
+  removeBlockedBy(input: {
+    issueId: "TARGET_ISSUE_ID",
+    blockingIssueId: "BLOCKER_ISSUE_ID"
+  }) {
+    issue { number }
+    blockingIssue { number }
+  }
+}'
+```
+
 ### Best Practices
 - PRD issue = parent, implementation slices = sub-issues
 - Add `Parent: #N` in child body for human-readable back-reference
 - Use `addSubIssue` mutation to create the actual relationship
-- Dependencies between siblings: document in body with `Blocked by: #N`
+- Dependencies between siblings: document in body with `Blocked by: #N` and create native edges with `addBlockedBy`
 - GitHub UI shows sub-issues in sidebar with completion tracking
 
 ## Output
 - Approved slice breakdown
-- Created issue list with sub-issue relationships
+- Created issue list with sub-issue + blocked-by relationships
 - HITL vs AFK labeling rationale
 - Follow-up recommendations for execution order
