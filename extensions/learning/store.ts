@@ -1,0 +1,363 @@
+import { promises as fs } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { LEARNING_STORE_DIRNAME } from "../lib/constants";
+import {
+  appendLine,
+  ensureFile,
+  exists,
+  formatErrorMessage,
+  isMissingPathError,
+  isRecord,
+  isRecoverableLearningStoreError,
+  readTextIfExists,
+  statIfExists,
+} from "../lib/io";
+
+export type WorkflowFlagValue = string | number | boolean | null | string[];
+export type WorkflowFlags = Record<string, WorkflowFlagValue>;
+
+type LearningHintKind = "promote" | "improve";
+
+interface LearningHint {
+  kind: LearningHintKind;
+  sampleSize: number;
+  scoreRate: number;
+  at: string;
+}
+
+export interface LearningPaths {
+  root: string;
+  memoryDir: string;
+  runsDir: string;
+  skillsDir: string;
+  learningJsonl: string;
+  memoryMd: string;
+  promotionQueue: string;
+  stateJson: string;
+}
+
+export interface LearningObservation<TWorkflowType extends string = string, TWorkflowOutcome extends string = string> {
+  version: number;
+  id: string;
+  timestamp: string;
+  taskType: TWorkflowType;
+  input: string;
+  flags: WorkflowFlags;
+  outcome: TWorkflowOutcome;
+  confidence: number;
+  evidenceSnippet: string;
+  workflowId: string;
+}
+
+interface LearningState {
+  hints: Record<string, LearningHint>;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isWorkflowFlagValue(value: unknown): value is WorkflowFlagValue {
+  return value === null
+    || typeof value === "string"
+    || typeof value === "number"
+    || typeof value === "boolean"
+    || isStringArray(value);
+}
+
+function isWorkflowFlags(value: unknown): value is WorkflowFlags {
+  if (!isRecord(value)) return false;
+  return Object.values(value).every((entry) => isWorkflowFlagValue(entry));
+}
+
+function parseLearningHint(value: unknown): LearningHint | null {
+  if (!isRecord(value)) return null;
+
+  const kind = value.kind;
+  const sampleSize = value.sampleSize;
+  const scoreRate = value.scoreRate;
+  const at = value.at;
+
+  if ((kind !== "promote" && kind !== "improve")
+    || typeof sampleSize !== "number"
+    || !Number.isFinite(sampleSize)
+    || typeof scoreRate !== "number"
+    || !Number.isFinite(scoreRate)
+    || typeof at !== "string") {
+    return null;
+  }
+
+  return { kind, sampleSize, scoreRate, at };
+}
+
+function parseLearningHints(value: unknown): Record<string, LearningHint> {
+  if (!isRecord(value)) return {};
+
+  const hints: Record<string, LearningHint> = {};
+  for (const [key, hintValue] of Object.entries(value)) {
+    const parsed = parseLearningHint(hintValue);
+    if (parsed) hints[key] = parsed;
+  }
+
+  return hints;
+}
+
+function parseLearningObservation(value: unknown): LearningObservation | null {
+  if (!isRecord(value)) return null;
+
+  const version = value.version;
+  const id = value.id;
+  const timestamp = value.timestamp;
+  const taskType = value.taskType;
+  const input = value.input;
+  const flags = value.flags;
+  const outcome = value.outcome;
+  const confidence = value.confidence;
+  const evidenceSnippet = value.evidenceSnippet;
+  const workflowId = value.workflowId;
+
+  if (typeof version !== "number"
+    || !Number.isFinite(version)
+    || typeof id !== "string"
+    || typeof timestamp !== "string"
+    || typeof taskType !== "string"
+    || typeof input !== "string"
+    || !isWorkflowFlags(flags)
+    || typeof outcome !== "string"
+    || typeof confidence !== "number"
+    || !Number.isFinite(confidence)
+    || typeof evidenceSnippet !== "string"
+    || typeof workflowId !== "string") {
+    return null;
+  }
+
+  return {
+    version,
+    id,
+    timestamp,
+    taskType,
+    input,
+    flags,
+    outcome,
+    confidence,
+    evidenceSnippet,
+    workflowId,
+  };
+}
+
+function buildLearningPaths(root: string): LearningPaths {
+  return {
+    root,
+    memoryDir: path.join(root, "memory"),
+    runsDir: path.join(root, "runs"),
+    skillsDir: path.join(root, "skills"),
+    learningJsonl: path.join(root, "memory", "learning.jsonl"),
+    memoryMd: path.join(root, "memory", "MEMORY.md"),
+    promotionQueue: path.join(root, "memory", "promotion-queue.md"),
+    stateJson: path.join(root, "state.json"),
+  };
+}
+
+function getGlobalLearningPaths(): LearningPaths {
+  return buildLearningPaths(path.join(homedir(), ".pi", LEARNING_STORE_DIRNAME));
+}
+
+async function resolveLearningPaths(cwd: string, cache: Map<string, LearningPaths>): Promise<LearningPaths> {
+  const cached = cache.get(cwd);
+  if (cached) return cached;
+  const projectPiDir = path.join(cwd, ".pi");
+  const useProjectLocal = await exists(projectPiDir);
+  const paths = useProjectLocal
+    ? buildLearningPaths(path.join(projectPiDir, LEARNING_STORE_DIRNAME))
+    : getGlobalLearningPaths();
+  cache.set(cwd, paths);
+  return paths;
+}
+
+async function initializeLearningStore(paths: LearningPaths): Promise<void> {
+  await fs.mkdir(paths.memoryDir, { recursive: true });
+  await fs.mkdir(paths.runsDir, { recursive: true });
+  await fs.mkdir(paths.skillsDir, { recursive: true });
+  await ensureFile(paths.learningJsonl, "");
+  await ensureFile(paths.memoryMd, "# MEMORY\n");
+  await ensureFile(paths.promotionQueue, "# Promotion Queue\n");
+  await ensureFile(paths.stateJson, JSON.stringify({ hints: {} }, null, 2));
+}
+
+export async function ensureLearningStore(cwd: string, cache: Map<string, LearningPaths>): Promise<LearningPaths> {
+  const primary = await resolveLearningPaths(cwd, cache);
+  try {
+    await initializeLearningStore(primary);
+    return primary;
+  } catch (error) {
+    if (!isRecoverableLearningStoreError(error)) {
+      throw new Error(`Failed to initialize learning store at ${primary.root}: ${formatErrorMessage(error)}`);
+    }
+    const fallback = getGlobalLearningPaths();
+    await initializeLearningStore(fallback);
+    cache.set(cwd, fallback);
+    return fallback;
+  }
+}
+
+export async function getLearningMemoryTail(cwd: string, cache: Map<string, LearningPaths>, tailLines: number): Promise<string> {
+  const paths = await ensureLearningStore(cwd, cache);
+  const memory = await readTextIfExists(paths.memoryMd);
+  if (!memory.trim()) return "";
+
+  const lines = memory
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"));
+
+  return lines.slice(-tailLines).join("\n");
+}
+
+export async function getLearnedSkillsList(cwd: string, cache: Map<string, LearningPaths>): Promise<string[]> {
+  const paths = await ensureLearningStore(cwd, cache);
+  try {
+    const entries = await fs.readdir(paths.skillsDir, { withFileTypes: true });
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  } catch (error) {
+    if (isMissingPathError(error)) return [];
+    throw new Error(`Failed to list learned skills in ${paths.skillsDir}: ${formatErrorMessage(error)}`);
+  }
+}
+
+async function readLearningState(paths: LearningPaths): Promise<LearningState> {
+  const raw = await readTextIfExists(paths.stateJson);
+  if (!raw.trim()) return { hints: {} };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Invalid learning state JSON in ${paths.stateJson}: ${formatErrorMessage(error)}`);
+  }
+
+  if (!isRecord(parsed)) {
+    throw new Error(`Invalid learning state in ${paths.stateJson}: expected a top-level object.`);
+  }
+  return { hints: parseLearningHints(parsed.hints) };
+}
+
+async function writeLearningState(paths: LearningPaths, state: LearningState): Promise<void> {
+  await fs.writeFile(paths.stateJson, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+}
+
+async function readLearningEntries(paths: LearningPaths): Promise<LearningObservation[]> {
+  const raw = await readTextIfExists(paths.learningJsonl);
+  if (!raw.trim()) return [];
+  const entries: LearningObservation[] = [];
+  const lines = raw.split(/\r?\n/);
+
+  for (const [index, line] of lines.entries()) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let jsonValue: unknown;
+    try {
+      jsonValue = JSON.parse(trimmed);
+    } catch (error) {
+      if (error instanceof SyntaxError) continue;
+      throw new Error(`Failed to parse learning entry at ${paths.learningJsonl}:${index + 1}: ${formatErrorMessage(error)}`);
+    }
+
+    const parsed = parseLearningObservation(jsonValue);
+    if (parsed) entries.push(parsed);
+  }
+  return entries;
+}
+
+export async function maybeEmitPromotionHint<TWorkflowType extends string, TWorkflowOutcome extends string>(params: {
+  paths: LearningPaths;
+  observation: LearningObservation<TWorkflowType, TWorkflowOutcome>;
+  ctx: ExtensionContext;
+  promotionMinObservations: number;
+  promotionSuccessThreshold: number;
+  promotionImprovementThreshold: number;
+  nowIso: () => string;
+  summarizeEvidence: (text: string, max?: number) => string;
+  notify: (ctx: ExtensionContext, message: string, type: "info" | "warning" | "error" | "success") => void;
+}): Promise<void> {
+  const entries = await readLearningEntries(params.paths);
+  const relevant = entries.filter((entry) => entry.taskType === params.observation.taskType).slice(-20);
+
+  if (relevant.length < params.promotionMinObservations) return;
+
+  const score = relevant.reduce((acc, entry) => {
+    if (entry.outcome === "success") return acc + 1;
+    if (entry.outcome === "partial") return acc + 0.5;
+    return acc;
+  }, 0);
+
+  const scoreRate = score / relevant.length;
+  const kind: LearningHintKind | null =
+    scoreRate >= params.promotionSuccessThreshold
+      ? "promote"
+      : scoreRate <= params.promotionImprovementThreshold
+        ? "improve"
+        : null;
+
+  if (!kind) return;
+
+  const state = await readLearningState(params.paths);
+  const key = `${params.observation.taskType}:${kind}`;
+  const previous = state.hints[key];
+
+  if (previous && relevant.length - previous.sampleSize < params.promotionMinObservations) {
+    return;
+  }
+
+  const now = params.nowIso();
+  const summary =
+    kind === "promote"
+      ? `Observed ${relevant.length} ${params.observation.taskType} runs with a strong score (${scoreRate.toFixed(2)}). Suggest promoting repeated behavior into INSTRUCTIONS.md or a dedicated skillflow.`
+      : `Observed ${relevant.length} ${params.observation.taskType} runs with low score (${scoreRate.toFixed(2)}). Suggest prompt/workflow refinement before further automation.`;
+
+  await appendLine(
+    params.paths.promotionQueue,
+    `- ${now.slice(0, 10)} [${params.observation.taskType}/${kind}] ${summary}`,
+  );
+
+  state.hints[key] = {
+    kind,
+    sampleSize: relevant.length,
+    scoreRate,
+    at: now,
+  };
+
+  await writeLearningState(params.paths, state);
+
+  params.notify(
+    params.ctx,
+    kind === "promote"
+      ? `Learning hint: ${params.observation.taskType} is stable enough to promote.`
+      : `Learning hint: ${params.observation.taskType} needs workflow tuning.`,
+    "info",
+  );
+}
+
+export async function loadProjectReviewGuidelines(cwd: string): Promise<string | null> {
+  let currentDir = path.resolve(cwd);
+
+  while (true) {
+    const piDir = path.join(currentDir, ".pi");
+    const guidelinesPath = path.join(currentDir, "REVIEW_GUIDELINES.md");
+
+    const piStats = await statIfExists(piDir);
+    if (piStats?.isDirectory()) {
+      const guidelineStats = await statIfExists(guidelinesPath);
+      if (!guidelineStats?.isFile()) return null;
+
+      const content = await readTextIfExists(guidelinesPath);
+      const trimmed = content.trim();
+      return trimmed || null;
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) return null;
+    currentDir = parentDir;
+  }
+}
