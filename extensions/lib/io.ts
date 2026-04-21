@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import path from "node:path";
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -66,5 +67,6 @@ export async function ensureFile(filePath: string, initialContent: string): Prom
 }
 
 export async function appendLine(filePath: string, line: string): Promise<void> {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.appendFile(filePath, `${line}\n`, "utf8");
 }
