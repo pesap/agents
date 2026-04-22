@@ -1,6 +1,6 @@
 ---
 name: system-design
-description: Design custom infrasys System classes, lifecycle behavior, composition/inheritance boundaries, and data-format versioning. Use this skill when users need robust system-level architecture in infrasys.
+description: Design custom infrasys System classes, lifecycle behavior, composition/inheritance boundaries, and data-format versioning. infrasys is the core system layer, and r2x-core is an application on top of that layer. Use this skill when users need robust system-level architecture in infrasys.
 license: MIT
 allowed-tools: Read Edit Grep Glob Bash Write
 metadata:
@@ -15,10 +15,12 @@ metadata:
 - Designing or extending infrasys `System` containers.
 - Defining component lifecycle and ownership patterns.
 - Implementing system data format versioning and upgrades.
+- Refining the infrasys system boundary used by higher-level apps such as r2x-core.
 
 ## Avoid when
 - Task does not involve infrasys `System` design or lifecycle concerns.
 - User needs generic OOP/system design without infrasys context.
+- Task is primarily about r2x-core plugin boundary decisions rather than base system design.
 
 ## Workflow
 1. Define system boundary and responsibilities.

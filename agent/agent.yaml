@@ -41,12 +41,13 @@ skills:
   - public-api-guard
   - create-pisubagents
   - caveman
-  - infrasys-integration
+  - r2x-core-plugin-system-and-data-modeling
+  - infrasys
   - component-modeling
   - cost-curves
   - system-design
   - storage-backends
-  - time-series-mastery
+  - infrasys-timeseries
   - serialization-migration
 pi:
   scope: project

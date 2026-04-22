@@ -1,6 +1,6 @@
 ---
 name: component-modeling
-description: Design infrasys Component subclasses, composition/associations, supplemental attributes, pint quantities, and copy semantics. Use this skill when users need robust component models or validation rules in infrasys-based systems.
+description: Design infrasys Component subclasses, composition/associations, supplemental attributes, pint quantities, and copy semantics. infrasys provides the component model foundation, and r2x-core consumes that model as an application layer. Use this skill when users need robust component models or validation rules in infrasys-based systems.
 license: MIT
 allowed-tools: Read Edit Grep Glob Bash Write
 metadata:
@@ -15,10 +15,12 @@ metadata:
 - Defining or refactoring `Component` subclasses in infrasys.
 - Deciding between inheritance and composition for domain entities.
 - Implementing validation, quantity/unit handling, or copy/deepcopy behavior.
+- Preparing component schemas consumed by r2x-core systems or transforms.
 
 ## Avoid when
 - Task is framework-agnostic and not tied to infrasys Component semantics.
 - User needs quick implementation without domain-modeling concerns.
+- Main decision is r2x-core plugin lifecycle behavior instead of component schema design.
 
 ## Workflow
 1. Define the domain object boundary and required fields.
