@@ -10,6 +10,13 @@ pi install https://github.com/pesap/agents
 
 pesap-agent relies on Pi package resource loading (`pi` manifest in `package.json`) and does not mutate `~/.pi/agent/settings.json` at runtime.
 
+Bundled + auto-loaded extension dependencies:
+
+- `pi-subagents` (https://github.com/nicobailon/pi-subagents)
+- `@ff-labs/pi-fff` (install target: `pi install npm:@ff-labs/pi-fff`)
+
+You do **not** need to install these separately when using this package.
+
 ## Try without installing
 
 ```bash

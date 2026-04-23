@@ -18,10 +18,14 @@
   },
   "pi": {
     "extensions": [
-      "./extensions/index.ts"
+      "./extensions/index.ts",
+      "./node_modules/pi-subagents/index.ts",
+      "./node_modules/pi-subagents/notify.ts",
+      "./node_modules/@ff-labs/pi-fff/src/index.ts"
     ],
     "skills": [
-      "./skills"
+      "./skills",
+      "./node_modules/pi-subagents/skills"
     ],
     "themes": [
       "./themes"
@@ -34,8 +38,14 @@
     "@sinclair/typebox": "*"
   },
   "dependencies": {
-    "js-yaml": "^4.1.1"
+    "@ff-labs/pi-fff": "^0.6.4",
+    "js-yaml": "^4.1.1",
+    "pi-subagents": "^0.17.5"
   },
+  "bundledDependencies": [
+    "@ff-labs/pi-fff",
+    "pi-subagents"
+  ],
   "devDependencies": {
     "@biomejs/biome": "^2.2.6",
     "@types/js-yaml": "^4.0.9",
