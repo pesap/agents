@@ -7,7 +7,7 @@ const RUNTIME_DIR = path.join(PACKAGE_ROOT, "runtime");
 export const RUNTIME_PATHS = {
   packageRoot: PACKAGE_ROOT,
   runtimeDir: RUNTIME_DIR,
-  skillflowsDir: path.join(RUNTIME_DIR, "skillflows"),
+  skillflowsDir: path.join(PACKAGE_ROOT, "workflows"),
   commandsDir: path.join(PACKAGE_ROOT, "commands"),
   interceptedCommandsDir: path.join(PACKAGE_ROOT, "intercepted-commands"),
   hooksDir: path.join(RUNTIME_DIR, "hooks"),

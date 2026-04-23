@@ -51,55 +51,55 @@ pesap command system
 │  └─ workflow commands
 │     ├─ /debug
 │     │  ├─ prompt: commands/debug-workflow.md
-│     │  ├─ flow:   runtime/skillflows/debug-workflow.yaml
+│     │  ├─ flow:   workflows/debug-workflow.yaml
 │     │  └─ skills: [debug-investigation]
 │     ├─ /feature
 │     │  ├─ prompt: commands/feature-workflow.md
-│     │  ├─ flow:   runtime/skillflows/feature-workflow.yaml
+│     │  ├─ flow:   workflows/feature-workflow.yaml
 │     │  └─ skills: [feature-delivery]
 │     ├─ /review
 │     │  ├─ prompt: commands/review-workflow.md
-│     │  ├─ flow:   runtime/skillflows/review-workflow.yaml
+│     │  ├─ flow:   workflows/review-workflow.yaml
 │     │  └─ skills: [code-review]
 │     ├─ /git-review
 │     │  ├─ prompt: commands/git-review-workflow.md
-│     │  ├─ flow:   runtime/skillflows/git-review-workflow.yaml
+│     │  ├─ flow:   workflows/git-review-workflow.yaml
 │     │  └─ skills: [github]
 │     ├─ /simplify
 │     │  ├─ prompt: commands/simplify-workflow.md
-│     │  ├─ flow:   runtime/skillflows/simplify-workflow.yaml
+│     │  ├─ flow:   workflows/simplify-workflow.yaml
 │     │  └─ skills: [simplify]
 │     ├─ /remove-slop
 │     │  ├─ prompt: commands/remove-slop-workflow.md
-│     │  ├─ flow:   runtime/skillflows/remove-slop-workflow.yaml
+│     │  ├─ flow:   workflows/remove-slop-workflow.yaml
 │     │  └─ skills: [simplify, comment-quality-gate, dead-code-proof, dependency-untangler, type-hardening, nasa-guidelines]
 │     ├─ /domain-model
 │     │  ├─ prompt: commands/domain-model-workflow.md
-│     │  ├─ flow:   runtime/skillflows/domain-model-workflow.yaml
+│     │  ├─ flow:   workflows/domain-model-workflow.yaml
 │     │  └─ skills: [domain-model]
 │     ├─ /to-prd
 │     │  ├─ prompt: commands/to-prd-workflow.md
-│     │  ├─ flow:   runtime/skillflows/to-prd-workflow.yaml
+│     │  ├─ flow:   workflows/to-prd-workflow.yaml
 │     │  └─ skills: [to-prd]
 │     ├─ /to-issues
 │     │  ├─ prompt: commands/to-issues-workflow.md
-│     │  ├─ flow:   runtime/skillflows/to-issues-workflow.yaml
+│     │  ├─ flow:   workflows/to-issues-workflow.yaml
 │     │  └─ skills: [to-issues]
 │     ├─ /triage-issue
 │     │  ├─ prompt: commands/triage-issue-workflow.md
-│     │  ├─ flow:   runtime/skillflows/triage-issue-workflow.yaml
+│     │  ├─ flow:   workflows/triage-issue-workflow.yaml
 │     │  └─ skills: [triage-issue]
 │     ├─ /tdd
 │     │  ├─ prompt: commands/tdd-workflow.md
-│     │  ├─ flow:   runtime/skillflows/tdd-workflow.yaml
+│     │  ├─ flow:   workflows/tdd-workflow.yaml
 │     │  └─ skills: [tdd-core, testing-pytest]
 │     ├─ /address-open-issues
 │     │  ├─ prompt: commands/address-open-issues-workflow.md
-│     │  ├─ flow:   runtime/skillflows/address-open-issues-workflow.yaml
+│     │  ├─ flow:   workflows/address-open-issues-workflow.yaml
 │     │  └─ skills: [address-open-issues]
 │     └─ /learn-skill
 │        ├─ prompt: commands/learn-skill-workflow.md
-│        ├─ flow:   runtime/skillflows/learn-skill-workflow.yaml
+│        ├─ flow:   workflows/learn-skill-workflow.yaml
 │        └─ skills: [skill-creator]
 ```
 

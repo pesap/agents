@@ -25,11 +25,11 @@ documents:
     purpose: search tool schema
   - path: tools/capability/search.yaml
     purpose: search capability mapping
-  - path: skillflows/debug-workflow.yaml
+  - path: ../workflows/debug-workflow.yaml
     purpose: debug orchestration
-  - path: skillflows/feature-workflow.yaml
+  - path: ../workflows/feature-workflow.yaml
     purpose: feature orchestration
-  - path: skillflows/git-review-workflow.yaml
+  - path: ../workflows/git-review-workflow.yaml
     purpose: git history diagnostics orchestration
-  - path: skillflows/learn-skill-workflow.yaml
+  - path: ../workflows/learn-skill-workflow.yaml
     purpose: skill creation orchestration
