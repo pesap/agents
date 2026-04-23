@@ -53,9 +53,7 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
   for (const command of commands) {
     pi.registerCommand(command.name, {
       description: command.description,
-      handler: async (args, ctx) => {
-        await command.handler(args, ctx);
-      },
+      handler: command.handler,
     });
   }
 }

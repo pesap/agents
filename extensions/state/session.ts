@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { AGENT_STATE_TYPE, COMPLIANCE_MODE_TYPE, POLICY_EVENT_TYPE, POSTFLIGHT_EVENT_TYPE, PREFLIGHT_STATE_TYPE, RISK_APPROVAL_TYPE } from "../lib/constants";
-import type { PolicyMode, PostflightRecord, PreflightRecord } from "../policy/first-principles";
+import { parsePolicyMode, type PostflightRecord, type PreflightRecord } from "../policy/first-principles";
 import type { PolicyEvent, RiskApproval, RuntimeState } from "./runtime";
 
 interface RiskApprovalEntryData {
@@ -33,34 +33,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseRiskApprovalEntryData(value: unknown): RiskApprovalEntryData | null {
-  return isRecord(value) ? value : null;
-}
-
-function parsePreflightStateEntryData(value: unknown): PreflightStateEntryData | null {
-  return isRecord(value) ? value : null;
-}
-
-function parseAgentStateEntryData(value: unknown): AgentStateEntryData | null {
-  return isRecord(value) ? value : null;
-}
-
-function parseComplianceModeEntryData(value: unknown): ComplianceModeEntryData | null {
-  return isRecord(value) ? value : null;
-}
-
-function isPolicyMode(value: unknown): value is PolicyMode {
-  return value === "monitor" || value === "warn" || value === "enforce";
-}
-
 export function getAgentEnabledFromSession(ctx: ExtensionContext): boolean {
   let enabled = false;
 
   for (const entry of ctx.sessionManager.getEntries()) {
     if (entry.type !== "custom" || entry.customType !== AGENT_STATE_TYPE) continue;
 
-    const data = parseAgentStateEntryData(entry.data);
-    if (!data) continue;
+    if (!isRecord(entry.data)) continue;
+    const data: AgentStateEntryData = entry.data;
 
     if (typeof data.enabled === "boolean") {
       enabled = data.enabled;
@@ -76,14 +56,14 @@ export function getComplianceModeFromSession(ctx: ExtensionContext): RuntimeStat
   for (const entry of ctx.sessionManager.getEntries()) {
     if (entry.type !== "custom" || entry.customType !== COMPLIANCE_MODE_TYPE) continue;
 
-    const data = parseComplianceModeEntryData(entry.data);
-    if (!data) continue;
+    if (!isRecord(entry.data)) continue;
+    const data: ComplianceModeEntryData = entry.data;
 
-    const preflightMode = data.preflightMode;
-    const postflightMode = data.postflightMode;
-    const responseComplianceMode = data.responseComplianceMode;
+    const preflightMode = parsePolicyMode(data.preflightMode);
+    const postflightMode = parsePolicyMode(data.postflightMode);
+    const responseComplianceMode = parsePolicyMode(data.responseComplianceMode);
 
-    if (!isPolicyMode(preflightMode) || !isPolicyMode(postflightMode) || !isPolicyMode(responseComplianceMode)) {
+    if (!preflightMode || !postflightMode || !responseComplianceMode) {
       continue;
     }
 
@@ -103,8 +83,13 @@ export function getRiskApprovalFromSession(ctx: ExtensionContext): RiskApproval 
   for (const entry of ctx.sessionManager.getEntries()) {
     if (entry.type !== "custom" || entry.customType !== RISK_APPROVAL_TYPE) continue;
 
-    const data = parseRiskApprovalEntryData(entry.data);
-    if (!data || data.approved !== true) {
+    if (!isRecord(entry.data)) {
+      approval = null;
+      continue;
+    }
+
+    const data: RiskApprovalEntryData = entry.data;
+    if (data.approved !== true) {
       approval = null;
       continue;
     }
@@ -138,8 +123,8 @@ export function getPreflightFromSession(
   for (const entry of ctx.sessionManager.getEntries()) {
     if (entry.type !== "custom" || entry.customType !== PREFLIGHT_STATE_TYPE) continue;
 
-    const data = parsePreflightStateEntryData(entry.data);
-    if (!data) continue;
+    if (!isRecord(entry.data)) continue;
+    const data: PreflightStateEntryData = entry.data;
 
     if (
       typeof data.at === "string"
