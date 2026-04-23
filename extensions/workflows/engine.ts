@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { load as loadYaml } from "js-yaml";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { PostflightRecord, PreflightRecord } from "../policy/first-principles";
@@ -39,6 +40,26 @@ export function ensureWorkflowSlotAvailable<TWorkflowType extends string>(
   return false;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseWorkflowSkills(rawWorkflowYaml: string): string[] {
+  try {
+    const parsed = loadYaml(rawWorkflowYaml);
+    if (!isRecord(parsed)) return [];
+    if (!Array.isArray(parsed.skills)) return [];
+
+    const validSkills = parsed.skills
+      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+      .filter((entry) => entry.length > 0 && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(entry));
+
+    return [...new Set(validSkills)];
+  } catch {
+    return [];
+  }
+}
+
 export async function enqueueWorkflow(params: {
   pi: ExtensionAPI;
   workflowPromptName: string;
@@ -46,22 +67,42 @@ export async function enqueueWorkflow(params: {
   sections: string[];
   readCommandPrompt: (name: string) => Promise<string>;
   readWorkflow: (name: string) => Promise<string>;
+  readSkill?: (name: string) => Promise<string>;
 }): Promise<void> {
   const [promptTemplate, workflowSpec] = await Promise.all([
     params.readCommandPrompt(params.workflowPromptName),
     params.readWorkflow(params.workflowFileName),
   ]);
 
+  const workflowSkills = parseWorkflowSkills(workflowSpec);
+  const skillSections = await Promise.all(
+    workflowSkills.map(async (skillName) => {
+      if (!params.readSkill) {
+        return `[SKILL:${skillName}]\n(Skill loading unavailable in this runtime)`;
+      }
+      const content = (await params.readSkill(skillName)).trim();
+      if (!content) {
+        return `[SKILL:${skillName}]\n(Skill not found or empty)`;
+      }
+      return `[SKILL:${skillName}]\n${content}`;
+    }),
+  );
+
   const payload = [
     promptTemplate.trim(),
     "",
+    skillSections.length > 0 ? "Workflow skills context:" : "",
+    ...skillSections.map((section) => ["```markdown", section, "```"].join("\n")),
+    skillSections.length > 0 ? "" : "",
     "Workflow spec:",
     "```yaml",
     workflowSpec.trim(),
     "```",
     "",
     ...params.sections,
-  ].join("\n");
+  ]
+    .filter((line) => line.length > 0)
+    .join("\n");
 
   params.pi.sendUserMessage(payload);
 }

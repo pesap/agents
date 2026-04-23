@@ -1,6 +1,8 @@
 name: triage-issue-workflow
 version: 1
 objective: Investigate a bug, identify root cause, and file a durable TDD fix-plan issue
+skills:
+  - triage-issue
 steps:
   - id: capture
     action: capture_problem_statement

@@ -1,5 +1,6 @@
+import { load as loadYaml } from "js-yaml";
 import path from "node:path";
-import { readTextIfExists } from "../lib/io";
+import { isRecord, readTextIfExists } from "../lib/io";
 
 export type HookLifecycle = "on_session_start" | "pre_risky_action" | "on_session_end";
 export type HookType = "markdown" | "policy";
@@ -36,83 +37,81 @@ export function cloneHookConfig(config: HookConfig): HookConfig {
   };
 }
 
-function stripOuterQuotes(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed.length < 2) return trimmed;
-  const first = trimmed[0];
-  const last = trimmed[trimmed.length - 1];
-  if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-    return trimmed.slice(1, -1);
-  }
-  return trimmed;
-}
-
 function isHookLifecycle(value: string): value is HookLifecycle {
   return value === "on_session_start" || value === "pre_risky_action" || value === "on_session_end";
 }
 
+function parseHookEntry(value: unknown, lifecycle: HookLifecycle, warnings: string[]): HookEntry | null {
+  if (!isRecord(value)) {
+    warnings.push(`Invalid hook entry under ${lifecycle}; expected mapping.`);
+    return null;
+  }
+
+  const type = value.type;
+  if (type !== "markdown" && type !== "policy") {
+    warnings.push(`Unsupported hook entry type '${String(type)}' under ${lifecycle}; entry ignored.`);
+    return null;
+  }
+
+  const entry: HookEntry = { type };
+  if (typeof value.path === "string") entry.path = value.path;
+  if (typeof value.policy === "string") entry.policy = value.policy;
+  if (typeof value.description === "string") entry.description = value.description;
+  return entry;
+}
+
+function parseLifecycleEntries(root: Record<string, unknown>, lifecycle: HookLifecycle, warnings: string[]): HookEntry[] {
+  const rawEntries = root[lifecycle];
+  if (!Array.isArray(rawEntries)) {
+    warnings.push(`Hook lifecycle '${lifecycle}' missing or not a list in hooks.yaml; default policy used.`);
+    return [];
+  }
+
+  const entries = rawEntries
+    .map((entry) => parseHookEntry(entry, lifecycle, warnings))
+    .filter((entry): entry is HookEntry => entry !== null);
+
+  if (entries.length === 0) {
+    warnings.push(`Hook lifecycle '${lifecycle}' has no valid entries in hooks.yaml; default policy used.`);
+  }
+
+  return entries;
+}
+
 export function parseHooksConfig(raw: string, defaults: HookConfig = DEFAULT_HOOK_CONFIG): HookConfigLoadResult {
   const warnings: string[] = [];
-  const parsed: HookConfig = {
-    on_session_start: [],
-    pre_risky_action: [],
-    on_session_end: [],
-  };
 
-  let currentLifecycle: HookLifecycle | null = null;
-  let currentEntry: HookEntry | null = null;
+  let parsedYaml: unknown;
+  try {
+    parsedYaml = loadYaml(raw);
+  } catch (error) {
+    return {
+      config: cloneHookConfig(defaults),
+      warnings: [`hooks.yaml parse error (${error instanceof Error ? error.message : String(error)}); default hook policy used.`],
+    };
+  }
 
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#") || trimmed === "hooks:") continue;
+  if (!isRecord(parsedYaml)) {
+    return {
+      config: cloneHookConfig(defaults),
+      warnings: ["hooks.yaml must contain an object root; default hook policy used."],
+    };
+  }
 
-    const lifecycleMatch = line.match(/^\s{2}([a-z_]+):\s*$/);
-    if (lifecycleMatch) {
-      const lifecycle = lifecycleMatch[1];
-      if (isHookLifecycle(lifecycle)) {
-        currentLifecycle = lifecycle;
-      } else {
-        currentLifecycle = null;
-        warnings.push(`Unknown hook lifecycle '${lifecycle}' ignored.`);
-      }
-      currentEntry = null;
-      continue;
-    }
+  const hookRoot = isRecord(parsedYaml.hooks) ? parsedYaml.hooks : parsedYaml;
+  const merged = cloneHookConfig(defaults);
 
-    const typeMatch = line.match(/^\s{4}-\s+type:\s+([a-z_]+)\s*$/);
-    if (typeMatch) {
-      if (!currentLifecycle) {
-        warnings.push("Found hook entry before lifecycle section; entry ignored.");
-        currentEntry = null;
-        continue;
-      }
-      const type = stripOuterQuotes(typeMatch[1]);
-      if (type !== "markdown" && type !== "policy") {
-        warnings.push(`Unsupported hook entry type '${type}' under ${currentLifecycle}; entry ignored.`);
-        currentEntry = null;
-        continue;
-      }
-      currentEntry = { type };
-      parsed[currentLifecycle].push(currentEntry);
-      continue;
-    }
-
-    const propertyMatch = line.match(/^\s{6}(path|policy|description):\s+(.+)\s*$/);
-    if (propertyMatch && currentEntry) {
-      const key = propertyMatch[1];
-      if (key === "path" || key === "policy" || key === "description") {
-        currentEntry[key] = stripOuterQuotes(propertyMatch[2]);
-      }
+  for (const lifecycle of ["on_session_start", "pre_risky_action", "on_session_end"] as const) {
+    const entries = parseLifecycleEntries(hookRoot, lifecycle, warnings);
+    if (entries.length > 0) {
+      merged[lifecycle] = entries;
     }
   }
 
-  const merged = cloneHookConfig(defaults);
-  for (const lifecycle of ["on_session_start", "pre_risky_action", "on_session_end"] as const) {
-    if (parsed[lifecycle].length === 0) {
-      warnings.push(`Hook lifecycle '${lifecycle}' missing entries in hooks.yaml; default policy used.`);
-      continue;
+  for (const key of Object.keys(hookRoot)) {
+    if (!isHookLifecycle(key)) {
+      warnings.push(`Unknown hook lifecycle '${key}' ignored.`);
     }
-    merged[lifecycle] = parsed[lifecycle];
   }
 
   return {

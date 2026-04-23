@@ -1,6 +1,9 @@
 name: tdd-workflow
 version: 1
 objective: Execute behavior-first development via red-green-refactor vertical slices
+skills:
+  - tdd-core
+  - testing-pytest
 steps:
   - id: plan
     action: define_behavior_and_public_interface

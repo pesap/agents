@@ -1,6 +1,8 @@
 import type { ToolCallEvent } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { load as loadYaml } from "js-yaml";
 import { MUTATION_BASH_PATTERN, POSTFLIGHT_LINE_REGEX, PREFLIGHT_LINE_REGEX } from "../lib/constants";
+import { isRecord } from "../lib/io";
 
 export type PolicyMode = "monitor" | "warn" | "enforce";
 export type PolicyOutcome = "allow" | "warn" | "block";
@@ -45,33 +47,47 @@ export function parseFirstPrinciplesConfig(raw: string): { config: FirstPrincipl
     };
   }
 
+  let parsedYaml: unknown;
+  try {
+    parsedYaml = loadYaml(raw);
+  } catch (error) {
+    return {
+      config: { preflightMode: "warn", postflightMode: "warn", responseComplianceMode: "warn" },
+      warnings: [`first-principles-gate.yaml parse error (${error instanceof Error ? error.message : String(error)}); using defaults.`],
+    };
+  }
+
+  if (!isRecord(parsedYaml)) {
+    return {
+      config: { preflightMode: "warn", postflightMode: "warn", responseComplianceMode: "warn" },
+      warnings: ["first-principles-gate.yaml must contain a mapping root; using defaults."],
+    };
+  }
+
   const warnings: string[] = [];
-  let preflightMode: PolicyMode | null = null;
-  let postflightMode: PolicyMode | null = null;
-  let responseComplianceMode: PolicyMode | null = null;
-
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const match = trimmed.match(/^(preflight_mode|postflight_mode|response_compliance):\s*([a-zA-Z_-]+)\s*$/);
-    if (!match) continue;
-
-    const mode = parsePolicyMode(match[2]);
-    if (!mode) {
-      warnings.push(`Invalid ${match[1]} value '${match[2]}' in first-principles-gate.yaml.`);
-      continue;
+  const parseModeField = (field: "preflight_mode" | "postflight_mode" | "response_compliance"): PolicyMode | null => {
+    const rawValue = parsedYaml[field];
+    if (typeof rawValue !== "string") {
+      if (rawValue !== undefined) {
+        warnings.push(`Invalid ${field} value '${String(rawValue)}' in first-principles-gate.yaml.`);
+      }
+      return null;
     }
 
-    if (match[1] === "preflight_mode") preflightMode = mode;
-    if (match[1] === "postflight_mode") postflightMode = mode;
-    if (match[1] === "response_compliance") responseComplianceMode = mode;
-  }
+    const mode = parsePolicyMode(rawValue);
+    if (!mode) {
+      warnings.push(`Invalid ${field} value '${rawValue}' in first-principles-gate.yaml.`);
+      return null;
+    }
+
+    return mode;
+  };
 
   return {
     config: {
-      preflightMode: preflightMode ?? "warn",
-      postflightMode: postflightMode ?? "warn",
-      responseComplianceMode: responseComplianceMode ?? "warn",
+      preflightMode: parseModeField("preflight_mode") ?? "warn",
+      postflightMode: parseModeField("postflight_mode") ?? "warn",
+      responseComplianceMode: parseModeField("response_compliance") ?? "warn",
     },
     warnings,
   };

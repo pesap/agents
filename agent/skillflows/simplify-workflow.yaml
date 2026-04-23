@@ -1,6 +1,8 @@
 name: simplify-workflow
 version: 1
 objective: Simplify scoped code safely while preserving exact behavior
+skills:
+  - simplify
 steps:
   - id: scope
     action: confirm_target_scope_and_constraints

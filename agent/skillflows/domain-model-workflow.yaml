@@ -1,6 +1,8 @@
 name: domain-model-workflow
 version: 1
 objective: Stress-test a plan against project domain language and capture decisions in CONTEXT/ADR docs
+skills:
+  - domain-model
 steps:
   - id: intake
     action: capture_plan_and_scope

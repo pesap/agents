@@ -1,6 +1,8 @@
 name: review-workflow
 version: 1
 objective: Run a scoped code review with prioritized, actionable findings and a clear verdict
+skills:
+  - code-review
 steps:
   - id: scope
     action: confirm_review_target_and_constraints

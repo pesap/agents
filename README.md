@@ -37,6 +37,72 @@ pi -e https://github.com/pesap/agents
 - `/tdd <goal> [--lang auto|python|rust|c]` (strict red-green-refactor workflow using core + language adapter skills)
 - `/address-open-issues [--limit N] [--repo owner/repo]` (process your open issues through triage, TDD, review, simplify, re-review, and remediation loops)
 
+## Workflow tree map
+
+```text
+pesap command system
+├─ /commands (registered)
+│  ├─ control (no skillflow prompt)
+│  │  ├─ /start-agent
+│  │  ├─ /end-agent
+│  │  ├─ /approve-risk
+│  │  ├─ /preflight
+│  │  └─ /postflight
+│  └─ workflow commands
+│     ├─ /debug
+│     │  ├─ prompt: commands/debug-workflow.md
+│     │  ├─ flow:   agent/skillflows/debug-workflow.yaml
+│     │  └─ skills: [debug-investigation]
+│     ├─ /feature
+│     │  ├─ prompt: commands/feature-workflow.md
+│     │  ├─ flow:   agent/skillflows/feature-workflow.yaml
+│     │  └─ skills: [feature-delivery]
+│     ├─ /review
+│     │  ├─ prompt: commands/review-workflow.md
+│     │  ├─ flow:   agent/skillflows/review-workflow.yaml
+│     │  └─ skills: [code-review]
+│     ├─ /git-review
+│     │  ├─ prompt: commands/git-review-workflow.md
+│     │  ├─ flow:   agent/skillflows/git-review-workflow.yaml
+│     │  └─ skills: [github]
+│     ├─ /simplify
+│     │  ├─ prompt: commands/simplify-workflow.md
+│     │  ├─ flow:   agent/skillflows/simplify-workflow.yaml
+│     │  └─ skills: [simplify]
+│     ├─ /remove-slop
+│     │  ├─ prompt: commands/remove-slop-workflow.md
+│     │  ├─ flow:   agent/skillflows/remove-slop-workflow.yaml
+│     │  └─ skills: [simplify, comment-quality-gate, dead-code-proof, dependency-untangler, type-hardening, nasa-guidelines]
+│     ├─ /domain-model
+│     │  ├─ prompt: commands/domain-model-workflow.md
+│     │  ├─ flow:   agent/skillflows/domain-model-workflow.yaml
+│     │  └─ skills: [domain-model]
+│     ├─ /to-prd
+│     │  ├─ prompt: commands/to-prd-workflow.md
+│     │  ├─ flow:   agent/skillflows/to-prd-workflow.yaml
+│     │  └─ skills: [to-prd]
+│     ├─ /to-issues
+│     │  ├─ prompt: commands/to-issues-workflow.md
+│     │  ├─ flow:   agent/skillflows/to-issues-workflow.yaml
+│     │  └─ skills: [to-issues]
+│     ├─ /triage-issue
+│     │  ├─ prompt: commands/triage-issue-workflow.md
+│     │  ├─ flow:   agent/skillflows/triage-issue-workflow.yaml
+│     │  └─ skills: [triage-issue]
+│     ├─ /tdd
+│     │  ├─ prompt: commands/tdd-workflow.md
+│     │  ├─ flow:   agent/skillflows/tdd-workflow.yaml
+│     │  └─ skills: [tdd-core, testing-pytest]
+│     ├─ /address-open-issues
+│     │  ├─ prompt: commands/address-open-issues-workflow.md
+│     │  ├─ flow:   agent/skillflows/address-open-issues-workflow.yaml
+│     │  └─ skills: [address-open-issues]
+│     └─ /learn-skill
+│        ├─ prompt: commands/learn-skill-workflow.md
+│        ├─ flow:   agent/skillflows/learn-skill-workflow.yaml
+│        └─ skills: [skill-creator]
+```
+
 ### Run workflow commands outside the REPL
 
 These commands also work in non-interactive runs (print mode or RPC), not only in the TUI REPL.
@@ -53,6 +119,7 @@ pi -e https://github.com/pesap/agents -p "/triage-issue 'Intermittent timeout wh
 pi -e https://github.com/pesap/agents -p "/tdd 'Add retry policy for hook loading' --lang rust"
 pi -e https://github.com/pesap/agents -p "/address-open-issues --limit 10"
 ```
+
 ## Intercepted shell commands (active agent only)
 
 When pesap-agent is enabled (`/start-agent`, or auto-enabled by workflow commands), the extension wraps the `bash` tool and intercepts Python packaging commands inspired by https://github.com/mitsuhiko/agent-stuff:
@@ -66,6 +133,7 @@ When pesap-agent is enabled (`/start-agent`, or auto-enabled by workflow command
 
 Run `/end-agent` to disable this interception for the current session.
 Teardown lifecycle hooks run on both `/end-agent` and `session_shutdown`.
+
 ## Self-learning storage
 
 The extension writes durable learning artifacts to a local writable store:

@@ -72,9 +72,7 @@ import {
   type LearningObservation,
   type LearningPaths,
 } from "./learning/store";
-import { getBlockedCommandMessage } from "./policy/blocked-commands";
 import {
-  buildPreflightRawLine,
   extractPostflightFromAssistantText,
   isMutationToolCall,
   modeOutcome,
@@ -85,7 +83,7 @@ import {
   type PostflightRecord,
   type PreflightRecord,
 } from "./policy/first-principles";
-import { evaluateRiskPolicy } from "./policy/risk";
+import { evaluateMutationPreflightPolicy, evaluateSpawnPolicy } from "./policy/pipeline";
 import {
   createRuntimeState,
   hasValidRiskApproval,
@@ -202,24 +200,6 @@ async function ensureSkillPathInSettings(settingsPath: string, skillPath: string
 async function loadFirstPrinciplesConfig(): Promise<{ config: FirstPrinciplesConfig; warnings: string[] }> {
   const raw = await readTextIfExists(FIRST_PRINCIPLES_CONFIG_PATH);
   return parseFirstPrinciplesConfig(raw);
-}
-
-function evaluateRiskPolicyMessage(command: string): string | null {
-  const evaluation = evaluateRiskPolicy(command, {
-    hookConfig: activeHookConfig,
-    hasValidRiskApproval: hasValidRiskApproval(runtimeState),
-    nowIso,
-  });
-
-  if (evaluation.event) {
-    runtimeState.riskEvents.push(evaluation.event);
-  }
-
-  if (evaluation.consumeApproval) {
-    runtimeState.riskApproval = null;
-  }
-
-  return evaluation.blockedMessage;
 }
 
 async function appendRuntimeDailyLog(line: string): Promise<void> {
@@ -371,6 +351,15 @@ async function readCommandPrompt(name: string): Promise<string> {
   return readText(filePath);
 }
 
+async function readSkill(name: string): Promise<string> {
+  const skillFile = path.resolve(PACKAGE_SKILLS_PATH, name, "SKILL.md");
+  const skillsRoot = `${path.resolve(PACKAGE_SKILLS_PATH)}${path.sep}`;
+  if (!skillFile.startsWith(skillsRoot)) {
+    return "";
+  }
+  return readTextIfExists(skillFile);
+}
+
 async function getBootstrapPayload(cwd: string): Promise<string> {
   const [soul, rules, duties, instructions, complianceProfile, startupHooks, memoryTail, learnedSkills] = await Promise.all([
     readTextIfExists(path.join(AGENT_DIR, "SOUL.md")),
@@ -424,6 +413,7 @@ async function enqueueWorkflow(
     sections,
     readCommandPrompt,
     readWorkflow,
+    readSkill,
   });
 }
 
@@ -499,14 +489,22 @@ export default function pesapExtension(pi: ExtensionAPI): void {
     spawnHook: (spawnContext) => {
       if (!runtimeState.agentEnabled) return spawnContext;
 
-      const blockedMessage = getBlockedCommandMessage(spawnContext.command);
-      if (blockedMessage) {
-        throw new Error(blockedMessage);
+      const policy = evaluateSpawnPolicy(spawnContext.command, {
+        hookConfig: activeHookConfig,
+        hasValidRiskApproval: hasValidRiskApproval(runtimeState),
+        nowIso,
+      });
+
+      if (policy.riskEvent) {
+        runtimeState.riskEvents.push(policy.riskEvent);
       }
 
-      const riskPolicyMessage = evaluateRiskPolicyMessage(spawnContext.command);
-      if (riskPolicyMessage) {
-        throw new Error(riskPolicyMessage);
+      if (policy.consumeRiskApproval) {
+        runtimeState.riskApproval = null;
+      }
+
+      if (policy.blockedMessage) {
+        throw new Error(policy.blockedMessage);
       }
 
       return {
@@ -584,44 +582,35 @@ export default function pesapExtension(pi: ExtensionAPI): void {
 
   pi.on("tool_call", async (event, ctx) => {
     if (!runtimeState.agentEnabled) return;
-
     if (!isMutationToolCall(event)) return;
 
     if (pendingWorkflow) pendingWorkflow.mutationCount += 1;
 
-    const preflight = runtimeState.activePreflight;
-    const violation = !preflight;
-    const outcome = modeOutcome(runtimeState.firstPrinciplesConfig.preflightMode, violation);
-    const detail = violation
-      ? "Missing valid preflight before mutation."
-      : `Using ${preflight.source} preflight: ${buildPreflightRawLine(preflight)}`;
+    const decision = evaluateMutationPreflightPolicy({
+      preflightMode: runtimeState.firstPrinciplesConfig.preflightMode,
+      preflight: runtimeState.activePreflight,
+      toolName: event.toolName,
+    });
 
     addPolicyEvent(pi, {
       at: nowIso(),
       phase: "preflight",
       mode: runtimeState.firstPrinciplesConfig.preflightMode,
-      outcome,
-      detail,
+      outcome: decision.outcome,
+      detail: decision.detail,
       toolName: event.toolName,
     });
 
-    if (outcome === "warn") {
-      const warning = `Policy warning (${event.toolName}): ${detail}`;
-      pendingWorkflow?.policyWarnings.push(warning);
-      notify(ctx, warning, "warning");
+    if (decision.warningMessage) {
+      pendingWorkflow?.policyWarnings.push(decision.warningMessage);
+      notify(ctx, decision.warningMessage, "warning");
       return;
     }
 
-    if (outcome === "block") {
+    if (decision.blockReason) {
       return {
         block: true,
-        reason: [
-          `Policy blocked ${event.toolName}.`,
-          "Missing valid preflight before first mutation.",
-          "Run:",
-          "  /preflight Preflight: skill=<name|none> reason=\"<short>\" clarify=<yes|no>",
-          "Remediate and retry.",
-        ].join("\n"),
+        reason: decision.blockReason,
       };
     }
   });
