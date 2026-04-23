@@ -16,6 +16,7 @@ Bundled + auto-loaded extension dependencies:
 - `@ff-labs/pi-fff` (install target: `pi install npm:@ff-labs/pi-fff`)
 
 You do **not** need to install these separately when using this package.
+If you already have `pi-subagents` installed elsewhere, pesap-agent reuses it and skips its bundled copy to avoid extension load conflicts.
 
 ## Try without installing
 

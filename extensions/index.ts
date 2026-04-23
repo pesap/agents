@@ -4,6 +4,8 @@ import type {
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import { createBashTool } from "@mariozechner/pi-coding-agent";
+import registerSubagentExtension from "pi-subagents/index.ts";
+import registerSubagentNotifyExtension from "pi-subagents/notify.ts";
 import { createAgentCommandHandlers } from "./commands/agent";
 import { createComplianceCommandHandlers } from "./commands/compliance";
 import {
@@ -127,7 +129,10 @@ const learningPathCache = new Map<string, LearningPaths>();
 let activeHookConfig: HookConfig = DEFAULT_HOOK_CONFIG;
 let activeRuntimeProfile: RuntimeProfile = DEFAULT_RUNTIME_PROFILE;
 let lowConfidenceEvents: LowConfidenceEvent[] = [];
+let bundledExtensionsInitialized = false;
 const runtimeState = createRuntimeState();
+
+const SUBAGENT_TOOL_NAMES = new Set(["subagent", "subagent_status"]);
 
 const workflowReaders = createWorkflowReaders({
   skillflowsDir: RUNTIME_PATHS.skillflowsDir,
@@ -138,6 +143,31 @@ const workflowReaders = createWorkflowReaders({
 function prependInterceptedCommandsPath(command: string): string {
   const escapedPath = RUNTIME_PATHS.interceptedCommandsDir.replace(/"/g, '\\"');
   return `export PATH="${escapedPath}:$PATH"\n${command}`;
+}
+
+function hasAnyRegisteredTool(pi: ExtensionAPI, names: Set<string>): boolean {
+  return pi.getAllTools().some((tool) => names.has(tool.name));
+}
+
+function ensureBundledExtensions(
+  pi: ExtensionAPI,
+  ctx: Pick<ExtensionContext, "hasUI" | "ui">,
+): void {
+  if (bundledExtensionsInitialized) return;
+  bundledExtensionsInitialized = true;
+
+  if (!hasAnyRegisteredTool(pi, SUBAGENT_TOOL_NAMES)) {
+    try {
+      registerSubagentExtension(pi);
+      registerSubagentNotifyExtension(pi);
+    } catch (error) {
+      notify(
+        ctx,
+        `Failed to load bundled pi-subagents: ${error instanceof Error ? error.message : String(error)}`,
+        "warning",
+      );
+    }
+  }
 }
 
 function isPreflightClarify(value: unknown): value is PreflightClarify {
@@ -291,6 +321,8 @@ export default function pesapExtension(pi: ExtensionAPI): void {
 
   pi.registerTool(bashTool);
   pi.on("session_start", async (_event, ctx) => {
+    ensureBundledExtensions(pi, ctx);
+
     const paths = await ensureLearningStore(ctx.cwd, learningPathCache);
 
     const [hookConfig, profileLoad] = await Promise.all([
