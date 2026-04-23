@@ -15,6 +15,16 @@ export function notify(
   message: string,
   type: NotifyType,
 ): void {
-  if (!ctx.hasUI) return;
-  ctx.ui.notify(message, type === "success" ? "info" : type);
+  if (ctx.hasUI) {
+    ctx.ui.notify(message, type === "success" ? "info" : type);
+    return;
+  }
+
+  const line = `[pesap-agent/${type}] ${message}`;
+  if (type === "error" || type === "warning") {
+    console.error(line);
+    return;
+  }
+
+  console.log(line);
 }

@@ -563,6 +563,15 @@ export function createWorkflowCommandHandlers(params: {
         return;
       }
 
+      if (!resolveWorkflowConfig("learn-skill")) {
+        notify(
+          ctx,
+          "Workflow command /learn-skill is disabled by runtime/profile.yaml or failed validation.",
+          "error",
+        );
+        return;
+      }
+
       const paths = await ensureLearningStore(ctx.cwd);
 
       let sourceExcerpt = "";

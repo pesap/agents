@@ -40,14 +40,7 @@ skills:
   - comment-quality-gate
   - public-api-guard
   - caveman
-  - r2x-core-plugin-system-and-data-modeling
   - infrasys
-  - data-model
-  - cost-curves
-  - system-design
-  - storage-backends
-  - infrasys-timeseries
-  - serialization-migration
 pi:
   scope: project
   tools: "read,edit,write,grep,ast_search,nu,bash,gitagent_remember"
