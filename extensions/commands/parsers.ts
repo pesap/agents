@@ -3,7 +3,7 @@ import path from "node:path";
 import { RISK_APPROVAL_TTL_MINUTES } from "../lib/constants";
 import { removeFlag } from "../lib/flags";
 import { normalizeWhitespace } from "../lib/text";
-import type { PostflightRecord, PreflightRecord } from "../policy/first-principles";
+import type { PolicyMode, PostflightRecord, PreflightRecord } from "../policy/first-principles";
 
 export type WorkflowFlagValue = string | number | boolean | null | string[];
 export type WorkflowFlags = Record<string, WorkflowFlagValue>;
@@ -26,6 +26,37 @@ export interface ScopedTarget {
 export interface ParseRecordResult<T> {
   record?: T;
   error?: string;
+}
+
+export type CompliancePreset = "status" | "reset" | PolicyMode;
+
+const COMPLIANCE_PRESET_ALIASES: Record<string, CompliancePreset> = {
+  status: "status",
+  strict: "enforce",
+  enforce: "enforce",
+  warn: "warn",
+  warning: "warn",
+  monitor: "monitor",
+  reset: "reset",
+  default: "reset",
+  defaults: "reset",
+};
+
+export function parseComplianceArgs(args: string): { preset: CompliancePreset; error?: string } {
+  const value = normalizeWhitespace(args).toLowerCase();
+  if (!value) {
+    return { preset: "status" };
+  }
+
+  const preset = COMPLIANCE_PRESET_ALIASES[value];
+  if (preset) {
+    return { preset };
+  }
+
+  return {
+    preset: "status",
+    error: "Usage: /compliance [status|strict|enforce|warn|monitor|reset]",
+  };
 }
 
 export function parseApproveRiskArgs(args: string): { reason: string; ttlMinutes: number; error?: string } {

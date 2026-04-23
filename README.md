@@ -1,6 +1,55 @@
 # pesap-agent
 
-A Pi package for a single, self-learning development agent with Pi-native workflows and runtime guardrails.
+Single self-learning Pi dev agent package with runtime guardrails.
+
+## Start context injection (current session)
+
+If you only need one thing: **`/start-agent` works only after this package is loaded in the session**.
+
+### Requirements
+
+1. Start Pi with `pesap-agent` loaded (installed package **or** `-e` one-off extension).
+2. Run `/start-agent` (or any workflow command, which auto-starts it).
+
+### Copy/paste snippets
+
+Installed package flow:
+
+```bash
+pi install https://github.com/pesap/agents
+pi
+# then inside Pi:
+/start-agent
+```
+
+One-off (no install):
+
+```bash
+pi -e https://github.com/pesap/agents
+# then inside Pi:
+/start-agent
+```
+
+Non-interactive one-liner:
+
+```bash
+pi -e https://github.com/pesap/agents -p "/start-agent"
+```
+
+### How to confirm it started
+
+- You get: `pesap-agent initialized.` (or auto-init message from a workflow command)
+- Session status shows: `🐉 pesap-agent enabled`
+
+### How to stop it
+
+```text
+/end-agent
+```
+
+Also stops automatically on session shutdown.
+
+---
 
 ## Install
 
@@ -8,15 +57,15 @@ A Pi package for a single, self-learning development agent with Pi-native workfl
 pi install https://github.com/pesap/agents
 ```
 
-pesap-agent relies on Pi package resource loading (`pi` manifest in `package.json`) and does not mutate `~/.pi/agent/settings.json` at runtime.
+`pesap-agent` uses Pi package resource loading (`pi` manifest in `package.json`) and does **not** mutate `~/.pi/agent/settings.json` at runtime.
 
 Bundled + auto-loaded extension dependencies:
 
 - `pi-subagents` (https://github.com/nicobailon/pi-subagents)
-- `@ff-labs/pi-fff` (install target: `pi install npm:@ff-labs/pi-fff`)
+- `@ff-labs/pi-fff` (`pi install npm:@ff-labs/pi-fff`)
 
 You do **not** need to install these separately when using this package.
-If you already have `pi-subagents` installed elsewhere, pesap-agent reuses it and skips its bundled copy to avoid extension load conflicts.
+If `pi-subagents` is already installed elsewhere, pesap-agent reuses it and skips its bundled copy to avoid extension conflicts.
 
 ## Try without installing
 
@@ -24,161 +73,166 @@ If you already have `pi-subagents` installed elsewhere, pesap-agent reuses it an
 pi -e https://github.com/pesap/agents
 ```
 
-## Included commands
+## Commands
 
-- `/start-agent` - initialize pesap-agent context injection in the current session
-- `/end-agent` - stop pesap-agent context injection in the current session
-- `/approve-risk <reason> [--ttl MINUTES]` - record temporary checker approval required for one high-risk shell action
-- `/preflight Preflight: skill=<name|none> reason="<short>" clarify=<yes|no>` - record explicit mutation intent (required when preflight mode is `enforce`)
-- `/postflight Postflight: verify="<command_or_check>" result=<pass|fail|not-run>` - record verification evidence after mutation
-- `/debug <problem> [--fix]` (auto-initializes the agent if needed)
-- `/feature <request> [--ship]` (auto-initializes the agent if needed)
+### Control commands (manual session control)
+
+- `/start-agent` - enable pesap-agent context injection for this session
+- `/end-agent` - disable pesap-agent context injection for this session
+- `/compliance [status|strict|enforce|warn|monitor|reset]` - set first-principles compliance strictness for this session (no YAML edit required)
+- `/approve-risk <reason> [--ttl MINUTES]` - checker approval for one high-risk shell action
+- `/preflight Preflight: skill=<name|none> reason="<short>" clarify=<yes|no>` - mutation intent record (required when preflight mode is `enforce`)
+- `/postflight Postflight: verify="<command_or_check>" result=<pass|fail|not-run>` - verification evidence record
+
+### Workflow commands (auto-enable agent if needed)
+
+- `/debug <problem> [--fix]`
+- `/feature <request> [--ship]`
+- `/review [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`
+- `/git-review`
+- `/simplify [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`
+- `/remove-slop [scope]`
+- `/domain-model <plan_or_topic>`
+- `/to-prd [context]`
+- `/to-issues [plan_or_issue]`
+- `/triage-issue <problem_statement>`
+- `/tdd <goal> [--lang auto|python|rust|c]`
+- `/address-open-issues [--limit N] [--repo owner/repo]`
 - `/learn-skill <topic> [--from <path|url>] [--from-file path] [--from-url url] [--dry-run]`
-- `/review [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]` (adapted from `https://github.com/earendil-works/pi-review`)
-- `/git-review` - run git-history diagnostics before reading code (churn, authorship, bug clusters, velocity, firefighting)
-- `/simplify [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]` (code simplification workflow, behavior-preserving)
-- `/remove-slop [scope]` (code-quality cleanup workflow with mandatory safety/NASA guardrails and language-aware skill selection)
-- `/domain-model <plan_or_topic>` (domain-model grilling workflow that aligns terminology with code and updates CONTEXT/ADR docs lazily)
-- `/to-prd [context]` (synthesize current context into PRD markdown and file as GitHub issue when possible)
-- `/to-issues [plan_or_issue]` (break a plan/PRD into dependency-aware vertical-slice GitHub issues)
-- `/triage-issue <problem_statement>` (investigate root cause and file a TDD fix-plan issue)
-- `/tdd <goal> [--lang auto|python|rust|c]` (strict red-green-refactor workflow using core + language adapter skills)
-- `/address-open-issues [--limit N] [--repo owner/repo]` (process your open issues through triage, TDD, review, simplify, re-review, and remediation loops)
 
-## Workflow tree map
+## Run workflow commands outside the REPL
 
-```text
-pesap command system
-├─ /commands (registered)
-│  ├─ control (no skillflow prompt)
-│  │  ├─ /start-agent
-│  │  ├─ /end-agent
-│  │  ├─ /approve-risk
-│  │  ├─ /preflight
-│  │  └─ /postflight
-│  └─ workflow commands
-│     ├─ /debug
-│     │  ├─ prompt: commands/debug-workflow.md
-│     │  ├─ flow:   workflows/debug-workflow.yaml
-│     │  └─ skills: [debug-investigation]
-│     ├─ /feature
-│     │  ├─ prompt: commands/feature-workflow.md
-│     │  ├─ flow:   workflows/feature-workflow.yaml
-│     │  └─ skills: [feature-delivery]
-│     ├─ /review
-│     │  ├─ prompt: commands/review-workflow.md
-│     │  ├─ flow:   workflows/review-workflow.yaml
-│     │  └─ skills: [code-review]
-│     ├─ /git-review
-│     │  ├─ prompt: commands/git-review-workflow.md
-│     │  ├─ flow:   workflows/git-review-workflow.yaml
-│     │  └─ skills: [github]
-│     ├─ /simplify
-│     │  ├─ prompt: commands/simplify-workflow.md
-│     │  ├─ flow:   workflows/simplify-workflow.yaml
-│     │  └─ skills: [simplify]
-│     ├─ /remove-slop
-│     │  ├─ prompt: commands/remove-slop-workflow.md
-│     │  ├─ flow:   workflows/remove-slop-workflow.yaml
-│     │  └─ skills: [simplify, comment-quality-gate, dead-code-proof, dependency-untangler, type-hardening, nasa-guidelines]
-│     ├─ /domain-model
-│     │  ├─ prompt: commands/domain-model-workflow.md
-│     │  ├─ flow:   workflows/domain-model-workflow.yaml
-│     │  └─ skills: [domain-model]
-│     ├─ /to-prd
-│     │  ├─ prompt: commands/to-prd-workflow.md
-│     │  ├─ flow:   workflows/to-prd-workflow.yaml
-│     │  └─ skills: [to-prd]
-│     ├─ /to-issues
-│     │  ├─ prompt: commands/to-issues-workflow.md
-│     │  ├─ flow:   workflows/to-issues-workflow.yaml
-│     │  └─ skills: [to-issues]
-│     ├─ /triage-issue
-│     │  ├─ prompt: commands/triage-issue-workflow.md
-│     │  ├─ flow:   workflows/triage-issue-workflow.yaml
-│     │  └─ skills: [triage-issue]
-│     ├─ /tdd
-│     │  ├─ prompt: commands/tdd-workflow.md
-│     │  ├─ flow:   workflows/tdd-workflow.yaml
-│     │  └─ skills: [tdd-core, testing-pytest]
-│     ├─ /address-open-issues
-│     │  ├─ prompt: commands/address-open-issues-workflow.md
-│     │  ├─ flow:   workflows/address-open-issues-workflow.yaml
-│     │  └─ skills: [address-open-issues]
-│     └─ /learn-skill
-│        ├─ prompt: commands/learn-skill-workflow.md
-│        ├─ flow:   workflows/learn-skill-workflow.yaml
-│        └─ skills: [skill-creator]
-```
-
-### Run workflow commands outside the REPL
-
-These commands also work in non-interactive runs (print mode or RPC), not only in the TUI REPL.
+These commands also work in print mode / RPC (not only in TUI REPL).
 
 ```bash
 pi -e https://github.com/pesap/agents -p "/review README.md --extra 'focus on correctness'"
-pi -e https://github.com/pesap/agents -p "/review folder src docs"
 pi -e https://github.com/pesap/agents -p "/simplify src/commands/review.ts"
 pi -e https://github.com/pesap/agents -p "/remove-slop src"
-pi -e https://github.com/pesap/agents -p "/domain-model 'Split billing and ordering contexts with async events'"
-pi -e https://github.com/pesap/agents -p "/to-prd 'Add audit trail for policy gate actions'"
-pi -e https://github.com/pesap/agents -p "/to-issues 'Implement audit trail from PRD #123'"
-pi -e https://github.com/pesap/agents -p "/triage-issue 'Intermittent timeout when loading policy config'"
 pi -e https://github.com/pesap/agents -p "/tdd 'Add retry policy for hook loading' --lang rust"
-pi -e https://github.com/pesap/agents -p "/address-open-issues --limit 10"
 ```
 
-## Intercepted shell commands (active agent only)
+## What changes when agent is enabled
 
-When pesap-agent is enabled (`/start-agent`, or auto-enabled by workflow commands), the extension wraps the `bash` tool and intercepts Python packaging commands inspired by https://github.com/mitsuhiko/agent-stuff:
+When enabled (`/start-agent` or any workflow command), pesap-agent wraps `bash` and applies policy/interception:
 
-- `pip`, `pip3`, `poetry` → blocked with `uv` replacement guidance
-- `python`, `python3` → routed through `uv run` wrappers when invoked by command name
-- `python -m pip|venv|py_compile` → blocked with actionable alternatives
-- path-qualified Python executables (e.g. `/usr/bin/python3`, `.venv/bin/python`) → blocked to prevent interception bypass
-- high-risk destructive or sensitive shell commands (e.g. `rm -rf`, `git reset --hard`, force-push, obvious secret reads) → blocked unless checker approval is recorded via `/approve-risk`
-- first-principles mutation gate checks `edit`, `write`, and mutation-capable `bash` calls for preflight intent and postflight evidence (defaults in `runtime/profile.yaml`, optional overrides in `runtime/compliance/first-principles-gate.yaml`)
-
-Run `/end-agent` to disable this interception for the current session.
-Teardown lifecycle hooks run on both `/end-agent` and `session_shutdown`.
+- Blocks `pip`, `pip3`, `poetry` and guides to `uv`
+- Routes `python` / `python3` command-name invocations through `uv run`
+- Blocks `python -m pip|venv|py_compile`
+- Blocks path-qualified Python binaries (e.g. `/usr/bin/python3`, `.venv/bin/python`) to prevent bypass
+- Blocks high-risk destructive/sensitive shell commands unless approved via `/approve-risk`
+- Runs first-principles mutation gates on `edit`, `write`, and mutation-capable `bash` calls (defaults in `runtime/profile.yaml`, optional overrides in `runtime/compliance/first-principles-gate.yaml`)
 
 ## Self-learning storage
 
-The extension writes durable learning artifacts to a local writable store:
+Durable artifacts are written to:
 
 - Preferred (project-local): `<repo>/.pi/pesap-agent/` (when `.pi/` exists in cwd)
 - Fallback (global): `~/.pi/pesap-agent/`
 
-Stored artifacts:
+Stored files:
 
 - `memory/learning.jsonl` - structured observations per workflow run
 - `memory/MEMORY.md` - concise chronological learnings
-- `memory/promotion-queue.md` - promotion/improvement hints based on repeated outcomes
+- `memory/promotion-queue.md` - promotion/improvement hints from repeated outcomes
 - `runs/*.json` - per-run workflow records
 - `skills/<name>/SKILL.md` - skills created by `/learn-skill`
 
+## How learning actually works
+
+Learning is **event-based memory**, not model fine-tuning.
+
+1. A workflow command starts (`/debug`, `/feature`, `/review`, etc.).
+2. The extension opens a tracked run (`runs/<id>.json`) and records an observation on completion.
+3. On completion, it appends:
+   - one JSON line to `memory/learning.jsonl`
+   - one summary line to `memory/MEMORY.md`
+4. If enough recent runs of the same workflow exist, it may append a hint to `memory/promotion-queue.md`.
+
+### What is enforced vs not enforced
+
+Enforced (configurable warn/enforce modes):
+
+- preflight before mutation tools (`edit`, `write`, mutating `bash`)
+- postflight evidence after mutation
+- workflow response footer lines: `Result: ...` and `Confidence: 0..1`
+
+Not enforced / not automatic:
+
+- No automatic edits to `README.md`, `INSTRUCTIONS.md`, or skills from learning.
+- No automatic model training/fine-tuning.
+- No learning record is created for normal chat unless a tracked workflow command is running.
+
+### How learning is injected back into the session
+
+When agent mode is enabled, the extension injects into bootstrap context:
+
+- the latest tail of `memory/MEMORY.md` (recent learned outcomes)
+- names of learned skills in the learning store
+
+This affects prompt context for subsequent turns, but does not rewrite files automatically.
+
 ## Package layout
 
-- `extensions/index.ts` - command/workflow orchestration and bash interception while agent mode is enabled
-- `runtime/` - gitagent-style single agent runtime definition
+- `extensions/index.ts` - command/workflow orchestration + `bash` interception while enabled
+- `runtime/` - single-agent runtime definition
 - `commands/` - workflow prompt templates
-- `intercepted-commands/` - command shims for pip/pip3/poetry/python/python3 during active agent sessions
+- `intercepted-commands/` - shims for pip/pip3/poetry/python/python3 during active sessions
 - `themes/` - optional themes (empty by default)
 
 ## Compliance baseline
 
 - `runtime/DUTIES.md` - maker/checker separation and escalation boundaries
-- `runtime/compliance/` - risk profile, capability controls, and review cadence (`first-principles-gate.yaml` included)
-- `runtime/profile.yaml` - strict runtime profile for low-confidence threshold, command/workflow exposure, and first-principles default modes
-- `runtime/hooks/` - lifecycle hook policy that is loaded and enforced at runtime (`on_session_start`, `pre_risky_action`, `on_session_end`)
+- `runtime/compliance/` - risk profile, capability controls, review cadence
+- `runtime/profile.yaml` - strict runtime profile + first-principles defaults
+- `runtime/hooks/` - lifecycle hook policy (`on_session_start`, `pre_risky_action`, `on_session_end`)
 - `runtime/memory/runtime/live/` - `dailylog.md`, `key-decisions.md`, `context.md`
-- `runtime/tools/search.yaml` + `runtime/tools/capability/search.yaml` - tool schema and capability mapping
-- Hook warnings are surfaced at session start if `runtime/hooks/hooks.yaml` is missing or malformed; defaults are applied for safety.
-- Runtime profile warnings are surfaced at session start; workflows with missing prompt/skillflow files are disabled automatically with explicit warnings.
+- `runtime/tools/search.yaml` + `runtime/tools/capability/search.yaml` - tool schema/capability mapping
+
+If `runtime/hooks/hooks.yaml` or runtime profile artifacts are missing/malformed, warnings are surfaced at session start and safe defaults are applied.
+
+## Enforce compliance (block/fail), not just warnings
+
+Fast path (session-scoped, no file edits):
+
+```text
+/compliance strict
+```
+
+Reset back to configured defaults:
+
+```text
+/compliance reset
+```
+
+You can also inspect current modes anytime:
+
+```text
+/compliance status
+```
+
+Persistent path (repo/package config):
+
+- edit `runtime/compliance/first-principles-gate.yaml` (overrides profile defaults)
+
+```yaml
+preflight_mode: enforce
+postflight_mode: enforce
+response_compliance: enforce
+```
+
+Then start a new session (or restart Pi) and enable the agent.
+
+Expected strict behavior:
+
+- Missing preflight before first mutation (`edit`/`write`/mutating `bash`) -> mutation is **blocked** with remediation text.
+- Missing postflight evidence after mutation -> workflow is marked **failed** (strict violation) at completion.
+- Missing final `Result:` / `Confidence:` lines in workflow output -> response is **blocked** until fixed.
+
+Tip: if you want strict by default without override file, set `runtime/profile.yaml` under `first_principles` to `enforce`; the gate file still has precedence when present.
 
 ## Design goals
 
-1. Keep one canonical agent identity.
-2. Learn from user feedback and workflow outcomes.
-3. Stay concise and token-efficient by default.
-4. Enable safe self-improvement with explicit guardrails.
+1. One canonical agent identity
+2. Learn from user feedback + workflow outcomes
+3. Stay concise/token-efficient by default
+4. Enable safe self-improvement with explicit guardrails

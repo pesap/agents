@@ -10,6 +10,7 @@ export const RISK_APPROVAL_TTL_MINUTES = 20;
 export const PREFLIGHT_STATE_TYPE = "pesap-preflight-state";
 export const POSTFLIGHT_EVENT_TYPE = "pesap-postflight-event";
 export const POLICY_EVENT_TYPE = "pesap-policy-event";
+export const COMPLIANCE_MODE_TYPE = "pesap-compliance-mode";
 
 export const REVIEW_COMMAND_SOURCE = "https://github.com/earendil-works/pi-review";
 export const GIT_REVIEW_COMMAND_SOURCE = "https://piechowski.io/post/git-commands-before-reading-code/";

@@ -1,5 +1,5 @@
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import type { PostflightRecord, PreflightRecord } from "../policy/first-principles";
+import type { PolicyMode, PostflightRecord, PreflightRecord } from "../policy/first-principles";
 import type { RuntimeState } from "../state/runtime";
 
 type NotifyType = "info" | "error" | "warning" | "success";
@@ -8,19 +8,70 @@ type CommandHandler = (args: string | undefined, ctx: ExtensionCommandContext) =
 export function createComplianceCommandHandlers(params: {
   runtimeState: RuntimeState;
   notify: (ctx: Pick<ExtensionCommandContext, "hasUI" | "ui">, message: string, type: NotifyType) => void;
+  parseComplianceArgs: (args: string) => { preset: "status" | "reset" | PolicyMode; error?: string };
   parseApproveRiskArgs: (args: string) => { reason: string; ttlMinutes: number; error?: string };
   parsePreflightArgs: (args: string) => { record?: PreflightRecord; error?: string };
   parsePostflightArgs: (args: string) => { record?: PostflightRecord; error?: string };
   nowIso: () => string;
+  getDefaultFirstPrinciplesConfig: () => RuntimeState["firstPrinciplesConfig"];
+  appendComplianceModeEntry: (record: RuntimeState["firstPrinciplesConfig"] & { at: string; source: "command" }) => void;
   appendRiskApprovalEntry: (approval: { reason: string; approvedAt: string; expiresAt: string }) => void;
   appendPreflightEntry: (record: PreflightRecord) => void;
   appendPostflightEntry: (record: PostflightRecord) => void;
 }): {
+  compliance: CommandHandler;
   approveRisk: CommandHandler;
   preflight: CommandHandler;
   postflight: CommandHandler;
 } {
+  const formatCompliance = (config: RuntimeState["firstPrinciplesConfig"]): string => (
+    `preflight=${config.preflightMode}, postflight=${config.postflightMode}, response=${config.responseComplianceMode}`
+  );
+
+  const applyMode = (mode: PolicyMode): RuntimeState["firstPrinciplesConfig"] => ({
+    preflightMode: mode,
+    postflightMode: mode,
+    responseComplianceMode: mode,
+  });
+
   return {
+    compliance: async (args, ctx) => {
+      const parsed = params.parseComplianceArgs(args ?? "");
+      if (parsed.error) {
+        params.notify(ctx, parsed.error, "error");
+        return;
+      }
+
+      if (parsed.preset === "status") {
+        params.notify(
+          ctx,
+          `Compliance modes (session): ${formatCompliance(params.runtimeState.firstPrinciplesConfig)}. Usage: /compliance [status|strict|enforce|warn|monitor|reset]`,
+          "info",
+        );
+        return;
+      }
+
+      const isReset = parsed.preset === "reset";
+      const nextConfig = isReset
+        ? { ...params.getDefaultFirstPrinciplesConfig() }
+        : applyMode(parsed.preset);
+
+      params.runtimeState.firstPrinciplesConfig = nextConfig;
+      params.appendComplianceModeEntry({
+        at: params.nowIso(),
+        source: "command",
+        ...nextConfig,
+      });
+
+      params.notify(
+        ctx,
+        isReset
+          ? `Compliance modes reset to defaults: ${formatCompliance(nextConfig)}.`
+          : `Compliance strictness updated: ${formatCompliance(nextConfig)}.`,
+        "success",
+      );
+    },
+
     approveRisk: async (args, ctx) => {
       const parsed = params.parseApproveRiskArgs(args ?? "");
       if (parsed.error) {

@@ -7,6 +7,7 @@ export interface CommandRegistrarDeps {
   handlers: {
     startAgent: CommandHandler;
     endAgent: CommandHandler;
+    compliance: CommandHandler;
     approveRisk: CommandHandler;
     preflight: CommandHandler;
     postflight: CommandHandler;
@@ -30,6 +31,7 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
   const commands = [
     { name: "start-agent", description: "Initialize pesap-agent context injection for this session", handler: handlers.startAgent },
     { name: "end-agent", description: "Stop pesap-agent context injection for this session", handler: handlers.endAgent },
+    { name: "compliance", description: "Show or change first-principles compliance modes for this session", handler: handlers.compliance },
     { name: "approve-risk", description: "Record checker approval for one high-risk command", handler: handlers.approveRisk },
     { name: "preflight", description: "Set mutation intent line for first-principles gate", handler: handlers.preflight },
     { name: "postflight", description: "Record verification evidence line for first-principles gate", handler: handlers.postflight },

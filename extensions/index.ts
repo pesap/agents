@@ -14,6 +14,7 @@ import {
   buildSkillTemplate,
   parseAddressOpenIssuesArgs,
   parseApproveRiskArgs,
+  parseComplianceArgs,
   parseDebugArgs,
   parseDomainModelArgs,
   parseFeatureArgs,
@@ -76,11 +77,13 @@ import {
 } from "./state/runtime";
 import {
   appendAgentStateEntry,
+  appendComplianceModeEntry,
   appendPolicyEvent,
   appendPostflightEntry,
   appendPreflightEntry,
   appendRiskApprovalEntry,
   getAgentEnabledFromSession,
+  getComplianceModeFromSession,
   getPreflightFromSession,
   getRiskApprovalFromSession,
 } from "./state/session";
@@ -131,6 +134,7 @@ let activeRuntimeProfile: RuntimeProfile = DEFAULT_RUNTIME_PROFILE;
 let lowConfidenceEvents: LowConfidenceEvent[] = [];
 let bundledExtensionsInitialized = false;
 const runtimeState = createRuntimeState();
+let sessionFirstPrinciplesDefaults = { ...runtimeState.firstPrinciplesConfig };
 
 const SUBAGENT_TOOL_NAMES = new Set(["subagent", "subagent_status"]);
 
@@ -345,7 +349,10 @@ export default function pesapExtension(pi: ExtensionAPI): void {
 
     activeHookConfig = hookConfig.config;
     activeRuntimeProfile = profileValidation.profile;
-    runtimeState.firstPrinciplesConfig = gateConfig.config;
+    sessionFirstPrinciplesDefaults = { ...gateConfig.config };
+
+    const complianceOverride = getComplianceModeFromSession(ctx);
+    runtimeState.firstPrinciplesConfig = complianceOverride ?? gateConfig.config;
 
     for (const warning of profileLoad.warnings) {
       notify(ctx, `Profile warning: ${warning}`, "warning");
@@ -366,7 +373,7 @@ export default function pesapExtension(pi: ExtensionAPI): void {
 
     notify(
       ctx,
-      `pesap-agent path: ${paths.root} (workflows=${profileValidation.enabledWorkflowCount}/${Object.keys(activeRuntimeProfile.workflows).length}, low-confidence=${activeRuntimeProfile.lowConfidenceThreshold.toFixed(2)}, preflight=${runtimeState.firstPrinciplesConfig.preflightMode}, postflight=${runtimeState.firstPrinciplesConfig.postflightMode})`,
+      `pesap-agent path: ${paths.root} (workflows=${profileValidation.enabledWorkflowCount}/${Object.keys(activeRuntimeProfile.workflows).length}, low-confidence=${activeRuntimeProfile.lowConfidenceThreshold.toFixed(2)}, preflight=${runtimeState.firstPrinciplesConfig.preflightMode}, postflight=${runtimeState.firstPrinciplesConfig.postflightMode}, response=${runtimeState.firstPrinciplesConfig.responseComplianceMode})`,
       "info",
     );
   });
@@ -517,10 +524,13 @@ export default function pesapExtension(pi: ExtensionAPI): void {
   const complianceHandlers = createComplianceCommandHandlers({
     runtimeState,
     notify,
+    parseComplianceArgs,
     parseApproveRiskArgs,
     parsePreflightArgs: (args) => parsePreflightArgs(args, (line) => parsePreflightLine(line, nowIso)),
     parsePostflightArgs: (args) => parsePostflightArgs(args, (line) => parsePostflightLine(line, nowIso)),
     nowIso,
+    getDefaultFirstPrinciplesConfig: () => sessionFirstPrinciplesDefaults,
+    appendComplianceModeEntry: (record) => appendComplianceModeEntry(pi, record),
     appendRiskApprovalEntry: (approval) => appendRiskApprovalEntry(pi, approval),
     appendPreflightEntry: (record) => appendPreflightEntry(pi, record),
     appendPostflightEntry: (record) => appendPostflightEntry(pi, record),

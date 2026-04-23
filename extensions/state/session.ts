@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { AGENT_STATE_TYPE, POLICY_EVENT_TYPE, POSTFLIGHT_EVENT_TYPE, PREFLIGHT_STATE_TYPE, RISK_APPROVAL_TYPE } from "../lib/constants";
-import type { PostflightRecord, PreflightRecord } from "../policy/first-principles";
+import { AGENT_STATE_TYPE, COMPLIANCE_MODE_TYPE, POLICY_EVENT_TYPE, POSTFLIGHT_EVENT_TYPE, PREFLIGHT_STATE_TYPE, RISK_APPROVAL_TYPE } from "../lib/constants";
+import type { PolicyMode, PostflightRecord, PreflightRecord } from "../policy/first-principles";
 import type { PolicyEvent, RiskApproval, RuntimeState } from "./runtime";
 
 interface RiskApprovalEntryData {
@@ -23,6 +23,12 @@ interface AgentStateEntryData {
   enabled?: boolean;
 }
 
+interface ComplianceModeEntryData {
+  preflightMode?: string;
+  postflightMode?: string;
+  responseComplianceMode?: string;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -37,6 +43,14 @@ function parsePreflightStateEntryData(value: unknown): PreflightStateEntryData |
 
 function parseAgentStateEntryData(value: unknown): AgentStateEntryData | null {
   return isRecord(value) ? value : null;
+}
+
+function parseComplianceModeEntryData(value: unknown): ComplianceModeEntryData | null {
+  return isRecord(value) ? value : null;
+}
+
+function isPolicyMode(value: unknown): value is PolicyMode {
+  return value === "monitor" || value === "warn" || value === "enforce";
 }
 
 export function getAgentEnabledFromSession(ctx: ExtensionContext): boolean {
@@ -54,6 +68,33 @@ export function getAgentEnabledFromSession(ctx: ExtensionContext): boolean {
   }
 
   return enabled;
+}
+
+export function getComplianceModeFromSession(ctx: ExtensionContext): RuntimeState["firstPrinciplesConfig"] | null {
+  let config: RuntimeState["firstPrinciplesConfig"] | null = null;
+
+  for (const entry of ctx.sessionManager.getEntries()) {
+    if (entry.type !== "custom" || entry.customType !== COMPLIANCE_MODE_TYPE) continue;
+
+    const data = parseComplianceModeEntryData(entry.data);
+    if (!data) continue;
+
+    const preflightMode = data.preflightMode;
+    const postflightMode = data.postflightMode;
+    const responseComplianceMode = data.responseComplianceMode;
+
+    if (!isPolicyMode(preflightMode) || !isPolicyMode(postflightMode) || !isPolicyMode(responseComplianceMode)) {
+      continue;
+    }
+
+    config = {
+      preflightMode,
+      postflightMode,
+      responseComplianceMode,
+    };
+  }
+
+  return config;
 }
 
 export function getRiskApprovalFromSession(ctx: ExtensionContext): RiskApproval | null {
@@ -127,6 +168,13 @@ export function appendAgentStateEntry(pi: ExtensionAPI, enabled: boolean, at: st
     ? { enabled, source, at }
     : { enabled, at };
   pi.appendEntry(AGENT_STATE_TYPE, payload);
+}
+
+export function appendComplianceModeEntry(
+  pi: ExtensionAPI,
+  config: RuntimeState["firstPrinciplesConfig"] & { at: string; source: "command" },
+): void {
+  pi.appendEntry(COMPLIANCE_MODE_TYPE, config);
 }
 
 export function appendRiskApprovalEntry(pi: ExtensionAPI, approval: RiskApproval): void {
