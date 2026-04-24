@@ -1,16 +1,16 @@
-export const AGENT_STATE_TYPE = "pesap-agent-state";
-export const LEARNING_STORE_DIRNAME = "pesap-agent";
+export const AGENT_STATE_TYPE = "khala-state";
+export const LEARNING_STORE_DIRNAME = "khala";
 export const LEARNING_VERSION = 1;
 export const MEMORY_TAIL_LINES = 20;
 export const PROMOTION_MIN_OBSERVATIONS = 3;
 export const PROMOTION_SUCCESS_THRESHOLD = 0.75;
 export const PROMOTION_IMPROVEMENT_THRESHOLD = 0.4;
-export const RISK_APPROVAL_TYPE = "pesap-risk-approval";
+export const RISK_APPROVAL_TYPE = "khala-risk-approval";
 export const RISK_APPROVAL_TTL_MINUTES = 20;
-export const PREFLIGHT_STATE_TYPE = "pesap-preflight-state";
-export const POSTFLIGHT_EVENT_TYPE = "pesap-postflight-event";
-export const POLICY_EVENT_TYPE = "pesap-policy-event";
-export const COMPLIANCE_MODE_TYPE = "pesap-compliance-mode";
+export const PREFLIGHT_STATE_TYPE = "khala-preflight-state";
+export const POSTFLIGHT_EVENT_TYPE = "khala-postflight-event";
+export const POLICY_EVENT_TYPE = "khala-policy-event";
+export const COMPLIANCE_MODE_TYPE = "khala-compliance-mode";
 
 export const REVIEW_COMMAND_SOURCE = "https://github.com/earendil-works/pi-review";
 export const GIT_REVIEW_COMMAND_SOURCE = "https://piechowski.io/post/git-commands-before-reading-code/";
@@ -20,7 +20,7 @@ export const TO_PRD_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/
 export const TO_ISSUES_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/to-issues";
 export const TRIAGE_ISSUE_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/triage-issue";
 export const TDD_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/tdd";
-export const ADDRESS_OPEN_ISSUES_COMMAND_SOURCE = "pesap://workflow/address-open-issues";
+export const ADDRESS_OPEN_ISSUES_COMMAND_SOURCE = "khala://workflow/address-open-issues";
 
 export const PREFLIGHT_LINE_REGEX = /^Preflight:\s+skill=([a-zA-Z0-9_.-]+|none)\s+reason="([^"]{1,200})"\s+clarify=(yes|no)\s*$/;
 export const POSTFLIGHT_LINE_REGEX = /^Postflight:\s+verify="([^"]{1,280})"\s+result=(pass|fail|not-run)\s*$/;

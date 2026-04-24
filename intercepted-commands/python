@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PYTHON_CMD="${PESAP_PYTHON_CMD:-$(basename "$0")}"
+PYTHON_CMD="${KHALA_PYTHON_CMD:-$(basename "$0")}"
 
 block_python_module() {
     local module="$1"
@@ -35,7 +35,7 @@ EOF
             ;;
     esac
 
-    echo "Error: '${PYTHON_CMD} ${error_suffix}' is disabled while pesap-agent is active. Use uv instead:" >&2
+    echo "Error: '${PYTHON_CMD} ${error_suffix}' is disabled while khala is active. Use uv instead:" >&2
     echo "" >&2
     echo "${guidance}" >&2
     echo "" >&2

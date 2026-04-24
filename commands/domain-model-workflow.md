@@ -1,6 +1,6 @@
 # Domain-model command prompt
 
-You are running the pesap `/domain-model` workflow.
+You are running the khala `/domain-model` workflow.
 
 Requirements:
 - Be concise.

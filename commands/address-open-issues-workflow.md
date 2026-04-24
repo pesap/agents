@@ -1,6 +1,6 @@
 # Address-Open-Issues command prompt
 
-You are running the pesap `/address-open-issues` workflow.
+You are running the khala `/address-open-issues` workflow.
 
 Requirements:
 - Be concise.

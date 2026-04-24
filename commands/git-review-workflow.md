@@ -1,6 +1,6 @@
 # Git review command prompt
 
-You are running the pesap `/git-review` workflow.
+You are running the khala `/git-review` workflow.
 
 Requirements:
 - Do not read source code before running git diagnostics.

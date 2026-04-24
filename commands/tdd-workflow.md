@@ -1,6 +1,6 @@
 # TDD command prompt
 
-You are running the pesap `/tdd` workflow.
+You are running the khala `/tdd` workflow.
 
 Requirements:
 - Be concise.

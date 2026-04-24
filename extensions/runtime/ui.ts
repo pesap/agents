@@ -2,12 +2,12 @@ import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 
 export type NotifyType = "info" | "error" | "warning" | "success";
 
-export function setPesapStatus(
+export function setKhalaStatus(
   ctx: Pick<ExtensionContext, "hasUI" | "ui">,
   label?: string,
 ): void {
   if (!ctx.hasUI) return;
-  ctx.ui.setStatus("pesap", label);
+  ctx.ui.setStatus("khala", label);
 }
 
 export function notify(
@@ -20,7 +20,7 @@ export function notify(
     return;
   }
 
-  const line = `[pesap-agent/${type}] ${message}`;
+  const line = `[khala/${type}] ${message}`;
   if (type === "error" || type === "warning") {
     console.error(line);
     return;

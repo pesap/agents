@@ -1,6 +1,6 @@
 # To-PRD command prompt
 
-You are running the pesap `/to-prd` workflow.
+You are running the khala `/to-prd` workflow.
 
 Requirements:
 - Be concise.

@@ -1,6 +1,6 @@
 # To-Issues command prompt
 
-You are running the pesap `/to-issues` workflow.
+You are running the khala `/to-issues` workflow.
 
 Requirements:
 - Be concise.

@@ -59,7 +59,7 @@ export async function runSessionEndHooks(params: {
     policyEvents: params.runtimeState.policyEvents,
     teardownHooksLoaded: Boolean(teardownHooks.trim()),
   };
-  params.pi.appendEntry("pesap-hook-summary", summary);
+  params.pi.appendEntry("khala-hook-summary", summary);
 
   const executedHighRisk = params.runtimeState.riskEvents.filter(
     (event) => event.approved,

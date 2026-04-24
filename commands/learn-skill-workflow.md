@@ -1,6 +1,6 @@
 # Learn-skill command prompt
 
-You are running the pesap `/learn-skill` workflow.
+You are running the khala `/learn-skill` workflow.
 
 Requirements:
 - Be concise.

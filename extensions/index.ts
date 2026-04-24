@@ -118,7 +118,7 @@ import {
   type RuntimeProfile,
   type WorkflowType,
 } from "./runtime/profile";
-import { notify, setPesapStatus } from "./runtime/ui";
+import { notify, setKhalaStatus } from "./runtime/ui";
 type PreflightClarify = PreflightRecord["clarify"];
 type PreflightSource = PreflightRecord["source"];
 
@@ -187,7 +187,7 @@ function setAgentEnabledState(
   enabled: boolean,
 ): void {
   setAgentEnabled(runtimeState, enabled);
-  setPesapStatus(ctx, enabled ? "🐉 pesap-agent enabled" : undefined);
+  setKhalaStatus(ctx, enabled ? "🐉 khala enabled" : undefined);
 }
 
 function ensureAgentEnabledForCommand(
@@ -198,7 +198,7 @@ function ensureAgentEnabledForCommand(
   if (runtimeState.agentEnabled) return;
   setAgentEnabledState(ctx, true);
   appendAgentStateEntry(pi, true, nowIso(), source);
-  notify(ctx, `pesap-agent initialized automatically for /${source}.`, "info");
+  notify(ctx, `khala initialized automatically for /${source}.`, "info");
 }
 
 function addPolicyEvent(pi: ExtensionAPI, event: PolicyEvent): void {
@@ -293,7 +293,7 @@ async function completeWorkflowTracking(
   });
 }
 
-export default function pesapExtension(pi: ExtensionAPI): void {
+export default function khalaExtension(pi: ExtensionAPI): void {
   const bashTool = createBashTool(process.cwd(), {
     spawnHook: (spawnContext) => {
       if (!runtimeState.agentEnabled) return spawnContext;
@@ -373,7 +373,7 @@ export default function pesapExtension(pi: ExtensionAPI): void {
 
     notify(
       ctx,
-      `pesap-agent path: ${paths.root} (workflows=${profileValidation.enabledWorkflowCount}/${Object.keys(activeRuntimeProfile.workflows).length}, low-confidence=${activeRuntimeProfile.lowConfidenceThreshold.toFixed(2)}, preflight=${runtimeState.firstPrinciplesConfig.preflightMode}, postflight=${runtimeState.firstPrinciplesConfig.postflightMode}, response=${runtimeState.firstPrinciplesConfig.responseComplianceMode})`,
+      `khala path: ${paths.root} (workflows=${profileValidation.enabledWorkflowCount}/${Object.keys(activeRuntimeProfile.workflows).length}, low-confidence=${activeRuntimeProfile.lowConfidenceThreshold.toFixed(2)}, preflight=${runtimeState.firstPrinciplesConfig.preflightMode}, postflight=${runtimeState.firstPrinciplesConfig.postflightMode}, response=${runtimeState.firstPrinciplesConfig.responseComplianceMode})`,
       "info",
     );
   });

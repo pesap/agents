@@ -1,7 +1,7 @@
 # Risk Assessment
 
 ## Scope
-Compliance profile for `pesap-agent`, focused on secure software engineering workflows.
+Compliance profile for `khala`, focused on secure software engineering workflows.
 
 ## Risk tier
 - **Tier**: standard

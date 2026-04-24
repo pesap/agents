@@ -18,12 +18,12 @@ export function createAgentCommandHandlers(params: {
   return {
     startAgent: async (_args, ctx) => {
       if (params.runtimeState.agentEnabled) {
-        params.notify(ctx, "pesap-agent is already initialized.", "info");
+        params.notify(ctx, "khala is already initialized.", "info");
         return;
       }
       params.setAgentEnabledState(ctx, true);
       params.appendAgentStateEntry(true);
-      params.notify(ctx, "pesap-agent initialized.", "success");
+      params.notify(ctx, "khala initialized.", "success");
     },
 
     endAgent: async (_args, ctx) => {

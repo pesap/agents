@@ -1,6 +1,6 @@
 # Review command prompt
 
-You are running the pesap `/review` workflow.
+You are running the khala `/review` workflow.
 
 Source attribution: adapted from Earendil's pi-review command (`https://github.com/earendil-works/pi-review`).
 

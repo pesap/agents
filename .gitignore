@@ -7,7 +7,7 @@ dist/
 !extensions/runtime/
 !extensions/runtime/*.ts
 .tmp/
-.pi/pesap-agent/
+.pi/khala/
 
 # Python
 __pycache__/

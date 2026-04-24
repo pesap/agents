@@ -1,6 +1,6 @@
 # Debug command prompt
 
-You are running the pesap `/debug` workflow.
+You are running the khala `/debug` workflow.
 
 Requirements:
 - Be concise.

@@ -1,5 +1,5 @@
 {
-  "name": "pesap-agent",
+  "name": "khala",
   "version": "0.1.0",
   "description": "Single self-learning developer agent package for Pi",
   "type": "module",
@@ -27,7 +27,8 @@
     ],
     "themes": [
       "./themes"
-    ]
+    ],
+    "image": "./assets/pylon.png"
   },
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",

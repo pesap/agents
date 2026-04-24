@@ -1,6 +1,6 @@
 # Feature command prompt
 
-You are running the pesap `/feature` workflow.
+You are running the khala `/feature` workflow.
 
 Requirements:
 - Be concise.

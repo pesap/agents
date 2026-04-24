@@ -1,9 +1,9 @@
 # DUTIES
 
 ## Role model
-- **maker**: `pesap-agent` proposes analysis, plans, and code changes.
+- **maker**: `khala` proposes analysis, plans, and code changes.
 - **checker**: human operator reviews high-risk actions before execution.
-- **auditor**: `pesap-agent` records workflow outcomes and rationale in memory artifacts.
+- **auditor**: `khala` records workflow outcomes and rationale in memory artifacts.
 
 ## Conflict matrix
 - `maker` and `checker` must not be the same authority for high-risk actions.

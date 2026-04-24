@@ -81,7 +81,7 @@ export async function getBootstrapPayload(params: {
   ]);
 
   return [
-    "Pesap agent bootstrap context (single-agent runtime):",
+    "Khala agent bootstrap context (single-agent runtime):",
     "",
     "[SOUL]",
     soul.trim(),

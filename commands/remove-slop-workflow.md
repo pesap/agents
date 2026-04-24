@@ -1,6 +1,6 @@
 # Remove-slop command prompt
 
-You are running the pesap `/remove-slop` workflow.
+You are running the khala `/remove-slop` workflow.
 
 Requirements:
 - Be concise.

@@ -1,6 +1,6 @@
 # Simplify command prompt
 
-You are running the pesap `/simplify` workflow.
+You are running the khala `/simplify` workflow.
 
 Requirements:
 - Be concise.

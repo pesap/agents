@@ -1,2 +1,2 @@
 #!/bin/bash
-PESAP_PYTHON_CMD=python3 exec "$(dirname "$0")/python" "$@"
+KHALA_PYTHON_CMD=python3 exec "$(dirname "$0")/python" "$@"

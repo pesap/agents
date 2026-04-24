@@ -1,4 +1,4 @@
-# pesap-agent repo overrides
+# khala repo overrides
 
 This repo inherits global defaults from `~/.pi/agent/AGENTS.md`.
 Use this file only for repo-specific deltas.

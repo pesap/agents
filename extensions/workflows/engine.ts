@@ -137,7 +137,7 @@ export async function beginWorkflowTracking<TWorkflowType extends string, TWorkf
   };
 
   await fs.writeFile(runFile, `${JSON.stringify(record, null, 2)}\n`, "utf8");
-  params.pi.appendEntry("pesap-workflow-start", { id, type: params.type, input: params.input, flags: params.flags, startedAt });
+  params.pi.appendEntry("khala-workflow-start", { id, type: params.type, input: params.input, flags: params.flags, startedAt });
 
   const pending: PendingWorkflow<TWorkflowType, TWorkflowFlags> = {
     id,
@@ -296,7 +296,7 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
     `- ${finishedAt.slice(0, 10)} [${params.workflow.type}/${outcome}] ${params.summarizeEvidence(params.workflow.input, 180)} (confidence=${confidence.toFixed(2)}, q=${qualityScore})`,
   );
 
-  params.pi.appendEntry("pesap-workflow-complete", {
+  params.pi.appendEntry("khala-workflow-complete", {
     id: params.workflow.id,
     type: params.workflow.type,
     outcome,

@@ -1,4 +1,4 @@
-# pesap-agent
+# khala
 
 Single self-learning Pi dev agent package with runtime guardrails.
 
@@ -8,7 +8,7 @@ If you only need one thing: **`/start-agent` works only after this package is lo
 
 ### Requirements
 
-1. Start Pi with `pesap-agent` loaded (installed package **or** `-e` one-off extension).
+1. Start Pi with `khala` loaded (installed package **or** `-e` one-off extension).
 2. Run `/start-agent` (or any workflow command, which auto-starts it).
 
 ### Copy/paste snippets
@@ -38,8 +38,8 @@ pi -e https://github.com/pesap/agents -p "/start-agent"
 
 ### How to confirm it started
 
-- You get: `pesap-agent initialized.` (or auto-init message from a workflow command)
-- Session status shows: `🐉 pesap-agent enabled`
+- You get: `khala initialized.` (or auto-init message from a workflow command)
+- Session status shows: `🐉 khala enabled`
 
 ### How to stop it
 
@@ -57,7 +57,7 @@ Also stops automatically on session shutdown.
 pi install https://github.com/pesap/agents
 ```
 
-`pesap-agent` uses Pi package resource loading (`pi` manifest in `package.json`) and does **not** mutate `~/.pi/agent/settings.json` at runtime.
+`khala` uses Pi package resource loading (`pi` manifest in `package.json`) and does **not** mutate `~/.pi/agent/settings.json` at runtime.
 
 Bundled + auto-loaded extension dependencies:
 
@@ -65,7 +65,7 @@ Bundled + auto-loaded extension dependencies:
 - `@ff-labs/pi-fff` (`pi install npm:@ff-labs/pi-fff`)
 
 You do **not** need to install these separately when using this package.
-If `pi-subagents` is already installed elsewhere, pesap-agent reuses it and skips its bundled copy to avoid extension conflicts.
+If `pi-subagents` is already installed elsewhere, khala reuses it and skips its bundled copy to avoid extension conflicts.
 
 ## Try without installing
 
@@ -77,8 +77,8 @@ pi -e https://github.com/pesap/agents
 
 ### Control commands (manual session control)
 
-- `/start-agent` - enable pesap-agent context injection for this session
-- `/end-agent` - disable pesap-agent context injection for this session
+- `/start-agent` - enable khala context injection for this session
+- `/end-agent` - disable khala context injection for this session
 - `/compliance [status|strict|enforce|warn|monitor|reset]` - set first-principles compliance strictness for this session (no YAML edit required)
 - `/approve-risk <reason> [--ttl MINUTES]` - checker approval for one high-risk shell action
 - `/preflight Preflight: skill=<name|none> reason="<short>" clarify=<yes|no>` - mutation intent record (required when preflight mode is `enforce`)
@@ -113,7 +113,7 @@ pi -e https://github.com/pesap/agents -p "/tdd 'Add retry policy for hook loadin
 
 ## What changes when agent is enabled
 
-When enabled (`/start-agent` or any workflow command), pesap-agent wraps `bash` and applies policy/interception:
+When enabled (`/start-agent` or any workflow command), khala wraps `bash` and applies policy/interception:
 
 - Blocks `pip`, `pip3`, `poetry` and guides to `uv`
 - Routes `python` / `python3` command-name invocations through `uv run`
@@ -126,8 +126,8 @@ When enabled (`/start-agent` or any workflow command), pesap-agent wraps `bash` 
 
 Durable artifacts are written to:
 
-- Preferred (project-local): `<repo>/.pi/pesap-agent/` (when `.pi/` exists in cwd)
-- Fallback (global): `~/.pi/pesap-agent/`
+- Preferred (project-local): `<repo>/.pi/khala/` (when `.pi/` exists in cwd)
+- Fallback (global): `~/.pi/khala/`
 
 Stored files:
 

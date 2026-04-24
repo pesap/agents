@@ -1,6 +1,6 @@
 # Triage-Issue command prompt
 
-You are running the pesap `/triage-issue` workflow.
+You are running the khala `/triage-issue` workflow.
 
 Requirements:
 - Be concise.

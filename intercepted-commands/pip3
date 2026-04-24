@@ -1,2 +1,2 @@
 #!/bin/bash
-PESAP_PIP_CMD=pip3 exec "$(dirname "$0")/pip" "$@"
+KHALA_PIP_CMD=pip3 exec "$(dirname "$0")/pip" "$@"
