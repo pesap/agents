@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@m
 import { load as loadYaml } from "js-yaml";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { isRecord } from "../lib/io";
 import type { PostflightRecord, PreflightRecord } from "../policy/first-principles";
 import type { RuntimeState } from "../state/runtime";
 
@@ -38,10 +39,6 @@ export function ensureWorkflowSlotAvailable<TWorkflowType extends string>(
   if (!pendingWorkflow) return true;
   notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
   return false;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function parseWorkflowSkills(rawWorkflowYaml: string): string[] {

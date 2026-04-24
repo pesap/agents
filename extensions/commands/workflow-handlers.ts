@@ -5,6 +5,7 @@ import type {
   WorkflowCommandConfig,
   WorkflowType,
 } from "../runtime/profile";
+import type { PendingWorkflow } from "../workflows/engine";
 
 type NotifyType = "info" | "error" | "warning" | "success";
 type CommandHandler = (args: string | undefined, ctx: ExtensionCommandContext) => Promise<void>;
@@ -23,7 +24,6 @@ interface ScopedTarget {
   instruction: string;
   flags: WorkflowFlags;
 }
-
 
 interface RunWorkflowCommandParams {
   ctx: ExtensionCommandContext;
@@ -50,7 +50,7 @@ export function createWorkflowCommandHandlers(params: {
     type: WorkflowType,
     input: string,
     flags: WorkflowFlags,
-  ) => Promise<unknown>;
+  ) => Promise<PendingWorkflow<WorkflowType, WorkflowFlags>>;
   enqueueWorkflow: (pi: ExtensionAPI, workflowPromptName: string, workflowFileName: string, sections: string[]) => Promise<void>;
   notifyWorkflowStarted: (ctx: ExtensionCommandContext, message: string, notify: (ctx: ExtensionCommandContext, message: string, type: NotifyType) => void) => void;
   parseDebugArgs: (args: string) => { problem: string; fix: boolean };

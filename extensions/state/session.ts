@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { isRecord } from "../lib/io";
 import { AGENT_STATE_TYPE, COMPLIANCE_MODE_TYPE, POLICY_EVENT_TYPE, POSTFLIGHT_EVENT_TYPE, PREFLIGHT_STATE_TYPE, RISK_APPROVAL_TYPE } from "../lib/constants";
 import { parsePolicyMode, type PostflightRecord, type PreflightRecord } from "../policy/first-principles";
 import type { PolicyEvent, RiskApproval, RuntimeState } from "./runtime";
@@ -28,10 +29,6 @@ interface ComplianceModeEntryData {
   preflightMode?: string;
   postflightMode?: string;
   responseComplianceMode?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function getAgentEnabledFromSession(ctx: ExtensionContext): boolean {
