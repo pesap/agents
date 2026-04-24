@@ -327,8 +327,6 @@ export default function khalaExtension(pi: ExtensionAPI): void {
   pi.on("session_start", async (_event, ctx) => {
     ensureBundledExtensions(pi, ctx);
 
-    const paths = await ensureLearningStore(ctx.cwd, learningPathCache);
-
     const [hookConfig, profileLoad] = await Promise.all([
       loadHooksConfig(RUNTIME_PATHS.hooksConfigPath, DEFAULT_HOOK_CONFIG),
       loadRuntimeProfile(RUNTIME_PATHS.profileConfigPath).catch((error) => ({
@@ -371,11 +369,13 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     runtimeState.activePreflight = getPreflightFromSession(ctx, { isPreflightClarify, isPreflightSource });
     setAgentEnabledState(ctx, getAgentEnabledFromSession(ctx));
 
-    notify(
-      ctx,
-      `khala path: ${paths.root} (workflows=${profileValidation.enabledWorkflowCount}/${Object.keys(activeRuntimeProfile.workflows).length}, low-confidence=${activeRuntimeProfile.lowConfidenceThreshold.toFixed(2)}, preflight=${runtimeState.firstPrinciplesConfig.preflightMode}, postflight=${runtimeState.firstPrinciplesConfig.postflightMode}, response=${runtimeState.firstPrinciplesConfig.responseComplianceMode})`,
-      "info",
-    );
+    if (runtimeState.agentEnabled) {
+      notify(
+        ctx,
+        `khala resumed (workflows=${profileValidation.enabledWorkflowCount}/${Object.keys(activeRuntimeProfile.workflows).length}, low-confidence=${activeRuntimeProfile.lowConfidenceThreshold.toFixed(2)}, preflight=${runtimeState.firstPrinciplesConfig.preflightMode}, postflight=${runtimeState.firstPrinciplesConfig.postflightMode}, response=${runtimeState.firstPrinciplesConfig.responseComplianceMode})`,
+        "info",
+      );
+    }
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
