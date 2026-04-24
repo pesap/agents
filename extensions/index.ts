@@ -600,10 +600,12 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     await complianceHandlers.compliance(compliancePreset, ctx);
   };
 
+  const { compliance: _unusedComplianceHandler, ...complianceGateHandlers } = complianceHandlers;
+
   registerCommands({
     pi,
     handlers: {
-      ...complianceHandlers,
+      ...complianceGateHandlers,
       ...workflowHandlers,
       endAgent: agentHandlers.endAgent,
       khala,

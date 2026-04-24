@@ -9,7 +9,7 @@ If you only need one thing: **`/khala` works only after this package is loaded i
 ### Requirements
 
 1. Start Pi with `khala` loaded (installed package **or** `-e` one-off extension).
-2. Run `/khala` (or any workflow command, which auto-starts it).
+2. Run `/khala` (enables khala and defaults compliance to `warn`; any workflow command also auto-starts it).
 
 ### Copy/paste snippets
 
@@ -38,7 +38,7 @@ pi -e https://github.com/pesap/agents -p "/khala"
 
 ### How to confirm it started
 
-- You get: `khala initialized.` (or auto-init message from a workflow command)
+- You get: `khala initialized.` plus a compliance mode message (default: `warn`)
 - Session status shows: `🔷 khala enabled`
 
 ### How to stop it
@@ -77,9 +77,8 @@ pi -e https://github.com/pesap/agents
 
 ### Control commands (manual session control)
 
-- `/khala [status|strict|enforce|warn|monitor|reset]` - enable khala context injection and set first-principles compliance strictness (defaults to `warn` when omitted)
+- `/khala [status|strict|enforce|warn|monitor|reset]` - enable khala context injection and set first-principles compliance strictness (`/khala` with no args sets `warn`)
 - `/end-agent` - disable khala context injection for this session
-- `/compliance [status|strict|enforce|warn|monitor|reset]` - compatibility alias for compliance-only updates
 - `/approve-risk <reason> [--ttl MINUTES]` - checker approval for one high-risk shell action
 - `/preflight Preflight: skill=<name|none> reason="<short>" clarify=<yes|no>` - mutation intent record (required when preflight mode is `enforce`)
 - `/postflight Postflight: verify="<command_or_check>" result=<pass|fail|not-run>` - verification evidence record
@@ -196,6 +195,12 @@ Fast path (session-scoped, no file edits):
 
 ```text
 /khala enforce
+```
+
+Back to warning mode:
+
+```text
+/khala warn
 ```
 
 Reset back to configured defaults:

@@ -46,7 +46,7 @@ export function createComplianceCommandHandlers(params: {
       if (parsed.preset === "status") {
         params.notify(
           ctx,
-          `Compliance modes (session): ${formatCompliance(params.runtimeState.firstPrinciplesConfig)}. Usage: /compliance [status|strict|enforce|warn|monitor|reset]`,
+          `Compliance modes (session): ${formatCompliance(params.runtimeState.firstPrinciplesConfig)}. Usage: /khala [status|strict|enforce|warn|monitor|reset]`,
           "info",
         );
         return;

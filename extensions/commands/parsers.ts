@@ -55,7 +55,7 @@ export function parseComplianceArgs(args: string): { preset: CompliancePreset; e
 
   return {
     preset: "status",
-    error: "Usage: /compliance [status|strict|enforce|warn|monitor|reset]",
+    error: "Usage: /khala [status|strict|enforce|warn|monitor|reset]",
   };
 }
 
