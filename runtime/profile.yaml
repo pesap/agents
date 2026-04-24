@@ -8,7 +8,7 @@ first_principles:
   # Used as defaults before first-principles-gate.yaml overrides are applied.
   preflight_mode: warn
   postflight_mode: warn
-  response_compliance: enforce
+  response_compliance: warn
 
 commands:
   debug:

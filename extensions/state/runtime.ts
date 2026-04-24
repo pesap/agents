@@ -39,7 +39,7 @@ export function createRuntimeState(): RuntimeState {
     agentEnabled: false,
     riskApproval: null,
     riskEvents: [],
-    firstPrinciplesConfig: { preflightMode: "warn", postflightMode: "warn", responseComplianceMode: "enforce" },
+    firstPrinciplesConfig: { preflightMode: "warn", postflightMode: "warn", responseComplianceMode: "warn" },
     activePreflight: null,
     latestPostflight: null,
     policyEvents: [],

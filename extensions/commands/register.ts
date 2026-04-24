@@ -5,7 +5,7 @@ type CommandHandler = (args: string | undefined, ctx: ExtensionCommandContext) =
 export interface CommandRegistrarDeps {
   pi: ExtensionAPI;
   handlers: {
-    startAgent: CommandHandler;
+    khala: CommandHandler;
     endAgent: CommandHandler;
     compliance: CommandHandler;
     approveRisk: CommandHandler;
@@ -29,7 +29,7 @@ export interface CommandRegistrarDeps {
 
 export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
   const commands = [
-    { name: "start-agent", description: "Initialize khala context injection for this session", handler: handlers.startAgent },
+    { name: "khala", description: "Initialize khala context injection and optionally set compliance mode (/khala enforce|warn|monitor|reset|status)", handler: handlers.khala },
     { name: "end-agent", description: "Stop khala context injection for this session", handler: handlers.endAgent },
     { name: "compliance", description: "Show or change first-principles compliance modes for this session", handler: handlers.compliance },
     { name: "approve-risk", description: "Record checker approval for one high-risk command", handler: handlers.approveRisk },

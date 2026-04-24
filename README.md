@@ -4,12 +4,12 @@ Single self-learning Pi dev agent package with runtime guardrails.
 
 ## Start context injection (current session)
 
-If you only need one thing: **`/start-agent` works only after this package is loaded in the session**.
+If you only need one thing: **`/khala` works only after this package is loaded in the session**.
 
 ### Requirements
 
 1. Start Pi with `khala` loaded (installed package **or** `-e` one-off extension).
-2. Run `/start-agent` (or any workflow command, which auto-starts it).
+2. Run `/khala` (or any workflow command, which auto-starts it).
 
 ### Copy/paste snippets
 
@@ -19,7 +19,7 @@ Installed package flow:
 pi install https://github.com/pesap/agents
 pi
 # then inside Pi:
-/start-agent
+/khala
 ```
 
 One-off (no install):
@@ -27,13 +27,13 @@ One-off (no install):
 ```bash
 pi -e https://github.com/pesap/agents
 # then inside Pi:
-/start-agent
+/khala
 ```
 
 Non-interactive one-liner:
 
 ```bash
-pi -e https://github.com/pesap/agents -p "/start-agent"
+pi -e https://github.com/pesap/agents -p "/khala"
 ```
 
 ### How to confirm it started
@@ -77,9 +77,9 @@ pi -e https://github.com/pesap/agents
 
 ### Control commands (manual session control)
 
-- `/start-agent` - enable khala context injection for this session
+- `/khala [status|strict|enforce|warn|monitor|reset]` - enable khala context injection and set first-principles compliance strictness (defaults to `warn` when omitted)
 - `/end-agent` - disable khala context injection for this session
-- `/compliance [status|strict|enforce|warn|monitor|reset]` - set first-principles compliance strictness for this session (no YAML edit required)
+- `/compliance [status|strict|enforce|warn|monitor|reset]` - compatibility alias for compliance-only updates
 - `/approve-risk <reason> [--ttl MINUTES]` - checker approval for one high-risk shell action
 - `/preflight Preflight: skill=<name|none> reason="<short>" clarify=<yes|no>` - mutation intent record (required when preflight mode is `enforce`)
 - `/postflight Postflight: verify="<command_or_check>" result=<pass|fail|not-run>` - verification evidence record
@@ -113,7 +113,7 @@ pi -e https://github.com/pesap/agents -p "/tdd 'Add retry policy for hook loadin
 
 ## What changes when agent is enabled
 
-When enabled (`/start-agent` or any workflow command), khala wraps `bash` and applies policy/interception:
+When enabled (`/khala` or any workflow command), khala wraps `bash` and applies policy/interception:
 
 - Blocks `pip`, `pip3`, `poetry` and guides to `uv`
 - Routes `python` / `python3` command-name invocations through `uv run`
@@ -195,19 +195,19 @@ If `runtime/hooks/hooks.yaml` or runtime profile artifacts are missing/malformed
 Fast path (session-scoped, no file edits):
 
 ```text
-/compliance strict
+/khala enforce
 ```
 
 Reset back to configured defaults:
 
 ```text
-/compliance reset
+/khala reset
 ```
 
 You can also inspect current modes anytime:
 
 ```text
-/compliance status
+/khala status
 ```
 
 Persistent path (repo/package config):
@@ -228,7 +228,7 @@ Expected strict behavior:
 - Missing postflight evidence after mutation -> workflow is marked **failed** (strict violation) at completion.
 - Missing final `Result:` / `Confidence:` lines in workflow output -> response is **blocked** until fixed.
 
-Tip: if you want strict by default without override file, set `runtime/profile.yaml` under `first_principles` to `enforce`; the gate file still has precedence when present.
+Tip: `/khala` with no args sets `warn` for this session. Use `/khala enforce` when you want strict mode; the gate file still has precedence when present.
 
 ## Design goals
 

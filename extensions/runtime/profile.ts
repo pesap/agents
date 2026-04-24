@@ -132,7 +132,7 @@ export const DEFAULT_RUNTIME_PROFILE: RuntimeProfile = {
   firstPrinciplesDefaults: {
     preflightMode: "warn",
     postflightMode: "warn",
-    responseComplianceMode: "enforce",
+    responseComplianceMode: "warn",
   },
   workflows: DEFAULT_WORKFLOWS,
 };

@@ -589,12 +589,24 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     },
   });
 
+  const khala = async (args: string | undefined, ctx: ExtensionCommandContext): Promise<void> => {
+    if (!runtimeState.agentEnabled) {
+      setAgentEnabledState(ctx, true);
+      appendAgentStateEntry(pi, true, nowIso(), "khala");
+      notify(ctx, "khala initialized.", "success");
+    }
+
+    const compliancePreset = normalizeWhitespace(args ?? "") || "warn";
+    await complianceHandlers.compliance(compliancePreset, ctx);
+  };
+
   registerCommands({
     pi,
     handlers: {
-      ...agentHandlers,
       ...complianceHandlers,
       ...workflowHandlers,
+      endAgent: agentHandlers.endAgent,
+      khala,
     },
   });
 }

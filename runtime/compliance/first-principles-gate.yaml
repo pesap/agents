@@ -4,4 +4,4 @@
 # enforce: block/fail
 preflight_mode: warn
 postflight_mode: warn
-response_compliance: enforce  # NEW: blocks responses missing Result/Confidence
+response_compliance: warn
