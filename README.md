@@ -39,7 +39,7 @@ pi -e https://github.com/pesap/agents -p "/start-agent"
 ### How to confirm it started
 
 - You get: `khala initialized.` (or auto-init message from a workflow command)
-- Session status shows: `🐉 khala enabled`
+- Session status shows: `khala enabled`
 
 ### How to stop it
 

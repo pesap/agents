@@ -187,7 +187,7 @@ function setAgentEnabledState(
   enabled: boolean,
 ): void {
   setAgentEnabled(runtimeState, enabled);
-  setKhalaStatus(ctx, enabled ? "🐉 khala enabled" : undefined);
+  setKhalaStatus(ctx, enabled ? "khala enabled" : undefined);
 }
 
 function ensureAgentEnabledForCommand(
