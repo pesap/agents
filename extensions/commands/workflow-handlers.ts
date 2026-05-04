@@ -59,7 +59,7 @@ export function createWorkflowCommandHandlers(params: {
   buildReviewTarget: (parsed: Exclude<ReviewArgsResult, { error: string }>) => ScopedTarget;
   loadProjectReviewGuidelines: (cwd: string) => Promise<string | null>;
   parseRemoveSlopArgs: (args: string) => { scope: string };
-  parseDomainModelArgs: (args: string) => { plan: string };
+  parsePlanArgs: (args: string) => { plan: string };
   parseToPrdArgs: (args: string) => { context: string };
   parseToIssuesArgs: (args: string) => { source: string };
   parseTriageIssueArgs: (args: string) => { problem: string };
@@ -78,7 +78,7 @@ export function createWorkflowCommandHandlers(params: {
     REVIEW_COMMAND_SOURCE: string;
     GIT_REVIEW_COMMAND_SOURCE: string;
     SIMPLIFY_COMMAND_SOURCE: string;
-    DOMAIN_MODEL_COMMAND_SOURCE: string;
+    PLAN_COMMAND_SOURCE: string;
     TO_PRD_COMMAND_SOURCE: string;
     TO_ISSUES_COMMAND_SOURCE: string;
     TRIAGE_ISSUE_COMMAND_SOURCE: string;
@@ -92,7 +92,7 @@ export function createWorkflowCommandHandlers(params: {
   gitReview: CommandHandler;
   simplify: CommandHandler;
   removeSlop: CommandHandler;
-  domainModel: CommandHandler;
+  plan: CommandHandler;
   toPrd: CommandHandler;
   toIssues: CommandHandler;
   triageIssue: CommandHandler;
@@ -119,7 +119,7 @@ export function createWorkflowCommandHandlers(params: {
     buildReviewTarget,
     loadProjectReviewGuidelines,
     parseRemoveSlopArgs,
-    parseDomainModelArgs,
+    parsePlanArgs,
     parseToPrdArgs,
     parseToIssuesArgs,
     parseTriageIssueArgs,
@@ -367,36 +367,38 @@ export function createWorkflowCommandHandlers(params: {
       });
     },
 
-    domainModel: async (args, ctx) => {
-      const parsed = parseDomainModelArgs(args ?? "");
+    plan: async (args, ctx) => {
+      const parsed = parsePlanArgs(args ?? "");
       if (!ensureWorkflowSlotAvailable(ctx)) return;
-      if (!parsed.plan) {
-        notify(ctx, "Usage: /domain-model <plan_or_topic>", "error");
+
+      const plan = parsed.plan;
+      if (!plan) {
+        notify(ctx, "Usage: /plan <plan_or_topic>", "error");
         return;
       }
 
       await runWorkflowCommand({
         ctx,
-        type: "domain-model",
-        input: parsed.plan,
+        type: "plan",
+        input: plan,
         flags: {
-          source: constants.DOMAIN_MODEL_COMMAND_SOURCE,
+          source: constants.PLAN_COMMAND_SOURCE,
         },
         sections: [
-          `Domain plan/topic: ${parsed.plan}`,
-          `Source reference: ${constants.DOMAIN_MODEL_COMMAND_SOURCE}`,
+          `Plan/topic: ${plan}`,
+          `Source reference: ${constants.PLAN_COMMAND_SOURCE}`,
           "",
           "Instruction: Ask one question at a time and wait for user feedback before continuing.",
           "Instruction: If a question can be answered from code/docs, inspect first and continue with the next unresolved question.",
-          "Instruction: Update CONTEXT.md/ADR docs lazily and only when terms/decisions are resolved.",
+          "Instruction: Capture edge cases and trade-offs, then update CONTEXT.md/ADR docs lazily when terms/decisions are resolved.",
           constants.POSTFLIGHT_INSTRUCTION,
           constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
         ],
         entry: {
-          plan: parsed.plan,
-          source: constants.DOMAIN_MODEL_COMMAND_SOURCE,
+          plan,
+          source: constants.PLAN_COMMAND_SOURCE,
         },
-        startedMessage: `Started domain-model workflow (${parsed.plan}).`,
+        startedMessage: `Started plan workflow (${plan}).`,
       });
     },
 

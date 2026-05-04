@@ -1,3 +1,8 @@
+---
+skills:
+  - address-open-issues
+---
+
 # Address-Open-Issues command prompt
 
 You are running the khala `/address-open-issues` workflow.

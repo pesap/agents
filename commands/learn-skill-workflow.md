@@ -1,3 +1,8 @@
+---
+skills:
+  - skill-creator
+---
+
 # Learn-skill command prompt
 
 You are running the khala `/learn-skill` workflow.

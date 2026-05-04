@@ -1,11 +1,6 @@
 name: triage-issue-workflow
 version: 2
 objective: Resolve a GitHub-reported bug end-to-end: root cause, TDD fix, and PR
-skills:
-  - triage-issue
-  - debug-investigation
-  - tdd-core
-  - github
 steps:
   - id: capture
     action: capture_issue_or_problem_statement

@@ -1,3 +1,13 @@
+---
+skills:
+  - simplify
+  - comment-quality-gate
+  - dead-code-proof
+  - dependency-untangler
+  - type-hardening
+  - nasa-guidelines
+---
+
 # Remove-slop command prompt
 
 You are running the khala `/remove-slop` workflow.

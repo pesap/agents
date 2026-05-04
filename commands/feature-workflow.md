@@ -1,3 +1,8 @@
+---
+skills:
+  - feature-delivery
+---
+
 # Feature command prompt
 
 You are running the khala `/feature` workflow.

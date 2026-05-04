@@ -1,8 +1,6 @@
 name: to-issues-workflow
 version: 1
 objective: Break a plan into dependency-aware vertical-slice GitHub issues
-skills:
-  - to-issues
 steps:
   - id: ingest
     action: load_source_plan_or_parent_issue

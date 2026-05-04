@@ -1,186 +1,81 @@
 ---
 name: to-issues
-description: Break a plan/PRD into independently grabbable GitHub issues using thin vertical slices (tracer bullets). Use when users ask to convert specs into actionable implementation tickets.
+description: Break a plan, spec, or PRD into independently-grabbable issues on the project issue tracker using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementation tickets, or break down work into issues.
 ---
 
-## Source
-- Adapted from: https://github.com/mattpocock/skills/tree/main/to-issues
+# To Issues
 
-## Use when
-- User wants to turn a PRD/plan into GitHub issues.
-- User asks for implementation ticket breakdown with dependencies.
-- User wants AFK vs HITL slicing for parallel execution.
+Break a plan into independently-grabbable issues using vertical slices (tracer bullets).
 
-## Avoid when
-- Input plan is too vague and user refuses clarification.
-- User wants only a high-level roadmap without issue creation.
+The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
 
-## Workflow
-1. Gather source plan (conversation, markdown, or parent GitHub issue).
-2. Explore codebase as needed for realistic boundaries.
-3. Draft thin vertical slices (end-to-end behavior per slice).
-4. Review slice list with user (granularity, dependencies, HITL/AFK labels).
-5. Create issues in dependency order with acceptance criteria and explicit blocker references.
-6. Link issues using GitHub's native sub-issues feature (see below).
-7. Add native dependency edges with `addBlockedBy` for every blocker relation (see below).
+## Process
 
-## Issue Creation Format
+### 1. Gather context
 
-### Labels via CLI flags (not body sections)
-```bash
-gh issue create \
-  --title "feat: my feature" \
-  --label "enhancement" \
-  --label "AFK" \
-  --body "..."
-```
+Work from whatever is already in the conversation context. If the user passes an issue reference (issue number, URL, or path) as an argument, fetch it from the issue tracker and read its full body and comments.
 
-### Issue body structure
-Include:
-- Summary
-- Parent reference (`Parent: #N`)
-- Acceptance criteria
-- Implementation notes (optional)
-- `Blocked by: #N` for human-readable dependencies (also set native blockers via GraphQL)
+### 2. Explore the codebase (optional)
 
-Exclude:
-- "Label" sections (use `--label` flag instead)
-- "Further Notes" (internal, not public-facing)
-- Redundant metadata already in GitHub UI
+If you have not already explored the codebase, do so to understand the current state of the code. Issue titles and descriptions should use the project's domain glossary vocabulary, and respect ADRs in the area you're touching.
 
-## GitHub Native Sub-issues
+### 3. Draft vertical slices
 
-GitHub has built-in parent/child relationships for issues. Use these instead of tasklist workarounds.
+Break the plan into **tracer bullet** issues. Each issue is a thin vertical slice that cuts through ALL integration layers end-to-end, NOT a horizontal slice of one layer.
 
-### Query sub-issues (GraphQL)
-```bash
-gh api graphql -f query='
-{
-  repository(owner: "OWNER", name: "REPO") {
-    issue(number: 176) {
-      subIssues(first: 10) {
-        nodes { number title }
-      }
-    }
-  }
-}'
-```
+Slices may be 'HITL' or 'AFK'. HITL slices require human interaction, such as an architectural decision or a design review. AFK slices can be implemented and merged without human interaction. Prefer AFK over HITL where possible.
 
-### Query parent (GraphQL)
-```bash
-gh api graphql -f query='
-{
-  repository(owner: "OWNER", name: "REPO") {
-    issue(number: 177) {
-      parent { number title }
-    }
-  }
-}'
-```
+<vertical-slice-rules>
+- Each slice delivers a narrow but COMPLETE path through every layer (schema, API, UI, tests)
+- A completed slice is demoable or verifiable on its own
+- Prefer many thin slices over few thick ones
+</vertical-slice-rules>
 
-### Add sub-issue (GraphQL mutation)
-```bash
-# Get issue node IDs first
-gh api graphql -f query='
-{
-  repository(owner: "OWNER", name: "REPO") {
-    parent: issue(number: 176) { id }
-    child: issue(number: 177) { id }
-  }
-}'
+### 4. Quiz the user
 
-# Add sub-issue
-gh api graphql -f query='
-mutation {
-  addSubIssue(input: {
-    issueId: "PARENT_NODE_ID",
-    subIssueId: "CHILD_NODE_ID"
-  }) {
-    issue { number }
-    subIssue { number }
-  }
-}'
-```
+Present the proposed breakdown as a numbered list. For each slice, show:
 
-### Remove sub-issue
-```bash
-gh api graphql -f query='
-mutation {
-  removeSubIssue(input: {
-    issueId: "PARENT_NODE_ID",
-    subIssueId: "CHILD_NODE_ID"
-  }) {
-    issue { number }
-    subIssue { number }
-  }
-}'
-```
+- **Title**: short descriptive name
+- **Type**: HITL / AFK
+- **Blocked by**: which other slices (if any) must complete first
+- **User stories covered**: which user stories this addresses (if the source material has them)
 
-## GitHub Native Dependencies (Blocked by)
+Ask the user:
 
-Use GitHub issue dependency edges in addition to body text references.
+- Does the granularity feel right? (too coarse / too fine)
+- Are the dependency relationships correct?
+- Should any slices be merged or split further?
+- Are the correct slices marked as HITL and AFK?
 
-### Query blockers (GraphQL)
-```bash
-gh api graphql -f query='
-{
-  repository(owner: "OWNER", name: "REPO") {
-    issue(number: 177) {
-      blockedBy(first: 20) {
-        nodes { number title }
-      }
-    }
-  }
-}'
-```
+Iterate until the user approves the breakdown.
 
-### Add blocker (GraphQL mutation)
-```bash
-# Get issue node IDs first
-gh api graphql -f query='
-{
-  repository(owner: "OWNER", name: "REPO") {
-    target: issue(number: 177) { id }
-    blocker: issue(number: 176) { id }
-  }
-}'
+### 5. Publish the issues to the issue tracker
 
-# Add dependency edge: 177 blocked by 176
-gh api graphql -f query='
-mutation {
-  addBlockedBy(input: {
-    issueId: "TARGET_ISSUE_ID",
-    blockingIssueId: "BLOCKER_ISSUE_ID"
-  }) {
-    issue { number }
-    blockingIssue { number }
-  }
-}'
-```
+For each approved slice, publish a new issue to the issue tracker. Use the issue body template below. Apply the `needs-triage` triage label so each issue enters the normal triage flow.
 
-### Remove blocker
-```bash
-gh api graphql -f query='
-mutation {
-  removeBlockedBy(input: {
-    issueId: "TARGET_ISSUE_ID",
-    blockingIssueId: "BLOCKER_ISSUE_ID"
-  }) {
-    issue { number }
-    blockingIssue { number }
-  }
-}'
-```
+Publish issues in dependency order (blockers first) so you can reference real issue identifiers in the "Blocked by" field.
 
-### Best Practices
-- PRD issue = parent, implementation slices = sub-issues
-- Add `Parent: #N` in child body for human-readable back-reference
-- Use `addSubIssue` mutation to create the actual relationship
-- Dependencies between siblings: document in body with `Blocked by: #N` and create native edges with `addBlockedBy`
-- GitHub UI shows sub-issues in sidebar with completion tracking
+<issue-template>
+## Parent
 
-## Output
-- Approved slice breakdown
-- Created issue list with sub-issue + blocked-by relationships
-- HITL vs AFK labeling rationale
-- Follow-up recommendations for execution order
+A reference to the parent issue on the issue tracker (if the source was an existing issue, otherwise omit this section).
+
+## What to build
+
+A concise description of this vertical slice. Describe the end-to-end behavior, not layer-by-layer implementation.
+
+## Acceptance criteria
+
+- [ ] Criterion 1
+- [ ] Criterion 2
+- [ ] Criterion 3
+
+## Blocked by
+
+- A reference to the blocking ticket (if any)
+
+Or "None - can start immediately" if no blockers.
+
+</issue-template>
+
+Do NOT close or modify any parent issue.

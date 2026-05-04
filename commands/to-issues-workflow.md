@@ -1,3 +1,8 @@
+---
+skills:
+  - to-issues
+---
+
 # To-Issues command prompt
 
 You are running the khala `/to-issues` workflow.

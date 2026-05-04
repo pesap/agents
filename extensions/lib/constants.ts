@@ -15,11 +15,11 @@ export const COMPLIANCE_MODE_TYPE = "khala-compliance-mode";
 export const REVIEW_COMMAND_SOURCE = "https://github.com/earendil-works/pi-review";
 export const GIT_REVIEW_COMMAND_SOURCE = "https://piechowski.io/post/git-commands-before-reading-code/";
 export const SIMPLIFY_COMMAND_SOURCE = "https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-simplifier/agents/code-simplifier.md";
-export const DOMAIN_MODEL_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/domain-model";
-export const TO_PRD_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/to-prd";
-export const TO_ISSUES_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/to-issues";
-export const TRIAGE_ISSUE_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/triage-issue";
-export const TDD_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/tdd";
+export const PLAN_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs";
+export const TO_PRD_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/skills/engineering/to-prd";
+export const TO_ISSUES_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/skills/engineering/to-issues";
+export const TRIAGE_ISSUE_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/skills/engineering/triage";
+export const TDD_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/skills/engineering/tdd";
 export const ADDRESS_OPEN_ISSUES_COMMAND_SOURCE = "khala://workflow/address-open-issues";
 
 export const PREFLIGHT_LINE_REGEX = /^Preflight:\s+skill=([a-zA-Z0-9_.-]+|none)\s+reason="([^"]{1,200})"\s+clarify=(yes|no)\s*$/;

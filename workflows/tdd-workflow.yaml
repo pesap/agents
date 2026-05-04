@@ -1,10 +1,6 @@
 name: tdd-workflow
 version: 2
 objective: Deliver features via behavior-first red-green-refactor with implementation, tests, docs, and validation
-skills:
-  - tdd-core
-  - testing-pytest
-  - feature-delivery
 steps:
   - id: clarify
     action: extract_acceptance_criteria

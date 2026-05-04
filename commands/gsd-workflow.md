@@ -1,3 +1,8 @@
+---
+skills:
+  - gsd-workflows
+---
+
 # GSD command prompt
 
 You are running the khala `/gsd` workflow.

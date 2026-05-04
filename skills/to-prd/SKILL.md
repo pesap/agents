@@ -1,29 +1,74 @@
 ---
 name: to-prd
-description: Turn current conversation/context into a product requirements document (PRD) and file it as a GitHub issue. Use when users ask to draft a PRD, formalize a feature spec, or capture implementation/testing decisions before coding.
+description: Turn the current conversation context into a PRD and publish it to the project issue tracker. Use when user wants to create a PRD from the current context.
 ---
 
-## Source
-- Adapted from: https://github.com/mattpocock/skills/tree/main/to-prd
+This skill takes the current conversation context and codebase understanding and produces a PRD. Do NOT interview the user — just synthesize what you already know.
 
-## Use when
-- User asks to create a PRD from current discussion.
-- User wants a structured feature spec before implementation.
-- User wants PRD captured as a GitHub issue.
+The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
 
-## Avoid when
-- User explicitly wants direct implementation without spec work.
-- Scope is tiny and a PRD would add unnecessary process.
+## Process
 
-## Workflow
-1. Synthesize current context and repo state (no long interview).
-2. Identify candidate modules/interfaces and testing scope.
-3. Confirm key assumptions briefly with user when ambiguous.
-4. Draft PRD with problem, solution, implementation decisions, testing decisions, and out-of-scope (add user stories only if explicitly requested).
-5. Create GitHub issue with `gh issue create` (or output PRD markdown if issue creation is unavailable).
+1. Explore the repo to understand the current state of the codebase, if you haven't already. Use the project's domain glossary vocabulary throughout the PRD, and respect any ADRs in the area you're touching.
 
-## Output
-- PRD markdown (final text)
-- Issue URL/number (or reason issue was not created)
-- Key assumptions and open questions
-- Suggested next command (`/to-issues`)
+2. Sketch out the major modules you will need to build or modify to complete the implementation. Actively look for opportunities to extract deep modules that can be tested in isolation.
+
+A deep module (as opposed to a shallow module) is one which encapsulates a lot of functionality in a simple, testable interface which rarely changes.
+
+Check with the user that these modules match their expectations. Check with the user which modules they want tests written for.
+
+3. Write the PRD using the template below, then publish it to the project issue tracker. Apply the `needs-triage` triage label so it enters the normal triage flow.
+
+<prd-template>
+
+## Problem Statement
+
+The problem that the user is facing, from the user's perspective.
+
+## Solution
+
+The solution to the problem, from the user's perspective.
+
+## User Stories
+
+A LONG, numbered list of user stories. Each user story should be in the format of:
+
+1. As an <actor>, I want a <feature>, so that <benefit>
+
+<user-story-example>
+1. As a mobile bank customer, I want to see balance on my accounts, so that I can make better informed decisions about my spending
+</user-story-example>
+
+This list of user stories should be extremely extensive and cover all aspects of the feature.
+
+## Implementation Decisions
+
+A list of implementation decisions that were made. This can include:
+
+- The modules that will be built/modified
+- The interfaces of those modules that will be modified
+- Technical clarifications from the developer
+- Architectural decisions
+- Schema changes
+- API contracts
+- Specific interactions
+
+Do NOT include specific file paths or code snippets. They may end up being outdated very quickly.
+
+## Testing Decisions
+
+A list of testing decisions that were made. Include:
+
+- A description of what makes a good test (only test external behavior, not implementation details)
+- Which modules will be tested
+- Prior art for the tests (i.e. similar types of tests in the codebase)
+
+## Out of Scope
+
+A description of the things that are out of scope for this PRD.
+
+## Further Notes
+
+Any further notes about the feature.
+
+</prd-template>

@@ -89,7 +89,7 @@ pi -e https://github.com/pesap/agents
 - `/review [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`
 - `/git-review`
 - `/simplify [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`
-- `/domain-model <plan_or_topic>`
+- `/plan <plan_or_topic>`
 - `/to-prd [context]`
 - `/to-issues [plan_or_issue]`
 - `/triage-issue <github_issue_or_problem_statement>`

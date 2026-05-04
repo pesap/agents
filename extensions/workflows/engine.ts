@@ -41,19 +41,40 @@ export function ensureWorkflowSlotAvailable<TWorkflowType extends string>(
   return false;
 }
 
+function normalizeSkills(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const validSkills = raw
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter((entry) => entry.length > 0 && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(entry));
+  return [...new Set(validSkills)];
+}
+
 function parseWorkflowSkills(rawWorkflowYaml: string): string[] {
   try {
     const parsed = loadYaml(rawWorkflowYaml);
     if (!isRecord(parsed)) return [];
-    if (!Array.isArray(parsed.skills)) return [];
-
-    const validSkills = parsed.skills
-      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-      .filter((entry) => entry.length > 0 && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(entry));
-
-    return [...new Set(validSkills)];
+    return normalizeSkills(parsed.skills);
   } catch {
     return [];
+  }
+}
+
+function parsePromptFrontmatter(rawPrompt: string): { template: string; skills: string[] } {
+  const frontmatterMatch = rawPrompt.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!frontmatterMatch) {
+    return { template: rawPrompt, skills: [] };
+  }
+
+  const [, frontmatter] = frontmatterMatch;
+  try {
+    const parsed = loadYaml(frontmatter);
+    const skills = isRecord(parsed) ? normalizeSkills(parsed.skills) : [];
+    return {
+      template: rawPrompt.slice(frontmatterMatch[0].length),
+      skills,
+    };
+  } catch {
+    return { template: rawPrompt, skills: [] };
   }
 }
 
@@ -66,12 +87,13 @@ export async function enqueueWorkflow(params: {
   readWorkflow: (name: string) => Promise<string>;
   readSkill?: (name: string) => Promise<string>;
 }): Promise<void> {
-  const [promptTemplate, workflowSpec] = await Promise.all([
+  const [promptTemplateRaw, workflowSpec] = await Promise.all([
     params.readCommandPrompt(params.workflowPromptName),
     params.readWorkflow(params.workflowFileName),
   ]);
 
-  const workflowSkills = parseWorkflowSkills(workflowSpec);
+  const prompt = parsePromptFrontmatter(promptTemplateRaw);
+  const workflowSkills = prompt.skills.length > 0 ? prompt.skills : parseWorkflowSkills(workflowSpec);
   const skillSections = await Promise.all(
     workflowSkills.map(async (skillName) => {
       if (!params.readSkill) {
@@ -79,14 +101,14 @@ export async function enqueueWorkflow(params: {
       }
       const content = (await params.readSkill(skillName)).trim();
       if (!content) {
-        return `[SKILL:${skillName}]\n(Skill not found or empty)`;
+        throw new Error(`Workflow prompt ${params.workflowPromptName} requires missing skill: ${skillName}`);
       }
       return `[SKILL:${skillName}]\n${content}`;
     }),
   );
 
   const payload = [
-    promptTemplate.trim(),
+    prompt.template.trim(),
     "",
     skillSections.length > 0 ? "Workflow skills context:" : "",
     ...skillSections.map((section) => ["```markdown", section, "```"].join("\n")),

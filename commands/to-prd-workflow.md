@@ -1,3 +1,8 @@
+---
+skills:
+  - to-prd
+---
+
 # To-PRD command prompt
 
 You are running the khala `/to-prd` workflow.

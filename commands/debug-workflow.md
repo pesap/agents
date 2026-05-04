@@ -1,3 +1,8 @@
+---
+skills:
+  - debug-investigation
+---
+
 # Debug command prompt
 
 You are running the khala `/debug` workflow.

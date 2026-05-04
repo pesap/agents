@@ -1,3 +1,10 @@
+---
+skills:
+  - tdd-core
+  - testing-pytest
+  - feature-delivery
+---
+
 # TDD command prompt
 
 You are running the khala `/tdd` workflow.

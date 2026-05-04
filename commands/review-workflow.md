@@ -1,3 +1,8 @@
+---
+skills:
+  - code-review
+---
+
 # Review command prompt
 
 You are running the khala `/review` workflow.

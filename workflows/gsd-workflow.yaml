@@ -1,8 +1,6 @@
 name: gsd-workflow
 version: 1
 objective: Execute an imported Get-Shit-Done workflow by name
-skills:
-  - gsd-workflows
 steps:
   - id: resolve
     action: map_user_request_to_gsd_workflow

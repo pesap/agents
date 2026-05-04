@@ -1,8 +1,6 @@
 name: to-prd-workflow
 version: 1
 objective: Convert conversation/repo context into a PRD and capture it as a GitHub issue
-skills:
-  - to-prd
 steps:
   - id: gather-context
     action: synthesize_conversation_and_repo_state

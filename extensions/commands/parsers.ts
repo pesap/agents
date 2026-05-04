@@ -147,7 +147,7 @@ export function parseRemoveSlopArgs(args: string): { scope: string } {
   };
 }
 
-export function parseDomainModelArgs(args: string): { plan: string } {
+export function parsePlanArgs(args: string): { plan: string } {
   return { plan: normalizeWhitespace(args) };
 }
 

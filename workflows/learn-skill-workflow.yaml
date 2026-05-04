@@ -1,8 +1,6 @@
 name: learn-skill-workflow
 version: 2
 objective: Create or improve a safe reusable skill with clear triggers and validation
-skills:
-  - skill-creator
 steps:
   - id: scope
     action: capture_intent_trigger_output_and_boundaries

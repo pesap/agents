@@ -1,8 +1,6 @@
 name: feature-workflow
 version: 1
 objective: Deliver a requested feature with verification and concise handoff
-skills:
-  - feature-delivery
 steps:
   - id: clarify
     action: extract_acceptance_criteria

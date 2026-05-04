@@ -1,8 +1,6 @@
 name: git-review-workflow
 version: 1
 objective: Run git health diagnostics before reading code and identify the highest-value files to inspect first
-skills:
-  - github
 steps:
   - id: scope
     action: confirm_repository_scope_and_default_time_windows

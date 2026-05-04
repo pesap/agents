@@ -1,10 +1,10 @@
 ---
-name: domain-model
-description: Run a domain-model grilling session that challenges plans against existing terminology, code reality, and documented decisions. Use when users want to stress-test a design, sharpen domain language, and update CONTEXT.md/ADRs as decisions become clear.
+name: plan
+description: Run a rigorous planning session that challenges plans against existing terminology, code reality, and documented decisions. Use when users want to stress-test a design, sharpen domain language, and update CONTEXT.md/ADRs as decisions become clear.
 ---
 
 ## Source
-- Adapted from: https://github.com/mattpocock/skills/tree/main/domain-model
+- Adapted from: https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs
 
 ## Use when
 - User wants to validate a plan against domain language and boundaries.

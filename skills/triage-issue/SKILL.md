@@ -4,7 +4,7 @@ description: Triage a bug by investigating root cause in the codebase, then crea
 ---
 
 ## Source
-- Adapted from: https://github.com/mattpocock/skills/tree/main/triage-issue
+- Adapted from: https://github.com/mattpocock/skills/tree/main/skills/engineering/triage
 
 ## Use when
 - User reports a defect/regression and wants a ticket.

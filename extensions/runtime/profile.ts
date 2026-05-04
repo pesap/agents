@@ -11,7 +11,7 @@ export const WORKFLOW_TYPES = [
   "simplify",
   "learn-skill",
   "remove-slop",
-  "domain-model",
+  "plan",
   "to-prd",
   "to-issues",
   "triage-issue",
@@ -84,11 +84,11 @@ const DEFAULT_WORKFLOWS: Record<WorkflowType, WorkflowCommandConfig> = {
     workflowFile: "remove-slop-workflow.yaml",
     entryType: "khala-remove-slop-command",
   },
-  "domain-model": {
+  plan: {
     enabled: true,
-    promptFile: "domain-model-workflow.md",
-    workflowFile: "domain-model-workflow.yaml",
-    entryType: "khala-domain-model-command",
+    promptFile: "plan-workflow.md",
+    workflowFile: "plan-workflow.yaml",
+    entryType: "khala-plan-command",
   },
   "to-prd": {
     enabled: true,

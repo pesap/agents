@@ -14,7 +14,7 @@ export interface CommandRegistrarDeps {
     review: CommandHandler;
     gitReview: CommandHandler;
     simplify: CommandHandler;
-    domainModel: CommandHandler;
+    plan: CommandHandler;
     toPrd: CommandHandler;
     toIssues: CommandHandler;
     triageIssue: CommandHandler;
@@ -36,7 +36,7 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
     { name: "review", description: "Run the khala code review workflow (adapted from pi-review)", handler: handlers.review },
     { name: "git-review", description: "Run git history diagnostics before reading code", handler: handlers.gitReview },
     { name: "simplify", description: "Run the khala cleanup and code-quality workflow", handler: handlers.simplify },
-    { name: "domain-model", description: "Run domain-model grilling and context/ADR update workflow", handler: handlers.domainModel },
+    { name: "plan", description: "Run rigorous planning workflow with edge-case capture and context/ADR updates", handler: handlers.plan },
     { name: "to-prd", description: "Convert current context into a PRD and file a GitHub issue", handler: handlers.toPrd },
     { name: "to-issues", description: "Break a plan/PRD into dependency-aware GitHub issues", handler: handlers.toIssues },
     { name: "triage-issue", description: "Investigate a bug and create a TDD fix-plan issue", handler: handlers.triageIssue },

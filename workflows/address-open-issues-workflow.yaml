@@ -1,8 +1,6 @@
 name: address-open-issues-workflow
 version: 1
 objective: Resolve actionable open issues authored by current user through triage, implementation, review, simplify, and remediation loops
-skills:
-  - address-open-issues
 steps:
   - id: list-issues
     action: fetch_open_issues_authored_by_current_user

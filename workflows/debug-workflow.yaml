@@ -1,8 +1,6 @@
 name: debug-workflow
 version: 1
 objective: Diagnose root cause and validate a reliable fix
-skills:
-  - debug-investigation
 steps:
   - id: intake
     action: restate_problem

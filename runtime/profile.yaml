@@ -35,10 +35,10 @@ commands:
     enabled: false
     prompt: remove-slop-workflow.md
     workflow: remove-slop-workflow.yaml
-  domain-model:
+  plan:
     enabled: true
-    prompt: domain-model-workflow.md
-    workflow: domain-model-workflow.yaml
+    prompt: plan-workflow.md
+    workflow: plan-workflow.yaml
   to-prd:
     enabled: true
     prompt: to-prd-workflow.md

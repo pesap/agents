@@ -1,13 +1,6 @@
 name: simplify-workflow
 version: 2
 objective: Improve maintainability and code quality with behavior-preserving cleanup
-skills:
-  - simplify
-  - comment-quality-gate
-  - dead-code-proof
-  - dependency-untangler
-  - type-hardening
-  - nasa-guidelines
 steps:
   - id: scope
     action: confirm_scope_and_constraints

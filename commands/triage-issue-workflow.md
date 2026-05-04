@@ -1,3 +1,11 @@
+---
+skills:
+  - triage-issue
+  - debug-investigation
+  - tdd-core
+  - github
+---
+
 # Triage-Issue command prompt
 
 You are running the khala `/triage-issue` workflow.

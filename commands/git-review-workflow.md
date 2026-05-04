@@ -1,3 +1,8 @@
+---
+skills:
+  - github
+---
+
 # Git review command prompt
 
 You are running the khala `/git-review` workflow.
