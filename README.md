@@ -1,6 +1,7 @@
 # khala
 
 Khala is a Pi package that adds:
+
 - a guarded coding agent runtime,
 - workflow commands (`/debug`, `/simplify`, `/tdd`, etc.),
 - session policy controls (`/khala`, `/approve-risk`, preflight/postflight),
@@ -57,6 +58,7 @@ pi -e https://github.com/pesap/agents -p "/khala"
 ## What changes when enabled
 
 When khala is enabled (`/khala` or any workflow command):
+
 - `bash` calls are policy-checked,
 - risky/destructive commands may be blocked unless approved,
 - Python package/runtime commands are steered to `uv`,
@@ -65,22 +67,27 @@ When khala is enabled (`/khala` or any workflow command):
 ## Where to find things
 
 ### User-facing workflow prompts
+
 - `commands/`
 
 ### Workflow specs
+
 - `workflows/`
 
 ### Runtime and policy config
+
 - `runtime/profile.yaml`
 - `runtime/compliance/`
 - `runtime/hooks/`
 
 ### Extension implementation
+
 - `extensions/index.ts`
 - `extensions/commands/`
 - `extensions/workflows/`
 
 ### Skills
+
 - `skills/`
 
 ## Memory setup (Graphify)
@@ -92,15 +99,17 @@ Use:
 ```
 
 Setup command runs:
+
 - `uv tool install graphifyy`
 - `graphify install --platform pi`
 - `graphify pi install` (tries scope flag first, then fallback)
 
 Restart command runs:
-- `graphify pi restart` (tries scope flag first, then fallback)
-- fallback: `graphify restart`
+
+- `graphify pi install` (Graphify has no restart subcommand; reinstalling refreshes the Pi skill)
 
 Remove command runs:
+
 - `graphify pi uninstall` (tries scope flag first, then fallback)
 - `uv tool uninstall graphifyy`
 
@@ -125,6 +134,7 @@ Reset to configured defaults:
 ```
 
 Persistent defaults are in:
+
 - `runtime/compliance/first-principles-gate.yaml`
 
 ## Notes

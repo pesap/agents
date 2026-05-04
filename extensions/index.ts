@@ -6,6 +6,7 @@ import type {
 import { createBashTool } from "@mariozechner/pi-coding-agent";
 import registerFffExtension from "@ff-labs/pi-fff/src/index.ts";
 import { execFile } from "node:child_process";
+import path from "node:path";
 import registerThinkingStepsExtension from "pi-thinking-steps/index.ts";
 import registerLensExtension from "pi-lens/index.ts";
 import registerSubagentExtension from "pi-subagents/index.ts";
@@ -55,7 +56,11 @@ import {
 import { exists, readText } from "./lib/io";
 import { normalizeWhitespace, slugify, summarizeEvidence } from "./lib/text";
 import { makeId, nowIso } from "./lib/time";
-import { DEFAULT_HOOK_CONFIG, loadHooksConfig, type HookConfig } from "./hooks/config";
+import {
+  DEFAULT_HOOK_CONFIG,
+  loadHooksConfig,
+  type HookConfig,
+} from "./hooks/config";
 import {
   ensureLearningStore,
   loadProjectReviewGuidelines,
@@ -69,7 +74,10 @@ import {
   parsePreflightLine,
   type PreflightRecord,
 } from "./policy/first-principles";
-import { evaluateMutationPreflightPolicy, evaluateSpawnPolicy } from "./policy/pipeline";
+import {
+  evaluateMutationPreflightPolicy,
+  evaluateSpawnPolicy,
+} from "./policy/pipeline";
 import {
   createRuntimeState,
   hasValidRiskApproval,
@@ -144,8 +152,14 @@ const workflowReaders = createWorkflowReaders({
 const execFileAsync = promisify(execFile);
 
 function prependInterceptedCommandsPath(command: string): string {
-  const escapedPath = RUNTIME_PATHS.interceptedCommandsDir.replace(/"/g, '\\"');
-  return `export PATH="${escapedPath}:$PATH"\n${command}`;
+  const escapedInterceptedPath = RUNTIME_PATHS.interceptedCommandsDir.replace(
+    /"/g,
+    '\\"',
+  );
+  const escapedPackageBinPath = path
+    .join(RUNTIME_PATHS.packageRoot, "node_modules", ".bin")
+    .replace(/"/g, '\\"');
+  return `export PATH="${escapedInterceptedPath}:${escapedPackageBinPath}:$PATH"\n${command}`;
 }
 
 function warnBundledExtensionLoadFailure(
@@ -185,9 +199,13 @@ function ensureBundledExtensions(
     registerSubagentNotifyExtension(pi);
   });
 
-  registerBundledExtension(ctx, "@ff-labs/pi-fff", () => registerFffExtension(pi));
+  registerBundledExtension(ctx, "@ff-labs/pi-fff", () =>
+    registerFffExtension(pi),
+  );
 
-  registerBundledExtension(ctx, "pi-thinking-steps", () => registerThinkingStepsExtension(pi));
+  registerBundledExtension(ctx, "pi-thinking-steps", () =>
+    registerThinkingStepsExtension(pi),
+  );
 
   registerBundledExtension(ctx, "pi-lens", () => registerLensExtension(pi));
 }
@@ -335,14 +353,19 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       loadHooksConfig(RUNTIME_PATHS.hooksConfigPath, DEFAULT_HOOK_CONFIG),
       loadRuntimeProfile(RUNTIME_PATHS.profileConfigPath).catch((error) => ({
         profile: cloneRuntimeProfile(DEFAULT_RUNTIME_PROFILE),
-        warnings: [`runtime/profile.yaml load error (${error instanceof Error ? error.message : String(error)}); using defaults.`],
+        warnings: [
+          `runtime/profile.yaml load error (${error instanceof Error ? error.message : String(error)}); using defaults.`,
+        ],
       })),
     ]);
 
-    const profileValidation = await validateRuntimeProfile(profileLoad.profile, {
-      commandsDir: RUNTIME_PATHS.commandsDir,
-      skillflowsDir: RUNTIME_PATHS.skillflowsDir,
-    });
+    const profileValidation = await validateRuntimeProfile(
+      profileLoad.profile,
+      {
+        commandsDir: RUNTIME_PATHS.commandsDir,
+        skillflowsDir: RUNTIME_PATHS.skillflowsDir,
+      },
+    );
 
     const gateConfig = await loadFirstPrinciplesConfig(
       RUNTIME_PATHS.firstPrinciplesConfigPath,
@@ -354,7 +377,8 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     sessionFirstPrinciplesDefaults = { ...gateConfig.config };
 
     const complianceOverride = getComplianceModeFromSession(ctx);
-    runtimeState.firstPrinciplesConfig = complianceOverride ?? gateConfig.config;
+    runtimeState.firstPrinciplesConfig =
+      complianceOverride ?? gateConfig.config;
 
     for (const warning of profileLoad.warnings) {
       notify(ctx, `Profile warning: ${warning}`, "warning");
@@ -370,7 +394,10 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     }
 
     runtimeState.riskApproval = getRiskApprovalFromSession(ctx);
-    runtimeState.activePreflight = getPreflightFromSession(ctx, { isPreflightClarify, isPreflightSource });
+    runtimeState.activePreflight = getPreflightFromSession(ctx, {
+      isPreflightClarify,
+      isPreflightSource,
+    });
     setAgentEnabledState(ctx, getAgentEnabledFromSession(ctx));
 
     if (runtimeState.agentEnabled) {
@@ -477,26 +504,45 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     const workflow = pendingWorkflow;
     if (!workflow) return;
 
-    const text = extractLastAssistantText(event.messages) || "No assistant output captured.";
+    const text =
+      extractLastAssistantText(event.messages) ||
+      "No assistant output captured.";
 
     // Harness compliance enforcement (minimal)
-    if (runtimeState.firstPrinciplesConfig.responseComplianceMode === "enforce") {
-      const resultMatch = text.match(/^\s*Result:\s*(success|partial|failed)\s*$/mi);
-      const confidenceMatch = text.match(/^\s*Confidence:\s*([\d.]+)\s*$/mi);
-      const confidenceValue = confidenceMatch ? parseFloat(confidenceMatch[1]) : null;
+    if (
+      runtimeState.firstPrinciplesConfig.responseComplianceMode === "enforce"
+    ) {
+      const resultMatch = text.match(
+        /^\s*Result:\s*(success|partial|failed)\s*$/im,
+      );
+      const confidenceMatch = text.match(/^\s*Confidence:\s*([\d.]+)\s*$/im);
+      const confidenceValue = confidenceMatch
+        ? parseFloat(confidenceMatch[1])
+        : null;
       const hasResult = resultMatch !== null;
-      const hasConfidence = confidenceValue !== null && confidenceValue >= 0 && confidenceValue <= 1;
+      const hasConfidence =
+        confidenceValue !== null &&
+        confidenceValue >= 0 &&
+        confidenceValue <= 1;
       if (!hasResult || !hasConfidence) {
         return {
           block: true,
           reason: [
             "HARNESS COMPLIANCE FAILED",
             "",
-            hasResult ? "" : "Missing or invalid: Result: success|partial|failed",
-            hasConfidence ? "" : (confidenceMatch ? "Invalid: Confidence must be 0..1" : "Missing: Confidence: 0..1"),
+            hasResult
+              ? ""
+              : "Missing or invalid: Result: success|partial|failed",
+            hasConfidence
+              ? ""
+              : confidenceMatch
+                ? "Invalid: Confidence must be 0..1"
+                : "Missing: Confidence: 0..1",
             "",
             "Add these lines to your response and retry.",
-          ].filter(Boolean).join("\n"),
+          ]
+            .filter(Boolean)
+            .join("\n"),
         };
       }
     }
@@ -511,7 +557,8 @@ export default function khalaExtension(pi: ExtensionAPI): void {
   const agentHandlers = createAgentCommandHandlers({
     runtimeState,
     setAgentEnabledState,
-    appendAgentStateEntry: (enabled) => appendAgentStateEntry(pi, enabled, nowIso()),
+    appendAgentStateEntry: (enabled) =>
+      appendAgentStateEntry(pi, enabled, nowIso()),
     clearPendingWorkflow: () => {
       pendingWorkflow = null;
     },
@@ -537,12 +584,16 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     notify,
     parseComplianceArgs,
     parseApproveRiskArgs,
-    parsePreflightArgs: (args) => parsePreflightArgs(args, (line) => parsePreflightLine(line, nowIso)),
-    parsePostflightArgs: (args) => parsePostflightArgs(args, (line) => parsePostflightLine(line, nowIso)),
+    parsePreflightArgs: (args) =>
+      parsePreflightArgs(args, (line) => parsePreflightLine(line, nowIso)),
+    parsePostflightArgs: (args) =>
+      parsePostflightArgs(args, (line) => parsePostflightLine(line, nowIso)),
     nowIso,
     getDefaultFirstPrinciplesConfig: () => sessionFirstPrinciplesDefaults,
-    appendComplianceModeEntry: (record) => appendComplianceModeEntry(pi, record),
-    appendRiskApprovalEntry: (approval) => appendRiskApprovalEntry(pi, approval),
+    appendComplianceModeEntry: (record) =>
+      appendComplianceModeEntry(pi, record),
+    appendRiskApprovalEntry: (approval) =>
+      appendRiskApprovalEntry(pi, approval),
     appendPreflightEntry: (record) => appendPreflightEntry(pi, record),
     appendPostflightEntry: (record) => appendPostflightEntry(pi, record),
     getActiveWorkflowId: () => pendingWorkflow?.id ?? null,
@@ -556,7 +607,8 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     normalizeWhitespace,
     ensureWorkflowSlotAvailable,
     ensureAgentEnabledForCommand,
-    resolveWorkflowConfig: (type) => getWorkflowConfig(activeRuntimeProfile, type),
+    resolveWorkflowConfig: (type) =>
+      getWorkflowConfig(activeRuntimeProfile, type),
     beginWorkflowTracking,
     enqueueWorkflow,
     notifyWorkflowStarted,
@@ -591,7 +643,10 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     },
   });
 
-  const khala = async (args: string | undefined, ctx: ExtensionCommandContext): Promise<void> => {
+  const khala = async (
+    args: string | undefined,
+    ctx: ExtensionCommandContext,
+  ): Promise<void> => {
     if (!runtimeState.agentEnabled) {
       setAgentEnabledState(ctx, true);
       appendAgentStateEntry(pi, true, nowIso(), "khala");
@@ -602,29 +657,39 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     await complianceHandlers.compliance(compliancePreset, ctx);
   };
 
-  const khalaMemorySetup = async (args: string | undefined, ctx: ExtensionCommandContext): Promise<void> => {
+  const khalaMemorySetup = async (
+    args: string | undefined,
+    ctx: ExtensionCommandContext,
+  ): Promise<void> => {
     const parsed = parseKhalaMemorySetupArgs(args ?? "");
     if (parsed.error) {
       notify(ctx, parsed.error, "error");
       return;
     }
 
-    const installTargetFlag = parsed.scope === "global" ? "--global" : "--project";
+    const installTargetFlag =
+      parsed.scope === "global" ? "--global" : "--project";
 
     try {
-      await execFileAsync("uv", ["tool", "install", "graphifyy"], { cwd: ctx.cwd });
-      await execFileAsync("graphify", ["install", "--platform", "pi"], { cwd: ctx.cwd });
+      await execFileAsync("uv", ["tool", "install", "graphifyy"], {
+        cwd: ctx.cwd,
+      });
+      await execFileAsync("graphify", ["install", "--platform", "pi"], {
+        cwd: ctx.cwd,
+      });
 
       try {
-        await execFileAsync("graphify", ["pi", "install", installTargetFlag], { cwd: ctx.cwd });
+        await execFileAsync("graphify", ["pi", "install", installTargetFlag], {
+          cwd: ctx.cwd,
+        });
       } catch {
         await execFileAsync("graphify", ["pi", "install"], { cwd: ctx.cwd });
       }
 
-      const version = await execFileAsync("graphify", ["--version"], { cwd: ctx.cwd });
+      await execFileAsync("graphify", ["--help"], { cwd: ctx.cwd });
       notify(
         ctx,
-        `Graphify memory setup complete (${parsed.scope}). ${version.stdout.trim() || "graphify installed"}`,
+        `Graphify memory setup complete (${parsed.scope}). graphify installed`,
         "success",
       );
     } catch (error) {
@@ -636,24 +701,26 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     }
   };
 
-  const khalaMemoryRestart = async (args: string | undefined, ctx: ExtensionCommandContext): Promise<void> => {
+  const khalaMemoryRestart = async (
+    args: string | undefined,
+    ctx: ExtensionCommandContext,
+  ): Promise<void> => {
     const parsed = parseKhalaMemoryRestartArgs(args ?? "");
     if (parsed.error) {
       notify(ctx, parsed.error, "error");
       return;
     }
 
-    const installTargetFlag = parsed.scope === "global" ? "--global" : "--project";
+    const installTargetFlag =
+      parsed.scope === "global" ? "--global" : "--project";
 
     try {
       try {
-        await execFileAsync("graphify", ["pi", "restart", installTargetFlag], { cwd: ctx.cwd });
+        await execFileAsync("graphify", ["pi", "install", installTargetFlag], {
+          cwd: ctx.cwd,
+        });
       } catch {
-        try {
-          await execFileAsync("graphify", ["pi", "restart"], { cwd: ctx.cwd });
-        } catch {
-          await execFileAsync("graphify", ["restart"], { cwd: ctx.cwd });
-        }
+        await execFileAsync("graphify", ["pi", "install"], { cwd: ctx.cwd });
       }
 
       notify(ctx, `Graphify memory restarted (${parsed.scope}).`, "success");
@@ -666,18 +733,26 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     }
   };
 
-  const khalaMemoryRemove = async (args: string | undefined, ctx: ExtensionCommandContext): Promise<void> => {
+  const khalaMemoryRemove = async (
+    args: string | undefined,
+    ctx: ExtensionCommandContext,
+  ): Promise<void> => {
     const parsed = parseKhalaMemoryRemoveArgs(args ?? "");
     if (parsed.error) {
       notify(ctx, parsed.error, "error");
       return;
     }
 
-    const installTargetFlag = parsed.scope === "global" ? "--global" : "--project";
+    const installTargetFlag =
+      parsed.scope === "global" ? "--global" : "--project";
 
     try {
       try {
-        await execFileAsync("graphify", ["pi", "uninstall", installTargetFlag], { cwd: ctx.cwd });
+        await execFileAsync(
+          "graphify",
+          ["pi", "uninstall", installTargetFlag],
+          { cwd: ctx.cwd },
+        );
       } catch {
         await execFileAsync("graphify", ["pi", "uninstall"], { cwd: ctx.cwd });
       }
@@ -686,7 +761,9 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     }
 
     try {
-      await execFileAsync("uv", ["tool", "uninstall", "graphifyy"], { cwd: ctx.cwd });
+      await execFileAsync("uv", ["tool", "uninstall", "graphifyy"], {
+        cwd: ctx.cwd,
+      });
       notify(ctx, `Graphify memory removed (${parsed.scope}).`, "success");
     } catch (error) {
       notify(
@@ -697,7 +774,8 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     }
   };
 
-  const { compliance: _unusedComplianceHandler, ...complianceGateHandlers } = complianceHandlers;
+  const { compliance: _unusedComplianceHandler, ...complianceGateHandlers } =
+    complianceHandlers;
 
   registerCommands({
     pi,

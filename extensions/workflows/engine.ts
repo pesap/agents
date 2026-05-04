@@ -1,14 +1,24 @@
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+  ExtensionContext,
+} from "@mariozechner/pi-coding-agent";
 import { load as loadYaml } from "js-yaml";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { isRecord } from "../lib/io";
-import type { PostflightRecord, PreflightRecord } from "../policy/first-principles";
+import type {
+  PostflightRecord,
+  PreflightRecord,
+} from "../policy/first-principles";
 import type { RuntimeState } from "../state/runtime";
 
 export type NotifyType = "info" | "error" | "warning" | "success";
 
-export interface PendingWorkflow<TWorkflowType extends string = string, TWorkflowFlags = Record<string, unknown>> {
+export interface PendingWorkflow<
+  TWorkflowType extends string = string,
+  TWorkflowFlags = Record<string, unknown>,
+> {
   id: string;
   type: TWorkflowType;
   input: string;
@@ -34,10 +44,18 @@ export interface WorkflowInference<TWorkflowOutcome extends string = string> {
 export function ensureWorkflowSlotAvailable<TWorkflowType extends string>(
   ctx: ExtensionCommandContext,
   pendingWorkflow: PendingWorkflow<TWorkflowType, unknown> | null,
-  notify: (ctx: ExtensionCommandContext, message: string, type: NotifyType) => void,
+  notify: (
+    ctx: ExtensionCommandContext,
+    message: string,
+    type: NotifyType,
+  ) => void,
 ): boolean {
   if (!pendingWorkflow) return true;
-  notify(ctx, `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`, "error");
+  notify(
+    ctx,
+    `Workflow already running (${pendingWorkflow.type}). Wait for completion before starting another.`,
+    "error",
+  );
   return false;
 }
 
@@ -45,24 +63,42 @@ function normalizeSkills(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const validSkills = raw
     .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-    .filter((entry) => entry.length > 0 && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(entry));
+    .filter(
+      (entry) => entry.length > 0 && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(entry),
+    );
   return [...new Set(validSkills)];
 }
 
-function parseWorkflowSkills(rawWorkflowYaml: string): string[] {
+type SkillContextMode = "none" | "manifest" | "full";
+
+function normalizeSkillContextMode(raw: unknown): SkillContextMode {
+  return raw === "none" || raw === "full" ? raw : "manifest";
+}
+
+function parseWorkflowMetadata(rawWorkflowYaml: string): {
+  skills: string[];
+  skillContext: SkillContextMode;
+} {
   try {
     const parsed = loadYaml(rawWorkflowYaml);
-    if (!isRecord(parsed)) return [];
-    return normalizeSkills(parsed.skills);
+    if (!isRecord(parsed)) return { skills: [], skillContext: "manifest" };
+    return {
+      skills: normalizeSkills(parsed.skills),
+      skillContext: normalizeSkillContextMode(parsed.skillContext),
+    };
   } catch {
-    return [];
+    return { skills: [], skillContext: "manifest" };
   }
 }
 
-function parsePromptFrontmatter(rawPrompt: string): { template: string; skills: string[] } {
+function parsePromptFrontmatter(rawPrompt: string): {
+  template: string;
+  skills: string[];
+  skillContext: SkillContextMode;
+} {
   const frontmatterMatch = rawPrompt.match(/^---\n([\s\S]*?)\n---\n?/);
   if (!frontmatterMatch) {
-    return { template: rawPrompt, skills: [] };
+    return { template: rawPrompt, skills: [], skillContext: "manifest" };
   }
 
   const [, frontmatter] = frontmatterMatch;
@@ -72,9 +108,25 @@ function parsePromptFrontmatter(rawPrompt: string): { template: string; skills: 
     return {
       template: rawPrompt.slice(frontmatterMatch[0].length),
       skills,
+      skillContext: isRecord(parsed)
+        ? normalizeSkillContextMode(parsed.skillContext)
+        : "manifest",
     };
   } catch {
-    return { template: rawPrompt, skills: [] };
+    return { template: rawPrompt, skills: [], skillContext: "manifest" };
+  }
+}
+
+function extractSkillDescription(skillMarkdown: string): string {
+  const frontmatterMatch = skillMarkdown.match(/^---\n([\s\S]*?)\n---\n?/);
+  if (!frontmatterMatch) return "No description available.";
+  try {
+    const parsed = loadYaml(frontmatterMatch[1]);
+    if (!isRecord(parsed) || typeof parsed.description !== "string")
+      return "No description available.";
+    return parsed.description.trim().replace(/\s+/g, " ");
+  } catch {
+    return "No description available.";
   }
 }
 
@@ -93,26 +145,50 @@ export async function enqueueWorkflow(params: {
   ]);
 
   const prompt = parsePromptFrontmatter(promptTemplateRaw);
-  const workflowSkills = prompt.skills.length > 0 ? prompt.skills : parseWorkflowSkills(workflowSpec);
+  const workflowMetadata = parseWorkflowMetadata(workflowSpec);
+  const workflowSkills =
+    prompt.skills.length > 0 ? prompt.skills : workflowMetadata.skills;
+  const skillContext =
+    prompt.skills.length > 0
+      ? prompt.skillContext
+      : workflowMetadata.skillContext;
   const skillSections = await Promise.all(
     workflowSkills.map(async (skillName) => {
       if (!params.readSkill) {
-        return `[SKILL:${skillName}]\n(Skill loading unavailable in this runtime)`;
+        return `- ${skillName}: Skill loading unavailable in this runtime. File: skills/${skillName}/SKILL.md`;
       }
       const content = (await params.readSkill(skillName)).trim();
       if (!content) {
-        throw new Error(`Workflow prompt ${params.workflowPromptName} requires missing skill: ${skillName}`);
+        throw new Error(
+          `Workflow prompt ${params.workflowPromptName} requires missing skill: ${skillName}`,
+        );
       }
-      return `[SKILL:${skillName}]\n${content}`;
+      if (skillContext === "full") return `[SKILL:${skillName}]\n${content}`;
+      return `- ${skillName}: ${extractSkillDescription(content)} File: skills/${skillName}/SKILL.md`;
     }),
   );
+  const shouldIncludeSkills =
+    skillContext !== "none" && skillSections.length > 0;
 
   const payload = [
     prompt.template.trim(),
     "",
-    skillSections.length > 0 ? "Workflow skills context:" : "",
-    ...skillSections.map((section) => ["```markdown", section, "```"].join("\n")),
-    skillSections.length > 0 ? "" : "",
+    shouldIncludeSkills
+      ? skillContext === "full"
+        ? "Workflow skills context:"
+        : "Workflow skills manifest:"
+      : "",
+    ...(shouldIncludeSkills
+      ? skillContext === "full"
+        ? skillSections.map((section) =>
+            ["```markdown", section, "```"].join("\n"),
+          )
+        : [
+            ...skillSections,
+            "Load full skill docs only when needed for a concrete analysis track or edit.",
+          ]
+      : []),
+    shouldIncludeSkills ? "" : "",
     "Workflow spec:",
     "```yaml",
     workflowSpec.trim(),
@@ -126,7 +202,10 @@ export async function enqueueWorkflow(params: {
   params.pi.sendUserMessage(payload);
 }
 
-export async function beginWorkflowTracking<TWorkflowType extends string, TWorkflowFlags>(params: {
+export async function beginWorkflowTracking<
+  TWorkflowType extends string,
+  TWorkflowFlags,
+>(params: {
   pi: ExtensionAPI;
   ctx: ExtensionCommandContext;
   type: TWorkflowType;
@@ -156,7 +235,13 @@ export async function beginWorkflowTracking<TWorkflowType extends string, TWorkf
   };
 
   await fs.writeFile(runFile, `${JSON.stringify(record, null, 2)}\n`, "utf8");
-  params.pi.appendEntry("khala-workflow-start", { id, type: params.type, input: params.input, flags: params.flags, startedAt });
+  params.pi.appendEntry("khala-workflow-start", {
+    id,
+    type: params.type,
+    input: params.input,
+    flags: params.flags,
+    startedAt,
+  });
 
   const pending: PendingWorkflow<TWorkflowType, TWorkflowFlags> = {
     id,
@@ -171,7 +256,9 @@ export async function beginWorkflowTracking<TWorkflowType extends string, TWorkf
 
   params.runtimeState.latestPostflight = null;
 
-  const autoPreflightReason = params.summarizeEvidence(params.input, 120).replace(/"/g, "'") || "workflow requested";
+  const autoPreflightReason =
+    params.summarizeEvidence(params.input, 120).replace(/"/g, "'") ||
+    "workflow requested";
   params.runtimeState.activePreflight = {
     at: startedAt,
     skill: params.type,
@@ -186,7 +273,11 @@ export async function beginWorkflowTracking<TWorkflowType extends string, TWorkf
   return pending;
 }
 
-export async function completeWorkflowTracking<TWorkflowType extends string, TWorkflowFlags, TWorkflowOutcome extends string>(params: {
+export async function completeWorkflowTracking<
+  TWorkflowType extends string,
+  TWorkflowFlags,
+  TWorkflowOutcome extends string,
+>(params: {
   pi: ExtensionAPI;
   ctx: ExtensionContext;
   workflow: PendingWorkflow<TWorkflowType, TWorkflowFlags>;
@@ -196,9 +287,18 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
   runtimeState: RuntimeState;
   inferOutcomeFromText: (text: string) => WorkflowInference<TWorkflowOutcome>;
   nowIso: () => string;
-  extractPostflightFromAssistantText: (text: string, nowIso: () => string) => PostflightRecord | null;
-  modeOutcome: (mode: RuntimeState["firstPrinciplesConfig"]["postflightMode"], violation: boolean) => RuntimeState["policyEvents"][number]["outcome"];
-  addPolicyEvent: (pi: ExtensionAPI, event: RuntimeState["policyEvents"][number]) => void;
+  extractPostflightFromAssistantText: (
+    text: string,
+    nowIso: () => string,
+  ) => PostflightRecord | null;
+  modeOutcome: (
+    mode: RuntimeState["firstPrinciplesConfig"]["postflightMode"],
+    violation: boolean,
+  ) => RuntimeState["policyEvents"][number]["outcome"];
+  addPolicyEvent: (
+    pi: ExtensionAPI,
+    event: RuntimeState["policyEvents"][number],
+  ) => void;
   appendPostflightEntry: (pi: ExtensionAPI, record: PostflightRecord) => void;
   summarizeEvidence: (text: string, max?: number) => string;
   notify: (ctx: ExtensionContext, message: string, type: NotifyType) => void;
@@ -213,9 +313,17 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
   const inference = params.inferOutcomeFromText(params.assistantText);
   const finishedAt = params.nowIso();
 
-  const postflightFromOutput = params.extractPostflightFromAssistantText(params.assistantText, params.nowIso) ?? params.runtimeState.latestPostflight;
-  const postflightMissing = params.workflow.mutationCount > 0 && !postflightFromOutput;
-  const postflightDecision = params.modeOutcome(params.runtimeState.firstPrinciplesConfig.postflightMode, postflightMissing);
+  const postflightFromOutput =
+    params.extractPostflightFromAssistantText(
+      params.assistantText,
+      params.nowIso,
+    ) ?? params.runtimeState.latestPostflight;
+  const postflightMissing =
+    params.workflow.mutationCount > 0 && !postflightFromOutput;
+  const postflightDecision = params.modeOutcome(
+    params.runtimeState.firstPrinciplesConfig.postflightMode,
+    postflightMissing,
+  );
 
   params.addPolicyEvent(params.pi, {
     at: finishedAt,
@@ -228,7 +336,8 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
   });
 
   if (postflightDecision === "warn") {
-    const warning = "Policy warning: Missing postflight evidence after mutation.";
+    const warning =
+      "Policy warning: Missing postflight evidence after mutation.";
     params.workflow.policyWarnings.push(warning);
     params.notify(params.ctx, warning, "warning");
   }
@@ -238,17 +347,29 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
     params.appendPostflightEntry(params.pi, postflightFromOutput);
   }
 
-  const hasPreflightWarning = params.workflow.policyWarnings.some((line) => line.includes("Missing valid preflight"));
-  const qualityScore = Math.max(0, 100 - (hasPreflightWarning ? 50 : 0) - (postflightMissing ? 20 : 0));
+  const hasPreflightWarning = params.workflow.policyWarnings.some((line) =>
+    line.includes("Missing valid preflight"),
+  );
+  const qualityScore = Math.max(
+    0,
+    100 - (hasPreflightWarning ? 50 : 0) - (postflightMissing ? 20 : 0),
+  );
 
   const strictViolations: string[] = [];
-  if (inference.strictViolation) strictViolations.push(inference.strictViolation);
-  if (postflightMissing && params.runtimeState.firstPrinciplesConfig.postflightMode === "enforce") {
+  if (inference.strictViolation)
+    strictViolations.push(inference.strictViolation);
+  if (
+    postflightMissing &&
+    params.runtimeState.firstPrinciplesConfig.postflightMode === "enforce"
+  ) {
     strictViolations.push("Missing required postflight evidence.");
   }
 
-  const strictViolation = strictViolations.length > 0 ? strictViolations.join(" ") : null;
-  const outcome = (strictViolation ? "failed" : inference.outcome) as TWorkflowOutcome;
+  const strictViolation =
+    strictViolations.length > 0 ? strictViolations.join(" ") : null;
+  const outcome = (
+    strictViolation ? "failed" : inference.outcome
+  ) as TWorkflowOutcome;
   const confidence = inference.confidence;
 
   const evidenceSnippet = strictViolation
@@ -278,7 +399,11 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
     },
   };
 
-  await fs.writeFile(params.workflow.runFile, `${JSON.stringify(runRecord, null, 2)}\n`, "utf8");
+  await fs.writeFile(
+    params.workflow.runFile,
+    `${JSON.stringify(runRecord, null, 2)}\n`,
+    "utf8",
+  );
 
   params.pi.appendEntry("khala-workflow-complete", {
     id: params.workflow.id,
