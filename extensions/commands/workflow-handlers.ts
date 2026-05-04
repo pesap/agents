@@ -77,6 +77,7 @@ export function createWorkflowCommandHandlers(params: {
     GIT_REVIEW_COMMAND_SOURCE: string;
     SIMPLIFY_COMMAND_SOURCE: string;
     PLAN_COMMAND_SOURCE: string;
+    SHIP_COMMAND_SOURCE: string;
     TRIAGE_ISSUE_COMMAND_SOURCE: string;
     TDD_COMMAND_SOURCE: string;
     ADDRESS_OPEN_ISSUES_COMMAND_SOURCE: string;
@@ -89,6 +90,7 @@ export function createWorkflowCommandHandlers(params: {
   simplify: CommandHandler;
   removeSlop: CommandHandler;
   plan: CommandHandler;
+  ship: CommandHandler;
   triageIssue: CommandHandler;
   tdd: CommandHandler;
   addressOpenIssues: CommandHandler;
@@ -394,6 +396,36 @@ export function createWorkflowCommandHandlers(params: {
           source: constants.PLAN_COMMAND_SOURCE,
         },
         startedMessage: `Started plan workflow (${plan}).`,
+      });
+    },
+
+    ship: async (_args, ctx) => {
+      if (!ensureWorkflowSlotAvailable(ctx)) return;
+
+      await runWorkflowCommand({
+        ctx,
+        type: "ship",
+        input: "current branch",
+        flags: {
+          source: constants.SHIP_COMMAND_SOURCE,
+        },
+        sections: [
+          "Scope: current branch",
+          `Source reference: ${constants.SHIP_COMMAND_SOURCE}`,
+          "",
+          "Instruction: Run simplify on current uncommitted changes first, preserving behavior.",
+          "Instruction: Run project CI/test command(s) and stop on failure with actionable diagnostics.",
+          "Instruction: If tests pass and branch is ahead, push current branch.",
+          "Instruction: If no open PR exists for current branch, open one using .github/pull_request_template.md.",
+          "Instruction: If PR already exists, update/confirm it instead of creating duplicate.",
+          constants.POSTFLIGHT_INSTRUCTION,
+          constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
+        ],
+        entry: {
+          branch: "current",
+          source: constants.SHIP_COMMAND_SOURCE,
+        },
+        startedMessage: "Started ship workflow (simplify -> test -> push -> PR).",
       });
     },
 

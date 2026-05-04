@@ -44,6 +44,7 @@ pi -e https://github.com/pesap/agents -p "/khala"
 - `/git-review`
 - `/simplify [scope] [--extra "focus"]`
 - `/plan <plan_or_topic>`
+- `/ship`
 - `/triage-issue <github_issue_or_problem_statement>`
 - `/tdd <goal> [--lang auto|python|rust|c]`
 - `/address-open-issues [--limit N] [--repo owner/repo]`

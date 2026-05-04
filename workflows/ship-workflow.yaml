@@ -1,0 +1,18 @@
+name: ship-workflow
+version: 1
+objective: Simplify, verify, publish branch, and open PR/MR when missing
+steps:
+  - id: simplify
+    action: simplify_current_uncommitted_scope
+  - id: validate
+    action: run_project_ci_or_test_command
+  - id: push
+    action: push_current_branch_after_green_checks
+  - id: pr-check
+    action: detect_existing_pr_or_mr_for_current_branch
+  - id: pr-open
+    action: open_pr_or_mr_if_missing_using_template
+  - id: summarize
+    action: report_simplify_test_push_pr_status
+  - id: learn
+    action: persist_learnings

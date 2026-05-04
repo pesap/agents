@@ -15,6 +15,7 @@ export interface CommandRegistrarDeps {
     gitReview: CommandHandler;
     simplify: CommandHandler;
     plan: CommandHandler;
+    ship: CommandHandler;
     triageIssue: CommandHandler;
     tdd: CommandHandler;
     addressOpenIssues: CommandHandler;
@@ -38,6 +39,7 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
     { name: "git-review", description: "Run git history diagnostics before reading code", handler: handlers.gitReview },
     { name: "simplify", description: "Run the khala cleanup and code-quality workflow", handler: handlers.simplify },
     { name: "plan", description: "Run rigorous planning workflow with edge-case capture and context/ADR updates", handler: handlers.plan },
+    { name: "ship", description: "Simplify, run CI, push branch, and open PR if missing", handler: handlers.ship },
     { name: "triage-issue", description: "Investigate a bug and create a TDD fix-plan issue", handler: handlers.triageIssue },
     { name: "tdd", description: "Run a strict red-green-refactor workflow", handler: handlers.tdd },
     { name: "address-open-issues", description: "Sweep open issues authored by you through triage, TDD, review, and remediation", handler: handlers.addressOpenIssues },

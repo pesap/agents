@@ -39,6 +39,10 @@ commands:
     enabled: true
     prompt: plan-workflow.md
     workflow: plan-workflow.yaml
+  ship:
+    enabled: true
+    prompt: ship-workflow.md
+    workflow: ship-workflow.yaml
   triage-issue:
     enabled: true
     prompt: triage-issue-workflow.md

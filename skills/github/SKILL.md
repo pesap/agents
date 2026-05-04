@@ -19,7 +19,8 @@ description: Use this skill when the user needs GitHub terminal workflows (PRs, 
 3. Diagnose failure/bottleneck and propose minimal high-impact changes.
 4. Validate via checks/reruns where possible.
 5. For PR feedback responses, prefer direct replies in the original review thread.
-6. Summarize evidence, decisions, and residual risks.
+6. When creating PRs, use the shared template from `skills/github/pr-template.md` via `gh pr create --body-file <path>`.
+7. Summarize evidence, decisions, and residual risks.
 
 ## PR review reply policy
 - Prefer replying in-thread to the reviewer comment (not a general PR comment).
@@ -28,6 +29,12 @@ description: Use this skill when the user needs GitHub terminal workflows (PRs, 
 - If wrong/general replies were posted, delete them and repost in-thread.
 
 See [REFERENCE.md](./REFERENCE.md) for command recipes and CI optimization playbook.
+
+## PR creation body policy
+- Prefer explicit body injection over repo-default templates.
+- Use `skills/github/pr-template.md` as baseline and fill placeholders (especially `Closes {LINK TO GH ISSUE}`).
+- Command pattern:
+  - `gh pr create --title "<title>" --body-file skills/github/pr-template.md`
 
 ## Output
 - Command evidence (key `gh` output snippets)

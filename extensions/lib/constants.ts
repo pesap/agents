@@ -16,6 +16,7 @@ export const REVIEW_COMMAND_SOURCE = "https://github.com/earendil-works/pi-revie
 export const GIT_REVIEW_COMMAND_SOURCE = "https://piechowski.io/post/git-commands-before-reading-code/";
 export const SIMPLIFY_COMMAND_SOURCE = "https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-simplifier/agents/code-simplifier.md";
 export const PLAN_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs";
+export const SHIP_COMMAND_SOURCE = "khala://workflow/ship";
 export const TRIAGE_ISSUE_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/skills/engineering/triage";
 export const TDD_COMMAND_SOURCE = "https://github.com/mattpocock/skills/tree/main/skills/engineering/tdd";
 export const ADDRESS_OPEN_ISSUES_COMMAND_SOURCE = "khala://workflow/address-open-issues";
