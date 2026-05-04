@@ -195,28 +195,13 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
   lowConfidenceThreshold: number;
   runtimeState: RuntimeState;
   inferOutcomeFromText: (text: string) => WorkflowInference<TWorkflowOutcome>;
-  ensureLearningStore: (cwd: string) => Promise<LearningPathsLike>;
   nowIso: () => string;
   extractPostflightFromAssistantText: (text: string, nowIso: () => string) => PostflightRecord | null;
   modeOutcome: (mode: RuntimeState["firstPrinciplesConfig"]["postflightMode"], violation: boolean) => RuntimeState["policyEvents"][number]["outcome"];
   addPolicyEvent: (pi: ExtensionAPI, event: RuntimeState["policyEvents"][number]) => void;
   appendPostflightEntry: (pi: ExtensionAPI, record: PostflightRecord) => void;
   summarizeEvidence: (text: string, max?: number) => string;
-  appendLine: (filePath: string, content: string) => Promise<void>;
-  maybeEmitPromotionHint: (paths: LearningPathsLike, observation: {
-    version: number;
-    id: string;
-    timestamp: string;
-    taskType: TWorkflowType;
-    input: string;
-    flags: TWorkflowFlags;
-    outcome: TWorkflowOutcome;
-    confidence: number;
-    evidenceSnippet: string;
-    workflowId: string;
-  }, ctx: ExtensionContext) => Promise<void>;
   notify: (ctx: ExtensionContext, message: string, type: NotifyType) => void;
-  makeId: (prefix: string) => string;
   onLowConfidence: (event: {
     at: string;
     workflowId: string;
@@ -226,7 +211,6 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
   }) => void;
 }): Promise<void> {
   const inference = params.inferOutcomeFromText(params.assistantText);
-  const paths = await params.ensureLearningStore(params.ctx.cwd);
   const finishedAt = params.nowIso();
 
   const postflightFromOutput = params.extractPostflightFromAssistantText(params.assistantText, params.nowIso) ?? params.runtimeState.latestPostflight;
@@ -296,25 +280,6 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
 
   await fs.writeFile(params.workflow.runFile, `${JSON.stringify(runRecord, null, 2)}\n`, "utf8");
 
-  const observation = {
-    version: params.learningVersion,
-    id: params.makeId("obs"),
-    timestamp: finishedAt,
-    taskType: params.workflow.type,
-    input: params.workflow.input,
-    flags: params.workflow.flags,
-    outcome,
-    confidence,
-    evidenceSnippet: runRecord.evidenceSnippet,
-    workflowId: params.workflow.id,
-  };
-
-  await params.appendLine(paths.learningJsonl, JSON.stringify(observation));
-  await params.appendLine(
-    paths.memoryMd,
-    `- ${finishedAt.slice(0, 10)} [${params.workflow.type}/${outcome}] ${params.summarizeEvidence(params.workflow.input, 180)} (confidence=${confidence.toFixed(2)}, q=${qualityScore})`,
-  );
-
   params.pi.appendEntry("khala-workflow-complete", {
     id: params.workflow.id,
     type: params.workflow.type,
@@ -336,8 +301,6 @@ export async function completeWorkflowTracking<TWorkflowType extends string, TWo
       outcome,
     });
   }
-
-  await params.maybeEmitPromotionHint(paths, observation, params.ctx);
 
   params.notify(
     params.ctx,

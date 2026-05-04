@@ -22,6 +22,8 @@ export interface CommandRegistrarDeps {
     addressOpenIssues: CommandHandler;
     learnSkill: CommandHandler;
     gsd: CommandHandler;
+    khalaMemorySetup: CommandHandler;
+    khalaMemoryRestart: CommandHandler;
   };
 }
 
@@ -44,6 +46,8 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
     { name: "address-open-issues", description: "Sweep open issues authored by you through triage, TDD, review, and remediation", handler: handlers.addressOpenIssues },
     { name: "learn-skill", description: "Create and refine a reusable skill", handler: handlers.learnSkill },
     { name: "gsd", description: "Run imported Get-Shit-Done workflows (/gsd <workflow> [instruction])", handler: handlers.gsd },
+    { name: "khala-memory-setup", description: "Install Graphify memory integration via uv (project/global)", handler: handlers.khalaMemorySetup },
+    { name: "khala-memory-restart", description: "Restart Graphify memory integration (project/global)", handler: handlers.khalaMemoryRestart },
   ] as const;
 
   for (const command of commands) {

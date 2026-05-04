@@ -1,11 +1,7 @@
 import path from "node:path";
 import { buildLifecycleHookMarkdown, type HookConfig } from "../hooks/config";
 import { readText, readTextIfExists } from "../lib/io";
-import {
-  getLearnedSkillsList,
-  getLearningMemoryTail,
-  type LearningPaths,
-} from "../learning/store";
+import { type LearningPaths } from "../learning/store";
 import {
   parseFirstPrinciplesConfig,
   type FirstPrinciplesConfig,
@@ -63,8 +59,6 @@ export async function getBootstrapPayload(params: {
     instructions,
     complianceProfile,
     startupHooks,
-    memoryTail,
-    learnedSkills,
   ] = await Promise.all([
     readTextIfExists(path.join(params.runtimeDir, "SOUL.md")),
     readTextIfExists(path.join(params.runtimeDir, "RULES.md")),
@@ -76,8 +70,6 @@ export async function getBootstrapPayload(params: {
       activeHookConfig: params.activeHookConfig,
       hooksDir: params.hooksDir,
     }),
-    getLearningMemoryTail(params.cwd, params.learningPathCache, params.memoryTailLines),
-    getLearnedSkillsList(params.cwd, params.learningPathCache),
   ]);
 
   return [
@@ -97,9 +89,6 @@ export async function getBootstrapPayload(params: {
     complianceProfile.trim(),
     startupHooks.trim() ? "[LIFECYCLE HOOKS: on_session_start]" : "",
     startupHooks.trim(),
-    memoryTail ? "[LEARNING MEMORY TAIL]" : "",
-    memoryTail,
-    learnedSkills.length > 0 ? `[LEARNED SKILLS] ${learnedSkills.join(", ")}` : "",
   ]
     .filter((line) => line.length > 0)
     .join("\n");

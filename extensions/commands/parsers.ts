@@ -228,6 +228,38 @@ export function parseLearnSkillArgs(args: string): {
   };
 }
 
+export function parseKhalaMemorySetupArgs(args: string): { scope: "project" | "global"; error?: string } {
+  const scope = normalizeWhitespace(args).toLowerCase();
+  if (!scope) {
+    return { scope: "project" };
+  }
+
+  if (scope === "project" || scope === "global") {
+    return { scope };
+  }
+
+  return {
+    scope: "project",
+    error: "Usage: /khala-memory-setup [project|global]",
+  };
+}
+
+export function parseKhalaMemoryRestartArgs(args: string): { scope: "project" | "global"; error?: string } {
+  const scope = normalizeWhitespace(args).toLowerCase();
+  if (!scope) {
+    return { scope: "project" };
+  }
+
+  if (scope === "project" || scope === "global") {
+    return { scope };
+  }
+
+  return {
+    scope: "project",
+    error: "Usage: /khala-memory-restart [project|global]",
+  };
+}
+
 export function parseGsdArgs(args: string): { workflow: string; instruction: string } {
   const trimmed = normalizeWhitespace(args);
   if (!trimmed) {

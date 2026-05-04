@@ -4,7 +4,9 @@ import type {
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import { createBashTool } from "@mariozechner/pi-coding-agent";
+import { execFile } from "node:child_process";
 import registerSubagentExtension from "pi-subagents/index.ts";
+import { promisify } from "node:util";
 import registerSubagentNotifyExtension from "pi-subagents/notify.ts";
 import { createAgentCommandHandlers } from "./commands/agent";
 import { createComplianceCommandHandlers } from "./commands/compliance";
@@ -19,6 +21,8 @@ import {
   parsePlanArgs,
   parseFeatureArgs,
   parseLearnSkillArgs,
+  parseKhalaMemoryRestartArgs,
+  parseKhalaMemorySetupArgs,
   parseGsdArgs,
   parsePostflightArgs,
   parsePreflightArgs,
@@ -144,6 +148,7 @@ const workflowReaders = createWorkflowReaders({
   commandsDir: RUNTIME_PATHS.commandsDir,
   packageSkillsPath: RUNTIME_PATHS.packageSkillsPath,
 });
+const execFileAsync = promisify(execFile);
 
 function prependInterceptedCommandsPath(command: string): string {
   const escapedPath = RUNTIME_PATHS.interceptedCommandsDir.replace(/"/g, '\\"');
@@ -267,27 +272,13 @@ async function completeWorkflowTracking(
     lowConfidenceThreshold: activeRuntimeProfile.lowConfidenceThreshold,
     runtimeState,
     inferOutcomeFromText,
-    ensureLearningStore: (cwd) => ensureLearningStore(cwd, learningPathCache),
     nowIso,
     extractPostflightFromAssistantText,
     modeOutcome,
     addPolicyEvent,
     appendPostflightEntry,
     summarizeEvidence,
-    appendLine,
-    maybeEmitPromotionHint: (paths, observation, context) => maybeEmitPromotionHint({
-      paths,
-      observation: observation as LearningObservation<WorkflowType, WorkflowOutcome>,
-      ctx: context,
-      promotionMinObservations: PROMOTION_MIN_OBSERVATIONS,
-      promotionSuccessThreshold: PROMOTION_SUCCESS_THRESHOLD,
-      promotionImprovementThreshold: PROMOTION_IMPROVEMENT_THRESHOLD,
-      nowIso,
-      summarizeEvidence,
-      notify,
-    }),
     notify,
-    makeId,
     onLowConfidence: (event) => {
       lowConfidenceEvents.push(event);
     },
@@ -602,6 +593,70 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     await complianceHandlers.compliance(compliancePreset, ctx);
   };
 
+  const khalaMemorySetup = async (args: string | undefined, ctx: ExtensionCommandContext): Promise<void> => {
+    const parsed = parseKhalaMemorySetupArgs(args ?? "");
+    if (parsed.error) {
+      notify(ctx, parsed.error, "error");
+      return;
+    }
+
+    const installTargetFlag = parsed.scope === "global" ? "--global" : "--project";
+
+    try {
+      await execFileAsync("uv", ["tool", "install", "graphifyy"], { cwd: ctx.cwd });
+      await execFileAsync("graphify", ["install", "--platform", "pi"], { cwd: ctx.cwd });
+
+      try {
+        await execFileAsync("graphify", ["pi", "install", installTargetFlag], { cwd: ctx.cwd });
+      } catch {
+        await execFileAsync("graphify", ["pi", "install"], { cwd: ctx.cwd });
+      }
+
+      const version = await execFileAsync("graphify", ["--version"], { cwd: ctx.cwd });
+      notify(
+        ctx,
+        `Graphify memory setup complete (${parsed.scope}). ${version.stdout.trim() || "graphify installed"}`,
+        "success",
+      );
+    } catch (error) {
+      notify(
+        ctx,
+        `Graphify setup failed: ${error instanceof Error ? error.message : String(error)}`,
+        "error",
+      );
+    }
+  };
+
+  const khalaMemoryRestart = async (args: string | undefined, ctx: ExtensionCommandContext): Promise<void> => {
+    const parsed = parseKhalaMemoryRestartArgs(args ?? "");
+    if (parsed.error) {
+      notify(ctx, parsed.error, "error");
+      return;
+    }
+
+    const installTargetFlag = parsed.scope === "global" ? "--global" : "--project";
+
+    try {
+      try {
+        await execFileAsync("graphify", ["pi", "restart", installTargetFlag], { cwd: ctx.cwd });
+      } catch {
+        try {
+          await execFileAsync("graphify", ["pi", "restart"], { cwd: ctx.cwd });
+        } catch {
+          await execFileAsync("graphify", ["restart"], { cwd: ctx.cwd });
+        }
+      }
+
+      notify(ctx, `Graphify memory restarted (${parsed.scope}).`, "success");
+    } catch (error) {
+      notify(
+        ctx,
+        `Graphify restart failed: ${error instanceof Error ? error.message : String(error)}`,
+        "error",
+      );
+    }
+  };
+
   const { compliance: _unusedComplianceHandler, ...complianceGateHandlers } = complianceHandlers;
 
   registerCommands({
@@ -611,6 +666,8 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       ...workflowHandlers,
       endAgent: agentHandlers.endAgent,
       khala,
+      khalaMemorySetup,
+      khalaMemoryRestart,
     },
   });
 }
