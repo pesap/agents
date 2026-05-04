@@ -1,18 +1,40 @@
 name: simplify-workflow
-version: 1
-objective: Simplify scoped code safely while preserving exact behavior
+version: 2
+objective: Improve maintainability and code quality with behavior-preserving cleanup
 skills:
   - simplify
+  - comment-quality-gate
+  - dead-code-proof
+  - dependency-untangler
+  - type-hardening
+  - nasa-guidelines
 steps:
   - id: scope
-    action: confirm_target_scope_and_constraints
-  - id: standards
-    action: load_project_conventions_for_style_and_safety
-  - id: simplify
-    action: reduce_complexity_without_semantic_change
+    action: confirm_scope_and_constraints
+  - id: skill-selection
+    action: select_language_aware_skills
+  - id: analysis-tracks
+    action: run_analysis_tracks_then_prioritize
+    parameters:
+      tracks:
+        - dry-dedup
+        - shared-types
+        - unused-code
+        - circular-deps
+        - weak-types
+        - error-handling
+        - legacy-pruning
+        - comment-quality
+      mode: analysis_only
+  - id: prioritize
+    action: rank_recommendations_by_confidence_and_risk
+  - id: implement
+    action: apply_high_confidence_changes_sequentially
   - id: validate
-    action: run_targeted_checks_for_touched_paths
-  - id: report
-    action: summarize_changes_validation_and_risks
+    action: run_relevant_checks
+  - id: compliance
+    action: report_nasa_guideline_status
+  - id: handoff
+    action: summarize_changes_and_risks
   - id: learn
-    action: persist_simplification_learnings
+    action: persist_learnings

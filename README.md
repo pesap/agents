@@ -19,7 +19,7 @@ Installed package flow:
 pi install https://github.com/pesap/agents
 pi
 # then inside Pi:
-/khala
+/khala 
 ```
 
 One-off (no install):
@@ -86,18 +86,34 @@ pi -e https://github.com/pesap/agents
 ### Workflow commands (auto-enable agent if needed)
 
 - `/debug <problem> [--fix]`
-- `/feature <request> [--ship]`
 - `/review [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`
 - `/git-review`
 - `/simplify [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`
-- `/remove-slop [scope]`
 - `/domain-model <plan_or_topic>`
 - `/to-prd [context]`
 - `/to-issues [plan_or_issue]`
-- `/triage-issue <problem_statement>`
-- `/tdd <goal> [--lang auto|python|rust|c]`
+- `/triage-issue <github_issue_or_problem_statement>`
+- `/tdd <goal> [--lang auto|python|rust|c]` (default feature-delivery path)
 - `/address-open-issues [--limit N] [--repo owner/repo]`
 - `/learn-skill <topic> [--from <path|url>] [--from-file path] [--from-url url] [--dry-run]`
+- `/gsd <workflow> [instruction]`
+
+### Recommended bug-fix entrypoints
+
+- **Local error found while coding:** use `/debug <problem> [--fix]`
+- **Bug reported on GitHub:** use `/triage-issue <github_issue_or_problem_statement>` (root cause + TDD + PR)
+
+### Upstream attribution (GSD import)
+
+We imported workflow/agent material from:
+
+- https://github.com/gsd-build/get-shit-done
+
+Specifically adapted into this repo:
+
+- `skills/gsd-*` (agent prompts translated to Pi skills)
+- `docs/gsd-workflows/*` (workflow specs + templates/contexts/references)
+- `/gsd` command glue (`commands/gsd-workflow.md`, `workflows/gsd-workflow.yaml`)
 
 ## Run workflow commands outside the REPL
 

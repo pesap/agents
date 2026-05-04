@@ -41,6 +41,13 @@ skills:
   - public-api-guard
   - caveman
   - infrasys
+  - gsd-workflows
+  - gsd-planner
+  - gsd-executor
+  - gsd-verifier
+  - gsd-code-reviewer
+  - gsd-debugger
+  - gsd-security-auditor
 pi:
   scope: project
   tools: "read,edit,write,grep,ast_search,nu,bash,gitagent_remember"

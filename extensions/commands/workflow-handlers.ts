@@ -66,6 +66,7 @@ export function createWorkflowCommandHandlers(params: {
   parseTddArgs: (args: string) => { goal: string; language: string };
   parseAddressOpenIssuesArgs: (args: string) => { limit: number; repo: string };
   parseLearnSkillArgs: (args: string) => { topic: string; fromFile?: string; fromUrl?: string; dryRun: boolean };
+  parseGsdArgs: (args: string) => { workflow: string; instruction: string };
   ensureLearningStore: (cwd: string) => Promise<{ skillsDir: string }>;
   exists: (filePath: string) => Promise<boolean>;
   readText: (filePath: string) => Promise<string>;
@@ -98,6 +99,7 @@ export function createWorkflowCommandHandlers(params: {
   tdd: CommandHandler;
   addressOpenIssues: CommandHandler;
   learnSkill: CommandHandler;
+  gsd: CommandHandler;
 } {
   const {
     pi,
@@ -124,6 +126,7 @@ export function createWorkflowCommandHandlers(params: {
     parseTddArgs,
     parseAddressOpenIssuesArgs,
     parseLearnSkillArgs,
+    parseGsdArgs,
     ensureLearningStore,
     exists,
     readText,
@@ -552,6 +555,34 @@ export function createWorkflowCommandHandlers(params: {
           source: constants.ADDRESS_OPEN_ISSUES_COMMAND_SOURCE,
         },
         startedMessage: `Started address-open-issues workflow (limit=${parsed.limit}, repo=${parsed.repo || "current"}).`,
+      });
+    },
+
+    gsd: async (args, ctx) => {
+      const parsed = parseGsdArgs(args ?? "");
+      if (!ensureWorkflowSlotAvailable(ctx)) return;
+
+      await runWorkflowCommand({
+        ctx,
+        type: "gsd",
+        input: parsed.workflow,
+        flags: {
+          workflow: parsed.workflow,
+          instruction: parsed.instruction || null,
+        },
+        sections: [
+          `GSD workflow: ${parsed.workflow}`,
+          parsed.instruction ? `Instruction: ${parsed.instruction}` : "Instruction: Execute the selected imported GSD workflow with project context.",
+          "",
+          "Instruction: Consult skills/gsd-workflows/SKILL.md for workflow names and docs/gsd-workflows/<name>.md for details.",
+          constants.POSTFLIGHT_INSTRUCTION,
+          constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
+        ],
+        entry: {
+          workflow: parsed.workflow,
+          instruction: parsed.instruction || null,
+        },
+        startedMessage: `Started gsd workflow '${parsed.workflow}'.`,
       });
     },
 

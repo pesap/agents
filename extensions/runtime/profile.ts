@@ -17,6 +17,7 @@ export const WORKFLOW_TYPES = [
   "triage-issue",
   "tdd",
   "address-open-issues",
+  "gsd",
 ] as const;
 
 export type WorkflowType = (typeof WORKFLOW_TYPES)[number];
@@ -54,7 +55,7 @@ const DEFAULT_WORKFLOWS: Record<WorkflowType, WorkflowCommandConfig> = {
     entryType: "khala-debug-command",
   },
   feature: {
-    enabled: true,
+    enabled: false,
     promptFile: "feature-workflow.md",
     workflowFile: "feature-workflow.yaml",
     entryType: "khala-feature-command",
@@ -78,7 +79,7 @@ const DEFAULT_WORKFLOWS: Record<WorkflowType, WorkflowCommandConfig> = {
     entryType: "khala-simplify-command",
   },
   "remove-slop": {
-    enabled: true,
+    enabled: false,
     promptFile: "remove-slop-workflow.md",
     workflowFile: "remove-slop-workflow.yaml",
     entryType: "khala-remove-slop-command",
@@ -124,6 +125,12 @@ const DEFAULT_WORKFLOWS: Record<WorkflowType, WorkflowCommandConfig> = {
     promptFile: "learn-skill-workflow.md",
     workflowFile: "learn-skill-workflow.yaml",
     entryType: "khala-learn-skill-command",
+  },
+  gsd: {
+    enabled: true,
+    promptFile: "gsd-workflow.md",
+    workflowFile: "gsd-workflow.yaml",
+    entryType: "khala-gsd-command",
   },
 };
 

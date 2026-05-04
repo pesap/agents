@@ -228,6 +228,23 @@ export function parseLearnSkillArgs(args: string): {
   };
 }
 
+export function parseGsdArgs(args: string): { workflow: string; instruction: string } {
+  const trimmed = normalizeWhitespace(args);
+  if (!trimmed) {
+    return { workflow: "help", instruction: "" };
+  }
+
+  const firstSpace = trimmed.indexOf(" ");
+  if (firstSpace < 0) {
+    return { workflow: trimmed.toLowerCase(), instruction: "" };
+  }
+
+  return {
+    workflow: trimmed.slice(0, firstSpace).toLowerCase(),
+    instruction: normalizeWhitespace(trimmed.slice(firstSpace + 1)),
+  };
+}
+
 function tokenizeArgs(value: string): string[] {
   const tokens: string[] = [];
   let current = "";

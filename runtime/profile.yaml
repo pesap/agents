@@ -16,7 +16,7 @@ commands:
     prompt: debug-workflow.md
     workflow: debug-workflow.yaml
   feature:
-    enabled: true
+    enabled: false
     prompt: feature-workflow.md
     workflow: feature-workflow.yaml
   review:
@@ -32,7 +32,7 @@ commands:
     prompt: simplify-workflow.md
     workflow: simplify-workflow.yaml
   remove-slop:
-    enabled: true
+    enabled: false
     prompt: remove-slop-workflow.md
     workflow: remove-slop-workflow.yaml
   domain-model:
@@ -63,3 +63,7 @@ commands:
     enabled: true
     prompt: learn-skill-workflow.md
     workflow: learn-skill-workflow.yaml
+  gsd:
+    enabled: true
+    prompt: gsd-workflow.md
+    workflow: gsd-workflow.yaml

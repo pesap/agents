@@ -11,11 +11,9 @@ export interface CommandRegistrarDeps {
     preflight: CommandHandler;
     postflight: CommandHandler;
     debug: CommandHandler;
-    feature: CommandHandler;
     review: CommandHandler;
     gitReview: CommandHandler;
     simplify: CommandHandler;
-    removeSlop: CommandHandler;
     domainModel: CommandHandler;
     toPrd: CommandHandler;
     toIssues: CommandHandler;
@@ -23,6 +21,7 @@ export interface CommandRegistrarDeps {
     tdd: CommandHandler;
     addressOpenIssues: CommandHandler;
     learnSkill: CommandHandler;
+    gsd: CommandHandler;
   };
 }
 
@@ -34,11 +33,9 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
     { name: "preflight", description: "Set mutation intent line for first-principles gate", handler: handlers.preflight },
     { name: "postflight", description: "Record verification evidence line for first-principles gate", handler: handlers.postflight },
     { name: "debug", description: "Run the khala debug workflow", handler: handlers.debug },
-    { name: "feature", description: "Run the khala feature workflow", handler: handlers.feature },
     { name: "review", description: "Run the khala code review workflow (adapted from pi-review)", handler: handlers.review },
     { name: "git-review", description: "Run git history diagnostics before reading code", handler: handlers.gitReview },
-    { name: "simplify", description: "Run the khala code simplification workflow", handler: handlers.simplify },
-    { name: "remove-slop", description: "Run the khala cleanup and code-quality workflow", handler: handlers.removeSlop },
+    { name: "simplify", description: "Run the khala cleanup and code-quality workflow", handler: handlers.simplify },
     { name: "domain-model", description: "Run domain-model grilling and context/ADR update workflow", handler: handlers.domainModel },
     { name: "to-prd", description: "Convert current context into a PRD and file a GitHub issue", handler: handlers.toPrd },
     { name: "to-issues", description: "Break a plan/PRD into dependency-aware GitHub issues", handler: handlers.toIssues },
@@ -46,6 +43,7 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
     { name: "tdd", description: "Run a strict red-green-refactor workflow", handler: handlers.tdd },
     { name: "address-open-issues", description: "Sweep open issues authored by you through triage, TDD, review, and remediation", handler: handlers.addressOpenIssues },
     { name: "learn-skill", description: "Create and refine a reusable skill", handler: handlers.learnSkill },
+    { name: "gsd", description: "Run imported Get-Shit-Done workflows (/gsd <workflow> [instruction])", handler: handlers.gsd },
   ] as const;
 
   for (const command of commands) {
