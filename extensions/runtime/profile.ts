@@ -12,8 +12,6 @@ export const WORKFLOW_TYPES = [
   "learn-skill",
   "remove-slop",
   "plan",
-  "to-prd",
-  "to-issues",
   "triage-issue",
   "tdd",
   "address-open-issues",
@@ -89,18 +87,6 @@ const DEFAULT_WORKFLOWS: Record<WorkflowType, WorkflowCommandConfig> = {
     promptFile: "plan-workflow.md",
     workflowFile: "plan-workflow.yaml",
     entryType: "khala-plan-command",
-  },
-  "to-prd": {
-    enabled: true,
-    promptFile: "to-prd-workflow.md",
-    workflowFile: "to-prd-workflow.yaml",
-    entryType: "khala-to-prd-command",
-  },
-  "to-issues": {
-    enabled: true,
-    promptFile: "to-issues-workflow.md",
-    workflowFile: "to-issues-workflow.yaml",
-    entryType: "khala-to-issues-command",
   },
   "triage-issue": {
     enabled: true,

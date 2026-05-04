@@ -29,8 +29,6 @@ import {
   parseRemoveSlopArgs,
   parseReviewArgs,
   parseTddArgs,
-  parseToIssuesArgs,
-  parseToPrdArgs,
   parseTriageIssueArgs,
   type WorkflowFlags,
 } from "./commands/parsers";
@@ -50,8 +48,6 @@ import {
   REVIEW_COMMAND_SOURCE,
   SIMPLIFY_COMMAND_SOURCE,
   TDD_COMMAND_SOURCE,
-  TO_ISSUES_COMMAND_SOURCE,
-  TO_PRD_COMMAND_SOURCE,
   TRIAGE_ISSUE_COMMAND_SOURCE,
 } from "./lib/constants";
 import { appendLine, exists, readText } from "./lib/io";
@@ -555,8 +551,6 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     loadProjectReviewGuidelines,
     parseRemoveSlopArgs,
     parsePlanArgs,
-    parseToPrdArgs,
-    parseToIssuesArgs,
     parseTriageIssueArgs,
     parseTddArgs,
     parseAddressOpenIssuesArgs,
@@ -574,8 +568,6 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       GIT_REVIEW_COMMAND_SOURCE,
       SIMPLIFY_COMMAND_SOURCE,
       PLAN_COMMAND_SOURCE,
-      TO_PRD_COMMAND_SOURCE,
-      TO_ISSUES_COMMAND_SOURCE,
       TRIAGE_ISSUE_COMMAND_SOURCE,
       TDD_COMMAND_SOURCE,
       ADDRESS_OPEN_ISSUES_COMMAND_SOURCE,

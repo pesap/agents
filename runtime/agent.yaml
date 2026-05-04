@@ -23,8 +23,6 @@ skills:
   - tdd-core
   - address-open-issues
   - triage-issue
-  - to-prd
-  - to-issues
   - uv
   - graphify
   - github
@@ -34,6 +32,7 @@ skills:
   - arco-optimization
   - skill-creator
   - plan
+  - vertical-slice-planning
   - nasa-guidelines
   - dead-code-proof
   - dependency-untangler

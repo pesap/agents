@@ -1,6 +1,7 @@
 ---
 skills:
   - plan
+  - vertical-slice-planning
 ---
 
 # Plan command prompt
@@ -18,4 +19,7 @@ Requirements:
 - Offer ADRs only for hard-to-reverse, surprising, trade-off decisions.
 - Create `CONTEXT.md` and `docs/adr/` lazily (only when needed).
 - If you mutate files (`edit`, `write`, or mutating `bash`), include: `Postflight: verify="<command_or_check>" result=<pass|fail|not-run>`.
+- After plan completion, ask once: "Do you want me to create vertical-slice issues now?"
+- If user says yes, break the plan into vertical slices (AFK/HITL + dependencies) and create issues.
+- Before creating issues, detect tracker platform and load the appropriate skill: `github` for GitHub repos, `gitlab` for GitLab repos.
 - End with: planned approach, edge cases covered, unresolved questions, files updated, risks, `Result: success|partial|failed`, and `Confidence: 0..1`.

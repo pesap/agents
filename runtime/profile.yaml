@@ -39,14 +39,6 @@ commands:
     enabled: true
     prompt: plan-workflow.md
     workflow: plan-workflow.yaml
-  to-prd:
-    enabled: true
-    prompt: to-prd-workflow.md
-    workflow: to-prd-workflow.yaml
-  to-issues:
-    enabled: true
-    prompt: to-issues-workflow.md
-    workflow: to-issues-workflow.yaml
   triage-issue:
     enabled: true
     prompt: triage-issue-workflow.md

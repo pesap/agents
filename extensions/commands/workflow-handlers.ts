@@ -60,8 +60,6 @@ export function createWorkflowCommandHandlers(params: {
   loadProjectReviewGuidelines: (cwd: string) => Promise<string | null>;
   parseRemoveSlopArgs: (args: string) => { scope: string };
   parsePlanArgs: (args: string) => { plan: string };
-  parseToPrdArgs: (args: string) => { context: string };
-  parseToIssuesArgs: (args: string) => { source: string };
   parseTriageIssueArgs: (args: string) => { problem: string };
   parseTddArgs: (args: string) => { goal: string; language: string };
   parseAddressOpenIssuesArgs: (args: string) => { limit: number; repo: string };
@@ -79,8 +77,6 @@ export function createWorkflowCommandHandlers(params: {
     GIT_REVIEW_COMMAND_SOURCE: string;
     SIMPLIFY_COMMAND_SOURCE: string;
     PLAN_COMMAND_SOURCE: string;
-    TO_PRD_COMMAND_SOURCE: string;
-    TO_ISSUES_COMMAND_SOURCE: string;
     TRIAGE_ISSUE_COMMAND_SOURCE: string;
     TDD_COMMAND_SOURCE: string;
     ADDRESS_OPEN_ISSUES_COMMAND_SOURCE: string;
@@ -93,8 +89,6 @@ export function createWorkflowCommandHandlers(params: {
   simplify: CommandHandler;
   removeSlop: CommandHandler;
   plan: CommandHandler;
-  toPrd: CommandHandler;
-  toIssues: CommandHandler;
   triageIssue: CommandHandler;
   tdd: CommandHandler;
   addressOpenIssues: CommandHandler;
@@ -120,8 +114,6 @@ export function createWorkflowCommandHandlers(params: {
     loadProjectReviewGuidelines,
     parseRemoveSlopArgs,
     parsePlanArgs,
-    parseToPrdArgs,
-    parseToIssuesArgs,
     parseTriageIssueArgs,
     parseTddArgs,
     parseAddressOpenIssuesArgs,
@@ -391,6 +383,9 @@ export function createWorkflowCommandHandlers(params: {
           "Instruction: Ask one question at a time and wait for user feedback before continuing.",
           "Instruction: If a question can be answered from code/docs, inspect first and continue with the next unresolved question.",
           "Instruction: Capture edge cases and trade-offs, then update CONTEXT.md/ADR docs lazily when terms/decisions are resolved.",
+          "Instruction: When plan is complete, ask the user exactly once whether to create vertical-slice issues now.",
+          "Instruction: If user says yes, produce a vertical-slice issue breakdown (AFK/HITL + dependencies) and then create issues.",
+          "Instruction: Detect issue tracker platform first and use matching skill: github for GitHub, gitlab for GitLab.",
           constants.POSTFLIGHT_INSTRUCTION,
           constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
         ],
@@ -399,62 +394,6 @@ export function createWorkflowCommandHandlers(params: {
           source: constants.PLAN_COMMAND_SOURCE,
         },
         startedMessage: `Started plan workflow (${plan}).`,
-      });
-    },
-
-    toPrd: async (args, ctx) => {
-      const parsed = parseToPrdArgs(args ?? "");
-      if (!ensureWorkflowSlotAvailable(ctx)) return;
-
-      await runWorkflowCommand({
-        ctx,
-        type: "to-prd",
-        input: parsed.context,
-        flags: {
-          source: constants.TO_PRD_COMMAND_SOURCE,
-        },
-        sections: [
-          `PRD source context: ${parsed.context}`,
-          `Source reference: ${constants.TO_PRD_COMMAND_SOURCE}`,
-          "",
-          "Instruction: Synthesize from current conversation and repository context. Do not run a long interview.",
-          "Instruction: Create a GitHub issue with the PRD when possible; otherwise provide markdown fallback and reason.",
-          constants.POSTFLIGHT_INSTRUCTION,
-          constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
-        ],
-        entry: {
-          context: parsed.context,
-          source: constants.TO_PRD_COMMAND_SOURCE,
-        },
-        startedMessage: `Started to-prd workflow (${parsed.context}).`,
-      });
-    },
-
-    toIssues: async (args, ctx) => {
-      const parsed = parseToIssuesArgs(args ?? "");
-      if (!ensureWorkflowSlotAvailable(ctx)) return;
-
-      await runWorkflowCommand({
-        ctx,
-        type: "to-issues",
-        input: parsed.source,
-        flags: {
-          source: constants.TO_ISSUES_COMMAND_SOURCE,
-        },
-        sections: [
-          `Issue source plan: ${parsed.source}`,
-          `Source reference: ${constants.TO_ISSUES_COMMAND_SOURCE}`,
-          "",
-          "Instruction: Break work into thin vertical slices with AFK/HITL labels and dependency ordering.",
-          "Instruction: Review slice breakdown with the user once before creating issues.",
-          constants.POSTFLIGHT_INSTRUCTION,
-          constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
-        ],
-        entry: {
-          sourceInput: parsed.source,
-          source: constants.TO_ISSUES_COMMAND_SOURCE,
-        },
-        startedMessage: `Started to-issues workflow (${parsed.source}).`,
       });
     },
 

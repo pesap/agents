@@ -151,16 +151,6 @@ export function parsePlanArgs(args: string): { plan: string } {
   return { plan: normalizeWhitespace(args) };
 }
 
-export function parseToPrdArgs(args: string): { context: string } {
-  const context = normalizeWhitespace(args);
-  return { context: context || "current conversation context" };
-}
-
-export function parseToIssuesArgs(args: string): { source: string } {
-  const source = normalizeWhitespace(args);
-  return { source: source || "current conversation context" };
-}
-
 export function parseTriageIssueArgs(args: string): { problem: string } {
   return { problem: normalizeWhitespace(args) };
 }
