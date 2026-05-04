@@ -32,6 +32,7 @@ graphify pi restart --global
 ## Pi command shortcuts in this repo
 - `/khala-memory-setup [project|global]`
 - `/khala-memory-restart [project|global]`
+- `/khala-memory-remove [project|global]`
 
 ## Practical usage
 - Build/update memory before deep planning or large refactors.

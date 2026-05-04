@@ -22,6 +22,7 @@ export interface CommandRegistrarDeps {
     gsd: CommandHandler;
     khalaMemorySetup: CommandHandler;
     khalaMemoryRestart: CommandHandler;
+    khalaMemoryRemove: CommandHandler;
   };
 }
 
@@ -44,6 +45,7 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
     { name: "gsd", description: "Run imported Get-Shit-Done workflows (/gsd <workflow> [instruction])", handler: handlers.gsd },
     { name: "khala-memory-setup", description: "Install Graphify memory integration via uv (project/global)", handler: handlers.khalaMemorySetup },
     { name: "khala-memory-restart", description: "Restart Graphify memory integration (project/global)", handler: handlers.khalaMemoryRestart },
+    { name: "khala-memory-remove", description: "Remove Graphify memory integration (project/global)", handler: handlers.khalaMemoryRemove },
   ] as const;
 
   for (const command of commands) {

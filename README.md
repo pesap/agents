@@ -51,6 +51,7 @@ pi -e https://github.com/pesap/agents -p "/khala"
 - `/gsd <workflow> [instruction]`
 - `/khala-memory-setup [project|global]` (uv-only Graphify setup)
 - `/khala-memory-restart [project|global]`
+- `/khala-memory-remove [project|global]`
 
 ## What changes when enabled
 
@@ -97,6 +98,10 @@ Setup command runs:
 Restart command runs:
 - `graphify pi restart` (tries scope flag first, then fallback)
 - fallback: `graphify restart`
+
+Remove command runs:
+- `graphify pi uninstall` (tries scope flag first, then fallback)
+- `uv tool uninstall graphifyy`
 
 ## Compliance modes
 

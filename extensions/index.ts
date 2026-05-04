@@ -21,6 +21,7 @@ import {
   parsePlanArgs,
   parseFeatureArgs,
   parseLearnSkillArgs,
+  parseKhalaMemoryRemoveArgs,
   parseKhalaMemoryRestartArgs,
   parseKhalaMemorySetupArgs,
   parseGsdArgs,
@@ -649,6 +650,37 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     }
   };
 
+  const khalaMemoryRemove = async (args: string | undefined, ctx: ExtensionCommandContext): Promise<void> => {
+    const parsed = parseKhalaMemoryRemoveArgs(args ?? "");
+    if (parsed.error) {
+      notify(ctx, parsed.error, "error");
+      return;
+    }
+
+    const installTargetFlag = parsed.scope === "global" ? "--global" : "--project";
+
+    try {
+      try {
+        await execFileAsync("graphify", ["pi", "uninstall", installTargetFlag], { cwd: ctx.cwd });
+      } catch {
+        await execFileAsync("graphify", ["pi", "uninstall"], { cwd: ctx.cwd });
+      }
+    } catch {
+      // best effort uninstall before uv removal
+    }
+
+    try {
+      await execFileAsync("uv", ["tool", "uninstall", "graphifyy"], { cwd: ctx.cwd });
+      notify(ctx, `Graphify memory removed (${parsed.scope}).`, "success");
+    } catch (error) {
+      notify(
+        ctx,
+        `Graphify remove failed: ${error instanceof Error ? error.message : String(error)}`,
+        "error",
+      );
+    }
+  };
+
   const { compliance: _unusedComplianceHandler, ...complianceGateHandlers } = complianceHandlers;
 
   registerCommands({
@@ -660,6 +692,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       khala,
       khalaMemorySetup,
       khalaMemoryRestart,
+      khalaMemoryRemove,
     },
   });
 }
