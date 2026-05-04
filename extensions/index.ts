@@ -4,7 +4,10 @@ import type {
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import { createBashTool } from "@mariozechner/pi-coding-agent";
+import registerFffExtension from "@ff-labs/pi-fff/src/index.ts";
 import { execFile } from "node:child_process";
+import registerThinkingStepsExtension from "pi-thinking-steps/index.ts";
+import registerLensExtension from "pi-lens/index.ts";
 import registerSubagentExtension from "pi-subagents/index.ts";
 import { promisify } from "node:util";
 import registerSubagentNotifyExtension from "pi-subagents/notify.ts";
@@ -42,9 +45,6 @@ import {
   LEARNING_VERSION,
   MEMORY_TAIL_LINES,
   POSTFLIGHT_INSTRUCTION,
-  PROMOTION_IMPROVEMENT_THRESHOLD,
-  PROMOTION_MIN_OBSERVATIONS,
-  PROMOTION_SUCCESS_THRESHOLD,
   REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
   REVIEW_COMMAND_SOURCE,
   SHIP_COMMAND_SOURCE,
@@ -52,15 +52,13 @@ import {
   TDD_COMMAND_SOURCE,
   TRIAGE_ISSUE_COMMAND_SOURCE,
 } from "./lib/constants";
-import { appendLine, exists, readText } from "./lib/io";
+import { exists, readText } from "./lib/io";
 import { normalizeWhitespace, slugify, summarizeEvidence } from "./lib/text";
 import { makeId, nowIso } from "./lib/time";
 import { DEFAULT_HOOK_CONFIG, loadHooksConfig, type HookConfig } from "./hooks/config";
 import {
   ensureLearningStore,
   loadProjectReviewGuidelines,
-  maybeEmitPromotionHint,
-  type LearningObservation,
   type LearningPaths,
 } from "./learning/store";
 import {
@@ -100,7 +98,6 @@ import { notifyWorkflowStarted } from "./workflows/notifications";
 import {
   extractLastAssistantText,
   inferOutcomeFromText,
-  type WorkflowOutcome,
 } from "./runtime/assistant";
 import {
   createWorkflowReaders,
@@ -140,6 +137,21 @@ const runtimeState = createRuntimeState();
 let sessionFirstPrinciplesDefaults = { ...runtimeState.firstPrinciplesConfig };
 
 const SUBAGENT_TOOL_NAMES = new Set(["subagent", "subagent_status"]);
+const FFF_COMMAND_NAMES = new Set(["fff-mode", "fff-health", "fff-rescan"]);
+const FFF_TOOL_NAMES = new Set(["ffgrep", "fffind", "fff-multi-grep"]);
+const THINKING_STEPS_COMMAND_NAMES = new Set(["thinking-steps"]);
+const LENS_COMMAND_NAMES = new Set([
+  "lens-booboo",
+  "lens-tdi",
+  "lens-health",
+  "lens-tools",
+  "lens-allow-edit",
+]);
+const LENS_TOOL_NAMES = new Set([
+  "ast_grep_search",
+  "ast_grep_replace",
+  "lsp_navigation",
+]);
 
 const workflowReaders = createWorkflowReaders({
   skillflowsDir: RUNTIME_PATHS.skillflowsDir,
@@ -157,25 +169,78 @@ function hasAnyRegisteredTool(pi: ExtensionAPI, names: Set<string>): boolean {
   return pi.getAllTools().some((tool) => names.has(tool.name));
 }
 
+function hasAnyRegisteredCommand(pi: ExtensionAPI, names: Set<string>): boolean {
+  return pi.getCommands().some((command) => names.has(command.name));
+}
+
+function warnBundledExtensionLoadFailure(
+  ctx: Pick<ExtensionContext, "hasUI" | "ui"> | undefined,
+  extensionName: string,
+  error: unknown,
+): void {
+  const message = `Failed to load bundled ${extensionName}: ${error instanceof Error ? error.message : String(error)}`;
+  if (ctx) {
+    notify(ctx, message, "warning");
+    return;
+  }
+  console.warn(message);
+}
+
+function registerBundledExtension(
+  ctx: Pick<ExtensionContext, "hasUI" | "ui"> | undefined,
+  extensionName: string,
+  isAlreadyRegistered: () => boolean,
+  register: () => void,
+): void {
+  if (isAlreadyRegistered()) return;
+  try {
+    register();
+  } catch (error) {
+    warnBundledExtensionLoadFailure(ctx, extensionName, error);
+  }
+}
+
 function ensureBundledExtensions(
   pi: ExtensionAPI,
-  ctx: Pick<ExtensionContext, "hasUI" | "ui">,
+  ctx?: Pick<ExtensionContext, "hasUI" | "ui">,
 ): void {
   if (bundledExtensionsInitialized) return;
   bundledExtensionsInitialized = true;
 
-  if (!hasAnyRegisteredTool(pi, SUBAGENT_TOOL_NAMES)) {
-    try {
+  registerBundledExtension(
+    ctx,
+    "pi-subagents",
+    () => hasAnyRegisteredTool(pi, SUBAGENT_TOOL_NAMES),
+    () => {
       registerSubagentExtension(pi);
       registerSubagentNotifyExtension(pi);
-    } catch (error) {
-      notify(
-        ctx,
-        `Failed to load bundled pi-subagents: ${error instanceof Error ? error.message : String(error)}`,
-        "warning",
-      );
-    }
-  }
+    },
+  );
+
+  registerBundledExtension(
+    ctx,
+    "@ff-labs/pi-fff",
+    () =>
+      hasAnyRegisteredCommand(pi, FFF_COMMAND_NAMES) ||
+      hasAnyRegisteredTool(pi, FFF_TOOL_NAMES),
+    () => registerFffExtension(pi),
+  );
+
+  registerBundledExtension(
+    ctx,
+    "pi-thinking-steps",
+    () => hasAnyRegisteredCommand(pi, THINKING_STEPS_COMMAND_NAMES),
+    () => registerThinkingStepsExtension(pi),
+  );
+
+  registerBundledExtension(
+    ctx,
+    "pi-lens",
+    () =>
+      hasAnyRegisteredCommand(pi, LENS_COMMAND_NAMES) ||
+      hasAnyRegisteredTool(pi, LENS_TOOL_NAMES),
+    () => registerLensExtension(pi),
+  );
 }
 
 function isPreflightClarify(value: unknown): value is PreflightClarify {
@@ -284,6 +349,8 @@ async function completeWorkflowTracking(
 }
 
 export default function khalaExtension(pi: ExtensionAPI): void {
+  ensureBundledExtensions(pi);
+
   const bashTool = createBashTool(process.cwd(), {
     spawnHook: (spawnContext) => {
       if (!runtimeState.agentEnabled) return spawnContext;
@@ -315,8 +382,6 @@ export default function khalaExtension(pi: ExtensionAPI): void {
 
   pi.registerTool(bashTool);
   pi.on("session_start", async (_event, ctx) => {
-    ensureBundledExtensions(pi, ctx);
-
     const [hookConfig, profileLoad] = await Promise.all([
       loadHooksConfig(RUNTIME_PATHS.hooksConfigPath, DEFAULT_HOOK_CONFIG),
       loadRuntimeProfile(RUNTIME_PATHS.profileConfigPath).catch((error) => ({

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { buildLifecycleHookMarkdown, type HookConfig } from "../hooks/config";
 import { readText, readTextIfExists } from "../lib/io";
-import { type LearningPaths } from "../learning/store";
+import type { LearningPaths } from "../learning/store";
 import {
   parseFirstPrinciplesConfig,
   type FirstPrinciplesConfig,

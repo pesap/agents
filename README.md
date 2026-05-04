@@ -129,6 +129,6 @@ Persistent defaults are in:
 
 ## Notes
 
-- This package auto-loads bundled dependencies (`pi-subagents`, `@ff-labs/pi-fff`).
+- This package auto-loads bundled dependencies (`pi-subagents`, `@ff-labs/pi-fff`, `pi-thinking-steps`, `pi-lens`).
 - It uses Pi package manifests and does not edit `~/.pi/agent/settings.json` at runtime.
 - GSD workflow material was adapted from: https://github.com/gsd-build/get-shit-done
