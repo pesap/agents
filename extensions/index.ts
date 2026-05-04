@@ -136,23 +136,6 @@ let bundledExtensionsInitialized = false;
 const runtimeState = createRuntimeState();
 let sessionFirstPrinciplesDefaults = { ...runtimeState.firstPrinciplesConfig };
 
-const SUBAGENT_TOOL_NAMES = new Set(["subagent", "subagent_status"]);
-const FFF_COMMAND_NAMES = new Set(["fff-mode", "fff-health", "fff-rescan"]);
-const FFF_TOOL_NAMES = new Set(["ffgrep", "fffind", "fff-multi-grep"]);
-const THINKING_STEPS_COMMAND_NAMES = new Set(["thinking-steps"]);
-const LENS_COMMAND_NAMES = new Set([
-  "lens-booboo",
-  "lens-tdi",
-  "lens-health",
-  "lens-tools",
-  "lens-allow-edit",
-]);
-const LENS_TOOL_NAMES = new Set([
-  "ast_grep_search",
-  "ast_grep_replace",
-  "lsp_navigation",
-]);
-
 const workflowReaders = createWorkflowReaders({
   skillflowsDir: RUNTIME_PATHS.skillflowsDir,
   commandsDir: RUNTIME_PATHS.commandsDir,
@@ -163,14 +146,6 @@ const execFileAsync = promisify(execFile);
 function prependInterceptedCommandsPath(command: string): string {
   const escapedPath = RUNTIME_PATHS.interceptedCommandsDir.replace(/"/g, '\\"');
   return `export PATH="${escapedPath}:$PATH"\n${command}`;
-}
-
-function hasAnyRegisteredTool(pi: ExtensionAPI, names: Set<string>): boolean {
-  return pi.getAllTools().some((tool) => names.has(tool.name));
-}
-
-function hasAnyRegisteredCommand(pi: ExtensionAPI, names: Set<string>): boolean {
-  return pi.getCommands().some((command) => names.has(command.name));
 }
 
 function warnBundledExtensionLoadFailure(
@@ -189,10 +164,8 @@ function warnBundledExtensionLoadFailure(
 function registerBundledExtension(
   ctx: Pick<ExtensionContext, "hasUI" | "ui"> | undefined,
   extensionName: string,
-  isAlreadyRegistered: () => boolean,
   register: () => void,
 ): void {
-  if (isAlreadyRegistered()) return;
   try {
     register();
   } catch (error) {
@@ -207,40 +180,16 @@ function ensureBundledExtensions(
   if (bundledExtensionsInitialized) return;
   bundledExtensionsInitialized = true;
 
-  registerBundledExtension(
-    ctx,
-    "pi-subagents",
-    () => hasAnyRegisteredTool(pi, SUBAGENT_TOOL_NAMES),
-    () => {
-      registerSubagentExtension(pi);
-      registerSubagentNotifyExtension(pi);
-    },
-  );
+  registerBundledExtension(ctx, "pi-subagents", () => {
+    registerSubagentExtension(pi);
+    registerSubagentNotifyExtension(pi);
+  });
 
-  registerBundledExtension(
-    ctx,
-    "@ff-labs/pi-fff",
-    () =>
-      hasAnyRegisteredCommand(pi, FFF_COMMAND_NAMES) ||
-      hasAnyRegisteredTool(pi, FFF_TOOL_NAMES),
-    () => registerFffExtension(pi),
-  );
+  registerBundledExtension(ctx, "@ff-labs/pi-fff", () => registerFffExtension(pi));
 
-  registerBundledExtension(
-    ctx,
-    "pi-thinking-steps",
-    () => hasAnyRegisteredCommand(pi, THINKING_STEPS_COMMAND_NAMES),
-    () => registerThinkingStepsExtension(pi),
-  );
+  registerBundledExtension(ctx, "pi-thinking-steps", () => registerThinkingStepsExtension(pi));
 
-  registerBundledExtension(
-    ctx,
-    "pi-lens",
-    () =>
-      hasAnyRegisteredCommand(pi, LENS_COMMAND_NAMES) ||
-      hasAnyRegisteredTool(pi, LENS_TOOL_NAMES),
-    () => registerLensExtension(pi),
-  );
+  registerBundledExtension(ctx, "pi-lens", () => registerLensExtension(pi));
 }
 
 function isPreflightClarify(value: unknown): value is PreflightClarify {
