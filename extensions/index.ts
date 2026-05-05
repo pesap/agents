@@ -655,6 +655,24 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     await complianceHandlers.compliance(compliancePreset, ctx);
   };
 
+  const graphify = async (
+    args: string | undefined,
+    ctx: ExtensionCommandContext,
+  ): Promise<void> => {
+    const request = normalizeWhitespace(args ?? "") || ".";
+    pi.sendUserMessage(
+      [
+        `Graphify request: /graphify ${request}`,
+        "",
+        "Use the installed Graphify integration for Pi. If the graphify skill is available, follow it as the source of truth.",
+        "For query/path/explain/add/hook/merge-graphs style requests, prefer the `graphify` CLI directly and summarize the output.",
+        "For corpus build/update requests such as `/graphify .`, `/graphify ./docs --update`, `/graphify . --cluster-only`, `/graphify . --no-viz`, or `/graphify . --wiki`, execute the Graphify skill workflow for those arguments.",
+        "If Graphify is not installed, tell the user to run `/khala-memory-setup project` first.",
+      ].join("\n"),
+    );
+    notify(ctx, `Queued Graphify request: /graphify ${request}`, "info");
+  };
+
   const khalaMemorySetup = async (
     args: string | undefined,
     ctx: ExtensionCommandContext,
@@ -782,6 +800,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       ...workflowHandlers,
       endAgent: agentHandlers.endAgent,
       khala,
+      graphify,
       khalaMemorySetup,
       khalaMemoryRestart,
       khalaMemoryRemove,

@@ -26,6 +26,7 @@ export interface CommandRegistrarDeps {
     tdd: CommandHandler;
     addressOpenIssues: CommandHandler;
     learnSkill: CommandHandler;
+    graphify: CommandHandler;
     khalaMemorySetup: CommandHandler;
     khalaMemoryRestart: CommandHandler;
     khalaMemoryRemove: CommandHandler;
@@ -113,6 +114,11 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
       name: "learn-skill",
       description: "Create and refine a reusable skill",
       handler: handlers.learnSkill,
+    },
+    {
+      name: "graphify",
+      description: "Run the installed Graphify skill/CLI workflow",
+      handler: handlers.graphify,
     },
     {
       name: "khala-memory-setup",
