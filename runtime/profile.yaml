@@ -59,7 +59,3 @@ commands:
     enabled: true
     prompt: learn-skill-workflow.md
     workflow: learn-skill-workflow.yaml
-  gsd:
-    enabled: true
-    prompt: gsd-workflow.md
-    workflow: gsd-workflow.yaml

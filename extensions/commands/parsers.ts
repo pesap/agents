@@ -3,7 +3,11 @@ import path from "node:path";
 import { RISK_APPROVAL_TTL_MINUTES } from "../lib/constants";
 import { removeFlag } from "../lib/flags";
 import { normalizeWhitespace } from "../lib/text";
-import type { PolicyMode, PostflightRecord, PreflightRecord } from "../policy/first-principles";
+import type {
+  PolicyMode,
+  PostflightRecord,
+  PreflightRecord,
+} from "../policy/first-principles";
 
 export type WorkflowFlagValue = string | number | boolean | null | string[];
 export type WorkflowFlags = Record<string, WorkflowFlagValue>;
@@ -42,7 +46,10 @@ const COMPLIANCE_PRESET_ALIASES: Record<string, CompliancePreset> = {
   defaults: "reset",
 };
 
-export function parseComplianceArgs(args: string): { preset: CompliancePreset; error?: string } {
+export function parseComplianceArgs(args: string): {
+  preset: CompliancePreset;
+  error?: string;
+} {
   const value = normalizeWhitespace(args).toLowerCase();
   if (!value) {
     return { preset: "status" };
@@ -59,13 +66,21 @@ export function parseComplianceArgs(args: string): { preset: CompliancePreset; e
   };
 }
 
-export function parseApproveRiskArgs(args: string): { reason: string; ttlMinutes: number; error?: string } {
+export function parseApproveRiskArgs(args: string): {
+  reason: string;
+  ttlMinutes: number;
+  error?: string;
+} {
   let rest = normalizeWhitespace(args);
   const ttlResult = removeFlag(rest, /(^|\s)--ttl\s+(\d+)(\s|$)/);
   rest = ttlResult.value;
 
-  const ttlCandidate = Number(ttlResult.match?.[2] ?? RISK_APPROVAL_TTL_MINUTES);
-  const ttlMinutes = Number.isFinite(ttlCandidate) ? Math.max(1, Math.min(120, Math.floor(ttlCandidate))) : RISK_APPROVAL_TTL_MINUTES;
+  const ttlCandidate = Number(
+    ttlResult.match?.[2] ?? RISK_APPROVAL_TTL_MINUTES,
+  );
+  const ttlMinutes = Number.isFinite(ttlCandidate)
+    ? Math.max(1, Math.min(120, Math.floor(ttlCandidate)))
+    : RISK_APPROVAL_TTL_MINUTES;
   if (!rest) {
     return {
       reason: "",
@@ -80,43 +95,56 @@ export function parseApproveRiskArgs(args: string): { reason: string; ttlMinutes
   };
 }
 
-export function parsePreflightArgs(args: string, parsePreflightLine: (line: string) => PreflightRecord | null): ParseRecordResult<PreflightRecord> {
+export function parsePreflightArgs(
+  args: string,
+  parsePreflightLine: (line: string) => PreflightRecord | null,
+): ParseRecordResult<PreflightRecord> {
   const candidate = args.trim();
   if (!candidate) {
     return {
-      error: "Usage: /preflight Preflight: skill=<name|none> reason=\"<short>\" clarify=<yes|no>",
+      error:
+        'Usage: /preflight Preflight: skill=<name|none> reason="<short>" clarify=<yes|no>',
     };
   }
 
   const parsed = parsePreflightLine(candidate);
   if (!parsed) {
     return {
-      error: "Invalid preflight. Expected: Preflight: skill=<name|none> reason=\"<short>\" clarify=<yes|no>",
+      error:
+        'Invalid preflight. Expected: Preflight: skill=<name|none> reason="<short>" clarify=<yes|no>',
     };
   }
 
   return { record: parsed };
 }
 
-export function parsePostflightArgs(args: string, parsePostflightLine: (line: string) => PostflightRecord | null): ParseRecordResult<PostflightRecord> {
+export function parsePostflightArgs(
+  args: string,
+  parsePostflightLine: (line: string) => PostflightRecord | null,
+): ParseRecordResult<PostflightRecord> {
   const candidate = args.trim();
   if (!candidate) {
     return {
-      error: "Usage: /postflight Postflight: verify=\"<command_or_check>\" result=<pass|fail|not-run>",
+      error:
+        'Usage: /postflight Postflight: verify="<command_or_check>" result=<pass|fail|not-run>',
     };
   }
 
   const parsed = parsePostflightLine(candidate);
   if (!parsed) {
     return {
-      error: "Invalid postflight. Expected: Postflight: verify=\"<command_or_check>\" result=<pass|fail|not-run>",
+      error:
+        'Invalid postflight. Expected: Postflight: verify="<command_or_check>" result=<pass|fail|not-run>',
     };
   }
 
   return { record: parsed };
 }
 
-export function parseDebugArgs(args: string): { problem: string; fix: boolean } {
+export function parseDebugArgs(args: string): {
+  problem: string;
+  fix: boolean;
+} {
   let rest = normalizeWhitespace(args);
   const fix = /(^|\s)--fix(\s|$)/.test(rest);
   rest = normalizeWhitespace(rest.replace(/(^|\s)--fix(\s|$)/g, " "));
@@ -128,7 +156,10 @@ export function parseDebugArgs(args: string): { problem: string; fix: boolean } 
   };
 }
 
-export function parseFeatureArgs(args: string): { request: string; ship: boolean } {
+export function parseFeatureArgs(args: string): {
+  request: string;
+  ship: boolean;
+} {
   let rest = normalizeWhitespace(args);
   const ship = /(^|\s)--ship(\s|$)/.test(rest);
   rest = normalizeWhitespace(rest.replace(/(^|\s)--ship(\s|$)/g, " "));
@@ -141,7 +172,10 @@ export function parseFeatureArgs(args: string): { request: string; ship: boolean
 }
 
 export function parseRemoveSlopArgs(args: string): { scope: string } {
-  const scope = removeFlag(normalizeWhitespace(args), /(^|\s)--parallel\s+\d+(\s|$)/).value;
+  const scope = removeFlag(
+    normalizeWhitespace(args),
+    /(^|\s)--parallel\s+\d+(\s|$)/,
+  ).value;
   return {
     scope: scope || "current repository",
   };
@@ -160,7 +194,9 @@ export function parseTddArgs(args: string): { goal: string; language: string } {
 
   const languageResult = removeFlag(rest, /(^|\s)--lang\s+(\S+)(\s|$)/);
   rest = languageResult.value;
-  const language = normalizeWhitespace(languageResult.match?.[2] ?? "auto").toLowerCase();
+  const language = normalizeWhitespace(
+    languageResult.match?.[2] ?? "auto",
+  ).toLowerCase();
 
   return {
     goal: rest,
@@ -168,7 +204,10 @@ export function parseTddArgs(args: string): { goal: string; language: string } {
   };
 }
 
-export function parseAddressOpenIssuesArgs(args: string): { limit: number; repo: string } {
+export function parseAddressOpenIssuesArgs(args: string): {
+  limit: number;
+  repo: string;
+} {
   let rest = normalizeWhitespace(args);
 
   const limitResult = removeFlag(rest, /(^|\s)--limit\s+(\d+)(\s|$)/);
@@ -218,7 +257,10 @@ export function parseLearnSkillArgs(args: string): {
   };
 }
 
-export function parseKhalaMemorySetupArgs(args: string): { scope: "project" | "global"; error?: string } {
+export function parseKhalaMemorySetupArgs(args: string): {
+  scope: "project" | "global";
+  error?: string;
+} {
   const scope = normalizeWhitespace(args).toLowerCase();
   if (!scope) {
     return { scope: "project" };
@@ -234,7 +276,10 @@ export function parseKhalaMemorySetupArgs(args: string): { scope: "project" | "g
   };
 }
 
-export function parseKhalaMemoryRestartArgs(args: string): { scope: "project" | "global"; error?: string } {
+export function parseKhalaMemoryRestartArgs(args: string): {
+  scope: "project" | "global";
+  error?: string;
+} {
   const scope = normalizeWhitespace(args).toLowerCase();
   if (!scope) {
     return { scope: "project" };
@@ -250,7 +295,10 @@ export function parseKhalaMemoryRestartArgs(args: string): { scope: "project" | 
   };
 }
 
-export function parseKhalaMemoryRemoveArgs(args: string): { scope: "project" | "global"; error?: string } {
+export function parseKhalaMemoryRemoveArgs(args: string): {
+  scope: "project" | "global";
+  error?: string;
+} {
   const scope = normalizeWhitespace(args).toLowerCase();
   if (!scope) {
     return { scope: "project" };
@@ -263,23 +311,6 @@ export function parseKhalaMemoryRemoveArgs(args: string): { scope: "project" | "
   return {
     scope: "project",
     error: "Usage: /khala-memory-remove [project|global]",
-  };
-}
-
-export function parseGsdArgs(args: string): { workflow: string; instruction: string } {
-  const trimmed = normalizeWhitespace(args);
-  if (!trimmed) {
-    return { workflow: "help", instruction: "" };
-  }
-
-  const firstSpace = trimmed.indexOf(" ");
-  if (firstSpace < 0) {
-    return { workflow: trimmed.toLowerCase(), instruction: "" };
-  }
-
-  return {
-    workflow: trimmed.slice(0, firstSpace).toLowerCase(),
-    instruction: normalizeWhitespace(trimmed.slice(firstSpace + 1)),
   };
 }
 
@@ -345,7 +376,11 @@ function isResolvableReviewPath(entry: string, cwd: string): boolean {
   );
 }
 
-export function parseReviewArgs(args: string, cwd: string, commandName = "review"): ParsedReviewArgsResult {
+export function parseReviewArgs(
+  args: string,
+  cwd: string,
+  commandName = "review",
+): ParsedReviewArgsResult {
   const usage = `Usage: /${commandName} [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`;
   const trimmed = args.trim();
   if (!trimmed) {
@@ -359,7 +394,10 @@ export function parseReviewArgs(args: string, cwd: string, commandName = "review
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
     if (token === "--extra") {
-      const extra = tokens.slice(i + 1).join(" ").trim();
+      const extra = tokens
+        .slice(i + 1)
+        .join(" ")
+        .trim();
       if (!extra) {
         return { error: usage };
       }
@@ -389,7 +427,9 @@ export function parseReviewArgs(args: string, cwd: string, commandName = "review
   if (mode === "branch") {
     const branch = rest[0]?.trim();
     if (!branch || rest.length !== 1) {
-      return { error: `Usage: /${commandName} branch <base-branch> [--extra "focus"]` };
+      return {
+        error: `Usage: /${commandName} branch <base-branch> [--extra "focus"]`,
+      };
     }
 
     return { mode: "branch", branch, extraInstruction };
@@ -407,23 +447,34 @@ export function parseReviewArgs(args: string, cwd: string, commandName = "review
   if (mode === "pr") {
     const pr = rest[0]?.trim();
     if (!pr || rest.length !== 1) {
-      return { error: `Usage: /${commandName} pr <number|url> [--extra "focus"]` };
+      return {
+        error: `Usage: /${commandName} pr <number|url> [--extra "focus"]`,
+      };
     }
 
     return { mode: "pr", pr, extraInstruction };
   }
 
   if (mode === "folder" || mode === "file") {
-    const paths = rest.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+    const paths = rest
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
     if (paths.length === 0) {
-      return { error: `Usage: /${commandName} ${mode} <path ...> [--extra "focus"]` };
+      return {
+        error: `Usage: /${commandName} ${mode} <path ...> [--extra "focus"]`,
+      };
     }
 
     return { mode: "folder", paths, extraInstruction };
   }
 
-  const directPaths = positional.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
-  if (directPaths.length > 0 && directPaths.every((entry) => isResolvableReviewPath(entry, cwd))) {
+  const directPaths = positional
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  if (
+    directPaths.length > 0 &&
+    directPaths.every((entry) => isResolvableReviewPath(entry, cwd))
+  ) {
     return { mode: "folder", paths: directPaths, extraInstruction };
   }
 
@@ -478,36 +529,45 @@ function buildScopedTarget(
 
 export function buildReviewTarget(parsed: ParsedReviewArgs): ScopedTarget {
   return buildScopedTarget(parsed, {
-    branch: (branch) => [
-      `Review changes against base branch \`${branch}\`.`,
-      `Find merge base first, e.g. \`git merge-base HEAD ${branch}\`, then inspect diff from that SHA.`,
-    ].join(" "),
-    commit: (commit) => `Review only changes introduced by commit \`${commit}\` (use \`git show ${commit}\` or equivalent).`,
-    pr: (pr) => [
-      `Review pull request reference \`${pr}\`.`,
-      "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch before reviewing.",
-    ].join(" "),
-    folder: (paths) => `Snapshot review only for files/folders in: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
-    uncommitted: "Review staged, unstaged, and untracked changes in the current workspace.",
+    branch: (branch) =>
+      [
+        `Review changes against base branch \`${branch}\`.`,
+        `Find merge base first, e.g. \`git merge-base HEAD ${branch}\`, then inspect diff from that SHA.`,
+      ].join(" "),
+    commit: (commit) =>
+      `Review only changes introduced by commit \`${commit}\` (use \`git show ${commit}\` or equivalent).`,
+    pr: (pr) =>
+      [
+        `Review pull request reference \`${pr}\`.`,
+        "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch before reviewing.",
+      ].join(" "),
+    folder: (paths) =>
+      `Snapshot review only for files/folders in: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
+    uncommitted:
+      "Review staged, unstaged, and untracked changes in the current workspace.",
   });
 }
 
 export function buildSimplifyTarget(parsed: ParsedReviewArgs): ScopedTarget {
   return buildScopedTarget(parsed, {
-    branch: (branch) => [
-      `Simplify code changed against base branch \`${branch}\` while preserving exact behavior.`,
-      `Find merge base first, e.g. \`git merge-base HEAD ${branch}\`, then work from that diff scope.`,
-    ].join(" "),
-    commit: (commit) => `Simplify only code introduced by commit \`${commit}\` while keeping output and API behavior unchanged.`,
-    pr: (pr) => [
-      `Simplify code in pull request reference \`${pr}\` with no behavior drift.`,
-      "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch first.",
-    ].join(" "),
-    folder: (paths) => `Simplify code only in these files/folders: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
-    uncommitted: "Simplify staged, unstaged, and untracked code in the current workspace while preserving exact functionality.",
+    branch: (branch) =>
+      [
+        `Simplify code changed against base branch \`${branch}\` while preserving exact behavior.`,
+        `Find merge base first, e.g. \`git merge-base HEAD ${branch}\`, then work from that diff scope.`,
+      ].join(" "),
+    commit: (commit) =>
+      `Simplify only code introduced by commit \`${commit}\` while keeping output and API behavior unchanged.`,
+    pr: (pr) =>
+      [
+        `Simplify code in pull request reference \`${pr}\` with no behavior drift.`,
+        "If GitHub CLI is available, resolve PR metadata and checkout or diff PR branch against its base branch first.",
+      ].join(" "),
+    folder: (paths) =>
+      `Simplify code only in these files/folders: ${paths.join(", ")}. Read files directly, do not assume git diff context.`,
+    uncommitted:
+      "Simplify staged, unstaged, and untracked code in the current workspace while preserving exact functionality.",
   });
 }
-
 
 export function buildSkillTemplate(skillName: string, topic: string): string {
   const summary = topic || skillName;

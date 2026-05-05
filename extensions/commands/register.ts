@@ -1,6 +1,12 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+} from "@mariozechner/pi-coding-agent";
 
-type CommandHandler = (args: string | undefined, ctx: ExtensionCommandContext) => Promise<void>;
+type CommandHandler = (
+  args: string | undefined,
+  ctx: ExtensionCommandContext,
+) => Promise<void>;
 
 export interface CommandRegistrarDeps {
   pi: ExtensionAPI;
@@ -20,7 +26,6 @@ export interface CommandRegistrarDeps {
     tdd: CommandHandler;
     addressOpenIssues: CommandHandler;
     learnSkill: CommandHandler;
-    gsd: CommandHandler;
     khalaMemorySetup: CommandHandler;
     khalaMemoryRestart: CommandHandler;
     khalaMemoryRemove: CommandHandler;
@@ -29,25 +34,102 @@ export interface CommandRegistrarDeps {
 
 export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
   const commands = [
-    { name: "khala", description: "Initialize khala context injection and optionally set compliance mode (/khala enforce|warn|monitor|reset|status)", handler: handlers.khala },
-    { name: "end-agent", description: "Stop khala context injection for this session", handler: handlers.endAgent },
-    { name: "approve-risk", description: "Record checker approval for one high-risk command", handler: handlers.approveRisk },
-    { name: "preflight", description: "Set mutation intent line for first-principles gate", handler: handlers.preflight },
-    { name: "postflight", description: "Record verification evidence line for first-principles gate", handler: handlers.postflight },
-    { name: "debug", description: "Run the khala debug workflow", handler: handlers.debug },
-    { name: "review", description: "Run the khala code review workflow (adapted from pi-review)", handler: handlers.review },
-    { name: "git-review", description: "Run git history diagnostics before reading code", handler: handlers.gitReview },
-    { name: "simplify", description: "Run the khala cleanup and code-quality workflow", handler: handlers.simplify },
-    { name: "plan", description: "Run rigorous planning workflow with edge-case capture and context/ADR updates", handler: handlers.plan },
-    { name: "ship", description: "Simplify, run CI, push branch, and open PR if missing", handler: handlers.ship },
-    { name: "triage-issue", description: "Investigate a bug and create a TDD fix-plan issue", handler: handlers.triageIssue },
-    { name: "tdd", description: "Run a strict red-green-refactor workflow", handler: handlers.tdd },
-    { name: "address-open-issues", description: "Sweep open issues authored by you through triage, TDD, review, and remediation", handler: handlers.addressOpenIssues },
-    { name: "learn-skill", description: "Create and refine a reusable skill", handler: handlers.learnSkill },
-    { name: "gsd", description: "Run imported Get-Shit-Done workflows (/gsd <workflow> [instruction])", handler: handlers.gsd },
-    { name: "khala-memory-setup", description: "Install Graphify memory integration via uv (project/global)", handler: handlers.khalaMemorySetup },
-    { name: "khala-memory-restart", description: "Restart Graphify memory integration (project/global)", handler: handlers.khalaMemoryRestart },
-    { name: "khala-memory-remove", description: "Remove Graphify memory integration (project/global)", handler: handlers.khalaMemoryRemove },
+    {
+      name: "khala",
+      description:
+        "Initialize khala context injection and optionally set compliance mode (/khala enforce|warn|monitor|reset|status)",
+      handler: handlers.khala,
+    },
+    {
+      name: "end-agent",
+      description: "Stop khala context injection for this session",
+      handler: handlers.endAgent,
+    },
+    {
+      name: "approve-risk",
+      description: "Record checker approval for one high-risk command",
+      handler: handlers.approveRisk,
+    },
+    {
+      name: "preflight",
+      description: "Set mutation intent line for first-principles gate",
+      handler: handlers.preflight,
+    },
+    {
+      name: "postflight",
+      description:
+        "Record verification evidence line for first-principles gate",
+      handler: handlers.postflight,
+    },
+    {
+      name: "debug",
+      description: "Run the khala debug workflow",
+      handler: handlers.debug,
+    },
+    {
+      name: "review",
+      description:
+        "Run the khala code review workflow (adapted from pi-review)",
+      handler: handlers.review,
+    },
+    {
+      name: "git-review",
+      description: "Run git history diagnostics before reading code",
+      handler: handlers.gitReview,
+    },
+    {
+      name: "simplify",
+      description: "Run the khala cleanup and code-quality workflow",
+      handler: handlers.simplify,
+    },
+    {
+      name: "plan",
+      description:
+        "Run rigorous planning workflow with edge-case capture and context/ADR updates",
+      handler: handlers.plan,
+    },
+    {
+      name: "ship",
+      description: "Simplify, run CI, push branch, and open PR if missing",
+      handler: handlers.ship,
+    },
+    {
+      name: "triage-issue",
+      description: "Investigate a bug and create a TDD fix-plan issue",
+      handler: handlers.triageIssue,
+    },
+    {
+      name: "tdd",
+      description: "Run a strict red-green-refactor workflow",
+      handler: handlers.tdd,
+    },
+    {
+      name: "address-open-issues",
+      description:
+        "Sweep open issues authored by you through triage, TDD, review, and remediation",
+      handler: handlers.addressOpenIssues,
+    },
+    {
+      name: "learn-skill",
+      description: "Create and refine a reusable skill",
+      handler: handlers.learnSkill,
+    },
+    {
+      name: "khala-memory-setup",
+      description:
+        "Install Graphify memory integration via uv (project/global)",
+      handler: handlers.khalaMemorySetup,
+    },
+    {
+      name: "khala-memory-restart",
+      description: "Restart Graphify memory integration (project/global)",
+      handler: handlers.khalaMemoryRestart,
+    },
+    {
+      name: "khala-memory-remove",
+      description: "Remove Graphify memory integration (project/global)",
+      handler: handlers.khalaMemoryRemove,
+    },
   ] as const;
 
   for (const command of commands) {

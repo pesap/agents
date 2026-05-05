@@ -37,7 +37,6 @@
   },
   "dependencies": {
     "@ff-labs/pi-fff": "^0.6.4",
-    "get-shit-done-cc": "^1.40.0",
     "js-yaml": "^4.1.1",
     "pi-lens": "^3.8.40",
     "pi-subagents": "^0.17.5",
@@ -45,7 +44,6 @@
   },
   "bundledDependencies": [
     "@ff-labs/pi-fff",
-    "get-shit-done-cc",
     "pi-subagents",
     "pi-thinking-steps",
     "pi-lens"

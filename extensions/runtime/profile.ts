@@ -1,7 +1,10 @@
 import { load as loadYaml } from "js-yaml";
 import path from "node:path";
 import { exists, isRecord, readTextIfExists } from "../lib/io";
-import { parsePolicyMode, type FirstPrinciplesConfig } from "../policy/first-principles";
+import {
+  parsePolicyMode,
+  type FirstPrinciplesConfig,
+} from "../policy/first-principles";
 
 export const WORKFLOW_TYPES = [
   "debug",
@@ -16,7 +19,6 @@ export const WORKFLOW_TYPES = [
   "triage-issue",
   "tdd",
   "address-open-issues",
-  "gsd",
 ] as const;
 
 export type WorkflowType = (typeof WORKFLOW_TYPES)[number];
@@ -119,12 +121,6 @@ const DEFAULT_WORKFLOWS: Record<WorkflowType, WorkflowCommandConfig> = {
     workflowFile: "learn-skill-workflow.yaml",
     entryType: "khala-learn-skill-command",
   },
-  gsd: {
-    enabled: true,
-    promptFile: "gsd-workflow.md",
-    workflowFile: "gsd-workflow.yaml",
-    entryType: "khala-gsd-command",
-  },
 };
 
 export const DEFAULT_RUNTIME_PROFILE: RuntimeProfile = {
@@ -167,7 +163,10 @@ function parseNonEmptyStringField(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export function parseRuntimeProfile(raw: string, defaults: RuntimeProfile = DEFAULT_RUNTIME_PROFILE): RuntimeProfileLoadResult {
+export function parseRuntimeProfile(
+  raw: string,
+  defaults: RuntimeProfile = DEFAULT_RUNTIME_PROFILE,
+): RuntimeProfileLoadResult {
   if (!raw.trim()) {
     return {
       profile: cloneRuntimeProfile(defaults),
@@ -181,14 +180,18 @@ export function parseRuntimeProfile(raw: string, defaults: RuntimeProfile = DEFA
   } catch (error) {
     return {
       profile: cloneRuntimeProfile(defaults),
-      warnings: [`runtime/profile.yaml parse error (${error instanceof Error ? error.message : String(error)}); using defaults.`],
+      warnings: [
+        `runtime/profile.yaml parse error (${error instanceof Error ? error.message : String(error)}); using defaults.`,
+      ],
     };
   }
 
   if (!isRecord(parsedYaml)) {
     return {
       profile: cloneRuntimeProfile(defaults),
-      warnings: ["runtime/profile.yaml must contain a mapping root; using defaults."],
+      warnings: [
+        "runtime/profile.yaml must contain a mapping root; using defaults.",
+      ],
     };
   }
 
@@ -197,23 +200,37 @@ export function parseRuntimeProfile(raw: string, defaults: RuntimeProfile = DEFA
 
   const quality = parsedYaml.quality;
   if (quality !== undefined && !isRecord(quality)) {
-    warnings.push("runtime/profile.yaml: quality must be a mapping; defaults kept.");
+    warnings.push(
+      "runtime/profile.yaml: quality must be a mapping; defaults kept.",
+    );
   }
   if (isRecord(quality) && quality.low_confidence_threshold !== undefined) {
-    if (typeof quality.low_confidence_threshold === "number" && Number.isFinite(quality.low_confidence_threshold)) {
-      if (quality.low_confidence_threshold >= 0 && quality.low_confidence_threshold <= 1) {
+    if (
+      typeof quality.low_confidence_threshold === "number" &&
+      Number.isFinite(quality.low_confidence_threshold)
+    ) {
+      if (
+        quality.low_confidence_threshold >= 0 &&
+        quality.low_confidence_threshold <= 1
+      ) {
         profile.lowConfidenceThreshold = quality.low_confidence_threshold;
       } else {
-        warnings.push("runtime/profile.yaml: quality.low_confidence_threshold must be in [0,1]; default kept.");
+        warnings.push(
+          "runtime/profile.yaml: quality.low_confidence_threshold must be in [0,1]; default kept.",
+        );
       }
     } else {
-      warnings.push("runtime/profile.yaml: quality.low_confidence_threshold must be numeric; default kept.");
+      warnings.push(
+        "runtime/profile.yaml: quality.low_confidence_threshold must be numeric; default kept.",
+      );
     }
   }
 
   const firstPrinciples = parsedYaml.first_principles;
   if (firstPrinciples !== undefined && !isRecord(firstPrinciples)) {
-    warnings.push("runtime/profile.yaml: first_principles must be a mapping; defaults kept.");
+    warnings.push(
+      "runtime/profile.yaml: first_principles must be a mapping; defaults kept.",
+    );
   }
 
   if (isRecord(firstPrinciples)) {
@@ -227,13 +244,17 @@ export function parseRuntimeProfile(raw: string, defaults: RuntimeProfile = DEFA
       const rawValue = firstPrinciples[field];
       if (rawValue === undefined) continue;
       if (typeof rawValue !== "string") {
-        warnings.push(`runtime/profile.yaml: first_principles.${field} must be a string; default kept.`);
+        warnings.push(
+          `runtime/profile.yaml: first_principles.${field} must be a string; default kept.`,
+        );
         continue;
       }
 
       const mode = parsePolicyMode(rawValue);
       if (!mode) {
-        warnings.push(`runtime/profile.yaml: first_principles.${field} must be monitor|warn|enforce; default kept.`);
+        warnings.push(
+          `runtime/profile.yaml: first_principles.${field} must be monitor|warn|enforce; default kept.`,
+        );
         continue;
       }
 
@@ -242,20 +263,26 @@ export function parseRuntimeProfile(raw: string, defaults: RuntimeProfile = DEFA
 
     for (const key of Object.keys(firstPrinciples)) {
       if (!(key in modeFields)) {
-        warnings.push(`runtime/profile.yaml: unknown first_principles key '${key}' ignored.`);
+        warnings.push(
+          `runtime/profile.yaml: unknown first_principles key '${key}' ignored.`,
+        );
       }
     }
   }
 
   const commands = parsedYaml.commands;
   if (commands !== undefined && !isRecord(commands)) {
-    warnings.push("runtime/profile.yaml: commands must be a mapping; defaults kept.");
+    warnings.push(
+      "runtime/profile.yaml: commands must be a mapping; defaults kept.",
+    );
   }
 
   if (isRecord(commands)) {
     for (const [commandName, commandConfig] of Object.entries(commands)) {
       if (!isWorkflowType(commandName)) {
-        warnings.push(`runtime/profile.yaml: unknown command '${commandName}' ignored.`);
+        warnings.push(
+          `runtime/profile.yaml: unknown command '${commandName}' ignored.`,
+        );
         continue;
       }
 
@@ -265,7 +292,9 @@ export function parseRuntimeProfile(raw: string, defaults: RuntimeProfile = DEFA
       }
 
       if (!isRecord(commandConfig)) {
-        warnings.push(`runtime/profile.yaml: commands.${commandName} must be boolean or mapping; defaults kept.`);
+        warnings.push(
+          `runtime/profile.yaml: commands.${commandName} must be boolean or mapping; defaults kept.`,
+        );
         continue;
       }
 
@@ -273,34 +302,49 @@ export function parseRuntimeProfile(raw: string, defaults: RuntimeProfile = DEFA
       if (enabled !== null) {
         profile.workflows[commandName].enabled = enabled;
       } else if (commandConfig.enabled !== undefined) {
-        warnings.push(`runtime/profile.yaml: commands.${commandName}.enabled must be boolean; default kept.`);
+        warnings.push(
+          `runtime/profile.yaml: commands.${commandName}.enabled must be boolean; default kept.`,
+        );
       }
 
       const prompt = parseNonEmptyStringField(commandConfig.prompt);
       if (prompt) {
         profile.workflows[commandName].promptFile = prompt;
       } else if (commandConfig.prompt !== undefined) {
-        warnings.push(`runtime/profile.yaml: commands.${commandName}.prompt must be a non-empty string; default kept.`);
+        warnings.push(
+          `runtime/profile.yaml: commands.${commandName}.prompt must be a non-empty string; default kept.`,
+        );
       }
 
       const workflow = parseNonEmptyStringField(commandConfig.workflow);
       if (workflow) {
         profile.workflows[commandName].workflowFile = workflow;
       } else if (commandConfig.workflow !== undefined) {
-        warnings.push(`runtime/profile.yaml: commands.${commandName}.workflow must be a non-empty string; default kept.`);
+        warnings.push(
+          `runtime/profile.yaml: commands.${commandName}.workflow must be a non-empty string; default kept.`,
+        );
       }
 
       for (const key of Object.keys(commandConfig)) {
         if (key !== "enabled" && key !== "prompt" && key !== "workflow") {
-          warnings.push(`runtime/profile.yaml: commands.${commandName}.${key} is unknown and ignored.`);
+          warnings.push(
+            `runtime/profile.yaml: commands.${commandName}.${key} is unknown and ignored.`,
+          );
         }
       }
     }
   }
 
   for (const key of Object.keys(parsedYaml)) {
-    if (key !== "version" && key !== "quality" && key !== "first_principles" && key !== "commands") {
-      warnings.push(`runtime/profile.yaml: unknown top-level key '${key}' ignored.`);
+    if (
+      key !== "version" &&
+      key !== "quality" &&
+      key !== "first_principles" &&
+      key !== "commands"
+    ) {
+      warnings.push(
+        `runtime/profile.yaml: unknown top-level key '${key}' ignored.`,
+      );
     }
   }
 
@@ -310,15 +354,21 @@ export function parseRuntimeProfile(raw: string, defaults: RuntimeProfile = DEFA
   };
 }
 
-export async function loadRuntimeProfile(profilePath: string, defaults: RuntimeProfile = DEFAULT_RUNTIME_PROFILE): Promise<RuntimeProfileLoadResult> {
+export async function loadRuntimeProfile(
+  profilePath: string,
+  defaults: RuntimeProfile = DEFAULT_RUNTIME_PROFILE,
+): Promise<RuntimeProfileLoadResult> {
   const raw = await readTextIfExists(profilePath);
   return parseRuntimeProfile(raw, defaults);
 }
 
-export async function validateRuntimeProfile(profile: RuntimeProfile, paths: {
-  commandsDir: string;
-  skillflowsDir: string;
-}): Promise<RuntimeProfileValidationResult> {
+export async function validateRuntimeProfile(
+  profile: RuntimeProfile,
+  paths: {
+    commandsDir: string;
+    skillflowsDir: string;
+  },
+): Promise<RuntimeProfileValidationResult> {
   const warnings: string[] = [];
   const validated = cloneRuntimeProfile(profile);
 
@@ -344,7 +394,9 @@ export async function validateRuntimeProfile(profile: RuntimeProfile, paths: {
     }
   }
 
-  const enabledWorkflowCount = WORKFLOW_TYPES.filter((workflowType) => validated.workflows[workflowType].enabled).length;
+  const enabledWorkflowCount = WORKFLOW_TYPES.filter(
+    (workflowType) => validated.workflows[workflowType].enabled,
+  ).length;
 
   return {
     profile: validated,
@@ -354,7 +406,10 @@ export async function validateRuntimeProfile(profile: RuntimeProfile, paths: {
   };
 }
 
-export function getWorkflowConfig(profile: RuntimeProfile, workflowType: WorkflowType): WorkflowCommandConfig | null {
+export function getWorkflowConfig(
+  profile: RuntimeProfile,
+  workflowType: WorkflowType,
+): WorkflowCommandConfig | null {
   const workflow = profile.workflows[workflowType];
   if (!workflow?.enabled) return null;
   return workflow;

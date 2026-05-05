@@ -1,15 +1,21 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+} from "@mariozechner/pi-coding-agent";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type {
-  WorkflowCommandConfig,
-  WorkflowType,
-} from "../runtime/profile";
+import type { WorkflowCommandConfig, WorkflowType } from "../runtime/profile";
 import type { PendingWorkflow } from "../workflows/engine";
 
 type NotifyType = "info" | "error" | "warning" | "success";
-type CommandHandler = (args: string | undefined, ctx: ExtensionCommandContext) => Promise<void>;
-type WorkflowFlags = Record<string, string | number | boolean | null | string[]>;
+type CommandHandler = (
+  args: string | undefined,
+  ctx: ExtensionCommandContext,
+) => Promise<void>;
+type WorkflowFlags = Record<
+  string,
+  string | number | boolean | null | string[]
+>;
 
 type ReviewArgsResult =
   | { mode: "uncommitted"; extraInstruction?: string }
@@ -37,12 +43,20 @@ interface RunWorkflowCommandParams {
 
 export function createWorkflowCommandHandlers(params: {
   pi: ExtensionAPI;
-  notify: (ctx: ExtensionCommandContext, message: string, type: NotifyType) => void;
+  notify: (
+    ctx: ExtensionCommandContext,
+    message: string,
+    type: NotifyType,
+  ) => void;
   nowIso: () => string;
   slugify: (value: string) => string;
   normalizeWhitespace: (value: string) => string;
   ensureWorkflowSlotAvailable: (ctx: ExtensionCommandContext) => boolean;
-  ensureAgentEnabledForCommand: (pi: ExtensionAPI, ctx: ExtensionCommandContext, source: WorkflowType) => void;
+  ensureAgentEnabledForCommand: (
+    pi: ExtensionAPI,
+    ctx: ExtensionCommandContext,
+    source: WorkflowType,
+  ) => void;
   resolveWorkflowConfig: (type: WorkflowType) => WorkflowCommandConfig | null;
   beginWorkflowTracking: (
     pi: ExtensionAPI,
@@ -51,25 +65,50 @@ export function createWorkflowCommandHandlers(params: {
     input: string,
     flags: WorkflowFlags,
   ) => Promise<PendingWorkflow<WorkflowType, WorkflowFlags>>;
-  enqueueWorkflow: (pi: ExtensionAPI, workflowPromptName: string, workflowFileName: string, sections: string[]) => Promise<void>;
-  notifyWorkflowStarted: (ctx: ExtensionCommandContext, message: string, notify: (ctx: ExtensionCommandContext, message: string, type: NotifyType) => void) => void;
+  enqueueWorkflow: (
+    pi: ExtensionAPI,
+    workflowPromptName: string,
+    workflowFileName: string,
+    sections: string[],
+  ) => Promise<void>;
+  notifyWorkflowStarted: (
+    ctx: ExtensionCommandContext,
+    message: string,
+    notify: (
+      ctx: ExtensionCommandContext,
+      message: string,
+      type: NotifyType,
+    ) => void,
+  ) => void;
   parseDebugArgs: (args: string) => { problem: string; fix: boolean };
   parseFeatureArgs: (args: string) => { request: string; ship: boolean };
-  parseReviewArgs: (args: string, cwd: string, commandName?: string) => ReviewArgsResult;
-  buildReviewTarget: (parsed: Exclude<ReviewArgsResult, { error: string }>) => ScopedTarget;
+  parseReviewArgs: (
+    args: string,
+    cwd: string,
+    commandName?: string,
+  ) => ReviewArgsResult;
+  buildReviewTarget: (
+    parsed: Exclude<ReviewArgsResult, { error: string }>,
+  ) => ScopedTarget;
   loadProjectReviewGuidelines: (cwd: string) => Promise<string | null>;
   parseRemoveSlopArgs: (args: string) => { scope: string };
   parsePlanArgs: (args: string) => { plan: string };
   parseTriageIssueArgs: (args: string) => { problem: string };
   parseTddArgs: (args: string) => { goal: string; language: string };
   parseAddressOpenIssuesArgs: (args: string) => { limit: number; repo: string };
-  parseLearnSkillArgs: (args: string) => { topic: string; fromFile?: string; fromUrl?: string; dryRun: boolean };
-  parseGsdArgs: (args: string) => { workflow: string; instruction: string };
+  parseLearnSkillArgs: (args: string) => {
+    topic: string;
+    fromFile?: string;
+    fromUrl?: string;
+    dryRun: boolean;
+  };
   ensureLearningStore: (cwd: string) => Promise<{ skillsDir: string }>;
   exists: (filePath: string) => Promise<boolean>;
   readText: (filePath: string) => Promise<string>;
   buildSkillTemplate: (skillName: string, topic: string) => string;
-  buildSimplifyTarget: (parsed: Exclude<ReviewArgsResult, { error: string }>) => ScopedTarget;
+  buildSimplifyTarget: (
+    parsed: Exclude<ReviewArgsResult, { error: string }>,
+  ) => ScopedTarget;
   constants: {
     POSTFLIGHT_INSTRUCTION: string;
     REQUIRED_WORKFLOW_FOOTER_INSTRUCTION: string;
@@ -95,7 +134,6 @@ export function createWorkflowCommandHandlers(params: {
   tdd: CommandHandler;
   addressOpenIssues: CommandHandler;
   learnSkill: CommandHandler;
-  gsd: CommandHandler;
 } {
   const {
     pi,
@@ -120,7 +158,6 @@ export function createWorkflowCommandHandlers(params: {
     parseTddArgs,
     parseAddressOpenIssuesArgs,
     parseLearnSkillArgs,
-    parseGsdArgs,
     ensureLearningStore,
     exists,
     readText,
@@ -129,7 +166,9 @@ export function createWorkflowCommandHandlers(params: {
     constants,
   } = params;
 
-  async function runWorkflowCommand(config: RunWorkflowCommandParams): Promise<void> {
+  async function runWorkflowCommand(
+    config: RunWorkflowCommandParams,
+  ): Promise<void> {
     const runtime = resolveWorkflowConfig(config.type);
     if (!runtime) {
       notify(
@@ -141,8 +180,19 @@ export function createWorkflowCommandHandlers(params: {
     }
 
     ensureAgentEnabledForCommand(pi, config.ctx, config.type);
-    await beginWorkflowTracking(pi, config.ctx, config.type, config.input, config.flags);
-    await enqueueWorkflow(pi, runtime.promptFile, runtime.workflowFile, config.sections);
+    await beginWorkflowTracking(
+      pi,
+      config.ctx,
+      config.type,
+      config.input,
+      config.flags,
+    );
+    await enqueueWorkflow(
+      pi,
+      runtime.promptFile,
+      runtime.workflowFile,
+      config.sections,
+    );
 
     pi.appendEntry(runtime.entryType, {
       ...config.entry,
@@ -244,9 +294,17 @@ export function createWorkflowCommandHandlers(params: {
           `Source reference: ${constants.REVIEW_COMMAND_SOURCE}`,
           "",
           `Instruction: ${target.instruction}`,
-          parsed.extraInstruction ? `Additional focus: ${parsed.extraInstruction}` : "",
+          parsed.extraInstruction
+            ? `Additional focus: ${parsed.extraInstruction}`
+            : "",
           projectGuidelines
-            ? ["", "Project review guidelines (REVIEW_GUIDELINES.md):", "```markdown", projectGuidelines, "```"].join("\n")
+            ? [
+                "",
+                "Project review guidelines (REVIEW_GUIDELINES.md):",
+                "```markdown",
+                projectGuidelines,
+                "```",
+              ].join("\n")
             : "",
           "Instruction: Prioritize correctness, security, performance, and maintainability findings with concrete evidence.",
           constants.POSTFLIGHT_INSTRUCTION,
@@ -266,7 +324,9 @@ export function createWorkflowCommandHandlers(params: {
       const extraFocus = normalizeWhitespace(args ?? "");
       if (!ensureWorkflowSlotAvailable(ctx)) return;
 
-      const summary = extraFocus ? `current repository (${extraFocus})` : "current repository";
+      const summary = extraFocus
+        ? `current repository (${extraFocus})`
+        : "current repository";
 
       await runWorkflowCommand({
         ctx,
@@ -320,7 +380,9 @@ export function createWorkflowCommandHandlers(params: {
           `Source reference: ${constants.SIMPLIFY_COMMAND_SOURCE}`,
           "",
           `Instruction: ${target.instruction}`,
-          parsed.extraInstruction ? `Additional focus: ${parsed.extraInstruction}` : "",
+          parsed.extraInstruction
+            ? `Additional focus: ${parsed.extraInstruction}`
+            : "",
           "Instruction: Preserve exact behavior, API shape, and outputs. Ask before any semantic change.",
           constants.POSTFLIGHT_INSTRUCTION,
           constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
@@ -425,7 +487,8 @@ export function createWorkflowCommandHandlers(params: {
           branch: "current",
           source: constants.SHIP_COMMAND_SOURCE,
         },
-        startedMessage: "Started ship workflow (simplify -> test -> push -> PR).",
+        startedMessage:
+          "Started ship workflow (simplify -> test -> push -> PR).",
       });
     },
 
@@ -531,39 +594,15 @@ export function createWorkflowCommandHandlers(params: {
       });
     },
 
-    gsd: async (args, ctx) => {
-      const parsed = parseGsdArgs(args ?? "");
-      if (!ensureWorkflowSlotAvailable(ctx)) return;
-
-      await runWorkflowCommand({
-        ctx,
-        type: "gsd",
-        input: parsed.workflow,
-        flags: {
-          workflow: parsed.workflow,
-          instruction: parsed.instruction || null,
-        },
-        sections: [
-          `GSD workflow: ${parsed.workflow}`,
-          parsed.instruction ? `Instruction: ${parsed.instruction}` : "Instruction: Execute the selected imported GSD workflow with project context.",
-          "",
-          "Instruction: Consult skills/gsd-workflows/SKILL.md for workflow names and docs/gsd-workflows/<name>.md for details.",
-          constants.POSTFLIGHT_INSTRUCTION,
-          constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
-        ],
-        entry: {
-          workflow: parsed.workflow,
-          instruction: parsed.instruction || null,
-        },
-        startedMessage: `Started gsd workflow '${parsed.workflow}'.`,
-      });
-    },
-
     learnSkill: async (args, ctx) => {
       const parsed = parseLearnSkillArgs(args ?? "");
       if (!ensureWorkflowSlotAvailable(ctx)) return;
       if (!parsed.topic && !parsed.fromFile && !parsed.fromUrl) {
-        notify(ctx, "Usage: /learn-skill <topic> [--from <path|url>] [--from-file path] [--from-url url] [--dry-run]", "error");
+        notify(
+          ctx,
+          "Usage: /learn-skill <topic> [--from <path|url>] [--from-file path] [--from-url url] [--dry-run]",
+          "error",
+        );
         return;
       }
 
@@ -589,7 +628,8 @@ export function createWorkflowCommandHandlers(params: {
         sourceExcerpt = raw.slice(0, 4000);
       }
 
-      const skillHint = parsed.topic || parsed.fromFile || parsed.fromUrl || "new-skill";
+      const skillHint =
+        parsed.topic || parsed.fromFile || parsed.fromUrl || "new-skill";
       const skillName = slugify(skillHint);
       const skillDir = path.join(paths.skillsDir, skillName);
       const skillFile = path.join(skillDir, "SKILL.md");
@@ -597,7 +637,11 @@ export function createWorkflowCommandHandlers(params: {
       if (!parsed.dryRun) {
         await fs.mkdir(skillDir, { recursive: true });
         if (!(await exists(skillFile))) {
-          await fs.writeFile(skillFile, buildSkillTemplate(skillName, parsed.topic || skillHint), "utf8");
+          await fs.writeFile(
+            skillFile,
+            buildSkillTemplate(skillName, parsed.topic || skillHint),
+            "utf8",
+          );
         }
       }
 
@@ -617,9 +661,15 @@ export function createWorkflowCommandHandlers(params: {
           `Target skill: ${skillName}`,
           `Target file: ${skillFile}`,
           `Dry run: ${parsed.dryRun ? "yes" : "no"}`,
-          parsed.fromFile ? `Source file: ${path.resolve(ctx.cwd, parsed.fromFile)}` : "",
+          parsed.fromFile
+            ? `Source file: ${path.resolve(ctx.cwd, parsed.fromFile)}`
+            : "",
           parsed.fromUrl ? `Source URL: ${parsed.fromUrl}` : "",
-          sourceExcerpt ? ["", "Source excerpt:", "```text", sourceExcerpt, "```"].join("\n") : "",
+          sourceExcerpt
+            ? ["", "Source excerpt:", "```text", sourceExcerpt, "```"].join(
+                "\n",
+              )
+            : "",
           "",
           "Instruction: Keep the skill concise and include explicit 'Use when' and 'Avoid when' sections.",
           constants.POSTFLIGHT_INSTRUCTION,
