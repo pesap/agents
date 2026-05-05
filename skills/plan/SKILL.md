@@ -4,23 +4,28 @@ description: Run a rigorous planning session that challenges plans against exist
 ---
 
 ## Source
+
 - Adapted from: https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs
 
 ## Use when
+
 - User wants to validate a plan against domain language and boundaries.
 - User asks for domain modeling, terminology alignment, or context mapping.
 - User wants architecture decisions captured as lightweight ADRs.
 
 ## Avoid when
+
 - Task is pure implementation with no domain/terminology design.
 - User explicitly wants quick coding without discovery questions.
 
 ## Session mode
+
 - Ask one question at a time.
 - Wait for user feedback before the next question.
 - If a question can be answered from code/docs, inspect first.
 
 ## Domain awareness
+
 - Look for `CONTEXT-MAP.md` first (multi-context repos).
 - Else look for root `CONTEXT.md` (single context).
 - Create files lazily:
@@ -28,23 +33,35 @@ description: Run a rigorous planning session that challenges plans against exist
   - create `docs/adr/` when first ADR is needed
 
 ## During the session
+
 1. Challenge conflicting terminology against `CONTEXT.md`.
 2. Replace fuzzy/overloaded terms with precise canonical terms.
 3. Use concrete scenarios to test boundaries and edge cases.
 4. Cross-check user claims against the codebase and surface contradictions.
-5. Update `CONTEXT.md` inline as terms are resolved (do not batch).
-6. Offer ADRs only when all are true:
+5. Use the decision/design guide to identify gray areas, scope creep, canonical refs, and remaining ambiguity.
+6. Use domain probes only when the user's topic naturally touches that domain; never run them as a checklist.
+7. Update `CONTEXT.md` inline as terms are resolved (do not batch).
+8. Offer ADRs only when all are true:
    - hard to reverse
    - surprising without context
    - result of a real trade-off
 
+Use references:
+
+- [DECISION-DESIGN.md](./DECISION-DESIGN.md) for thinking-partner posture, clarity gates, gray areas, scope creep, canonical refs, and final plan shape.
+- [DOMAIN-PROBES.md](./DOMAIN-PROBES.md) for contextual domain-specific probing questions.
+
 Use formats:
+
 - [CONTEXT-FORMAT.md](./CONTEXT-FORMAT.md)
 - [ADR-FORMAT.md](./ADR-FORMAT.md)
 
 ## Output
+
 - Ordered question log and recommended answers
 - Updated language terms and ambiguity resolutions
+- Canonical refs and existing code context used for the plan
+- Decisions captured vs deferred ideas
+- Verification/acceptance checks and unresolved ambiguity
 - Code/documentation contradictions found
 - Files created/updated (`CONTEXT.md`, `CONTEXT-MAP.md`, `docs/adr/*`)
-- Decisions captured vs deferred

@@ -55,6 +55,21 @@ pi -e https://github.com/pesap/agents -p "/khala"
 - `/khala-memory-restart [project|global]`
 - `/khala-memory-remove [project|global]`
 
+## `/plan` vs `/gsd`
+
+Use `/plan` for focused thinking with this repo's khala workflow. Use `/gsd` when you want the imported Get-Shit-Done project/phase machinery.
+
+| Use case                                        | Command                                                      | Why                                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Stress-test an idea or design                   | `/plan <topic>`                                              | Interactive, asks one question at a time, updates `CONTEXT.md`/ADRs only when useful.    |
+| Turn a known plan into vertical slices          | `/plan <topic>`                                              | Ends by offering issue creation with AFK/HITL labels and dependencies.                   |
+| Initialize or manage a full GSD project roadmap | `/gsd new-project ...`                                       | Uses GSD planning artifacts under `.planning/` and roadmap/requirements workflows.       |
+| Work through GSD phases                         | `/gsd plan-phase`, `/gsd execute-phase`, `/gsd verify-phase` | Follows imported GSD workflow docs and agent contracts.                                  |
+| Existing codebase needs GSD onboarding          | `/gsd map-codebase` then `/gsd new-project`                  | Maps architecture before creating brownfield planning artifacts.                         |
+| Lightweight repo-local design decision          | `/plan <decision>`                                           | Lower ceremony than GSD; best for ambiguous terminology, trade-offs, and ADR candidates. |
+
+Rule of thumb: choose `/plan` for one decision or feature direction; choose `/gsd` for multi-phase project execution with `.planning/` artifacts.
+
 ## What changes when enabled
 
 When khala is enabled (`/khala` or any workflow command):
