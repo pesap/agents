@@ -31,6 +31,10 @@ commands:
     enabled: true
     prompt: simplify-workflow.md
     workflow: simplify-workflow.yaml
+  ship:
+    enabled: true
+    prompt: ship-workflow.md
+    workflow: ship-workflow.yaml
   remove-slop:
     enabled: false
     prompt: remove-slop-workflow.md
@@ -39,10 +43,6 @@ commands:
     enabled: true
     prompt: plan-workflow.md
     workflow: plan-workflow.yaml
-  ship:
-    enabled: true
-    prompt: ship-workflow.md
-    workflow: ship-workflow.yaml
   triage-issue:
     enabled: true
     prompt: triage-issue-workflow.md

@@ -5,12 +5,10 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 import { createBashTool } from "@mariozechner/pi-coding-agent";
 import registerFffExtension from "@ff-labs/pi-fff/src/index.ts";
-import { execFile } from "node:child_process";
 import path from "node:path";
 import registerThinkingStepsExtension from "pi-thinking-steps/index.ts";
 import registerLensExtension from "pi-lens/index.ts";
 import registerSubagentExtension from "pi-subagents/index.ts";
-import { promisify } from "node:util";
 import registerSubagentNotifyExtension from "pi-subagents/notify.ts";
 import { createAgentCommandHandlers } from "./commands/agent";
 import { createComplianceCommandHandlers } from "./commands/compliance";
@@ -25,9 +23,6 @@ import {
   parsePlanArgs,
   parseFeatureArgs,
   parseLearnSkillArgs,
-  parseKhalaMemoryRemoveArgs,
-  parseKhalaMemoryRestartArgs,
-  parseKhalaMemorySetupArgs,
   parsePostflightArgs,
   parsePreflightArgs,
   parseRemoveSlopArgs,
@@ -44,6 +39,9 @@ import {
   GIT_REVIEW_COMMAND_SOURCE,
   LEARNING_VERSION,
   MEMORY_TAIL_LINES,
+  PROMOTION_IMPROVEMENT_THRESHOLD,
+  PROMOTION_MIN_OBSERVATIONS,
+  PROMOTION_SUCCESS_THRESHOLD,
   POSTFLIGHT_INSTRUCTION,
   REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
   REVIEW_COMMAND_SOURCE,
@@ -52,7 +50,7 @@ import {
   TDD_COMMAND_SOURCE,
   TRIAGE_ISSUE_COMMAND_SOURCE,
 } from "./lib/constants";
-import { exists, readText } from "./lib/io";
+import { appendLine, exists, readText } from "./lib/io";
 import { normalizeWhitespace, slugify, summarizeEvidence } from "./lib/text";
 import { makeId, nowIso } from "./lib/time";
 import {
@@ -61,8 +59,12 @@ import {
   type HookConfig,
 } from "./hooks/config";
 import {
+  appendLearningLesson,
   ensureLearningStore,
   loadProjectReviewGuidelines,
+  maybeEmitPromotionHint,
+  type LearningLesson,
+  type LearningObservation,
   type LearningPaths,
 } from "./learning/store";
 import {
@@ -105,6 +107,7 @@ import { notifyWorkflowStarted } from "./workflows/notifications";
 import {
   extractLastAssistantText,
   inferOutcomeFromText,
+  type WorkflowOutcome,
 } from "./runtime/assistant";
 import {
   createWorkflowReaders,
@@ -148,7 +151,6 @@ const workflowReaders = createWorkflowReaders({
   commandsDir: RUNTIME_PATHS.commandsDir,
   packageSkillsPath: RUNTIME_PATHS.packageSkillsPath,
 });
-const execFileAsync = promisify(execFile);
 
 function prependInterceptedCommandsPath(command: string): string {
   const escapedInterceptedPath = RUNTIME_PATHS.interceptedCommandsDir.replace(
@@ -184,6 +186,47 @@ function registerBundledExtension(
   } catch (error) {
     warnBundledExtensionLoadFailure(ctx, extensionName, error);
   }
+}
+
+function inferPassiveLessonFromUserText(
+  text: string,
+): Omit<LearningLesson, "version" | "id" | "timestamp"> | null {
+  const lower = text.toLowerCase();
+  const correctionPattern =
+    /\b(wrong|not working|stalling|stalled|do not|don't|instead|actually|you are not|stop planning|implement it)\b/;
+  if (!correctionPattern.test(lower)) return null;
+
+  let lesson =
+    "Treat this as corrective feedback; adjust behavior immediately instead of repeating the previous approach.";
+  let trigger = "user gives corrective feedback";
+
+  if (
+    /stalling|stalled|you are not working|stop planning|implement it/.test(
+      lower,
+    )
+  ) {
+    trigger = "user reports stalling or asks for implementation";
+    lesson =
+      "Move to concrete tool action or ask one blocking question; do not keep responding with plans only.";
+  } else if (/instead|actually/.test(lower)) {
+    trigger = "user redirects scope or edits intent";
+    lesson =
+      "Prefer the user's latest correction over prior assumptions and restate only the changed operating rule briefly.";
+  } else if (/wrong|not working/.test(lower)) {
+    trigger = "user says prior result was wrong or broken";
+    lesson =
+      "Investigate the failed assumption from evidence before proposing another fix.";
+  }
+
+  return {
+    scope: "repo",
+    type: "workflow_correction",
+    trigger,
+    lesson,
+    evidenceSnippet: summarizeEvidence(text, 220),
+    confidence: 0.72,
+    status: "active",
+  };
 }
 
 function ensureBundledExtensions(
@@ -307,6 +350,23 @@ async function completeWorkflowTracking(
     addPolicyEvent,
     appendPostflightEntry,
     summarizeEvidence,
+    appendLine,
+    ensureLearningStore: (cwd) => ensureLearningStore(cwd, learningPathCache),
+    maybeEmitPromotionHint: (paths, observation, context) =>
+      maybeEmitPromotionHint({
+        paths,
+        observation: observation as LearningObservation<
+          WorkflowType,
+          WorkflowOutcome
+        >,
+        ctx: context,
+        promotionMinObservations: PROMOTION_MIN_OBSERVATIONS,
+        promotionSuccessThreshold: PROMOTION_SUCCESS_THRESHOLD,
+        promotionImprovementThreshold: PROMOTION_IMPROVEMENT_THRESHOLD,
+        nowIso,
+        summarizeEvidence,
+        notify,
+      }),
     notify,
     onLowConfidence: (event) => {
       lowConfidenceEvents.push(event);
@@ -460,7 +520,20 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     if (postflight) {
       runtimeState.latestPostflight = postflight;
       appendPostflightEntry(pi, postflight);
+      return;
     }
+
+    if (!runtimeState.agentEnabled) return;
+    const passiveLesson = inferPassiveLessonFromUserText(text);
+    if (!passiveLesson) return;
+
+    const paths = await ensureLearningStore(_ctx.cwd, learningPathCache);
+    await appendLearningLesson(paths, {
+      version: LEARNING_VERSION,
+      id: makeId("lesson"),
+      timestamp: nowIso(),
+      ...passiveLesson,
+    });
   });
 
   pi.on("tool_call", async (event, ctx) => {
@@ -655,140 +728,6 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     await complianceHandlers.compliance(compliancePreset, ctx);
   };
 
-  const graphify = async (
-    args: string | undefined,
-    ctx: ExtensionCommandContext,
-  ): Promise<void> => {
-    const request = normalizeWhitespace(args ?? "") || ".";
-    pi.sendUserMessage(
-      [
-        `Graphify request: /graphify ${request}`,
-        "",
-        "Use the installed Graphify integration for Pi. If the graphify skill is available, follow it as the source of truth.",
-        "For query/path/explain/add/hook/merge-graphs style requests, prefer the `graphify` CLI directly and summarize the output.",
-        "For corpus build/update requests such as `/graphify .`, `/graphify ./docs --update`, `/graphify . --cluster-only`, `/graphify . --no-viz`, or `/graphify . --wiki`, execute the Graphify skill workflow for those arguments.",
-        "If Graphify is not installed, tell the user to run `/khala-memory-setup project` first.",
-      ].join("\n"),
-    );
-    notify(ctx, `Queued Graphify request: /graphify ${request}`, "info");
-  };
-
-  const khalaMemorySetup = async (
-    args: string | undefined,
-    ctx: ExtensionCommandContext,
-  ): Promise<void> => {
-    const parsed = parseKhalaMemorySetupArgs(args ?? "");
-    if (parsed.error) {
-      notify(ctx, parsed.error, "error");
-      return;
-    }
-
-    const installTargetFlag =
-      parsed.scope === "global" ? "--global" : "--project";
-
-    try {
-      await execFileAsync("uv", ["tool", "install", "graphifyy"], {
-        cwd: ctx.cwd,
-      });
-      await execFileAsync("graphify", ["install", "--platform", "pi"], {
-        cwd: ctx.cwd,
-      });
-
-      try {
-        await execFileAsync("graphify", ["pi", "install", installTargetFlag], {
-          cwd: ctx.cwd,
-        });
-      } catch {
-        await execFileAsync("graphify", ["pi", "install"], { cwd: ctx.cwd });
-      }
-
-      await execFileAsync("graphify", ["--help"], { cwd: ctx.cwd });
-      notify(
-        ctx,
-        `Graphify memory setup complete (${parsed.scope}). graphify installed`,
-        "success",
-      );
-    } catch (error) {
-      notify(
-        ctx,
-        `Graphify setup failed: ${error instanceof Error ? error.message : String(error)}`,
-        "error",
-      );
-    }
-  };
-
-  const khalaMemoryRestart = async (
-    args: string | undefined,
-    ctx: ExtensionCommandContext,
-  ): Promise<void> => {
-    const parsed = parseKhalaMemoryRestartArgs(args ?? "");
-    if (parsed.error) {
-      notify(ctx, parsed.error, "error");
-      return;
-    }
-
-    const installTargetFlag =
-      parsed.scope === "global" ? "--global" : "--project";
-
-    try {
-      try {
-        await execFileAsync("graphify", ["pi", "install", installTargetFlag], {
-          cwd: ctx.cwd,
-        });
-      } catch {
-        await execFileAsync("graphify", ["pi", "install"], { cwd: ctx.cwd });
-      }
-
-      notify(ctx, `Graphify memory restarted (${parsed.scope}).`, "success");
-    } catch (error) {
-      notify(
-        ctx,
-        `Graphify restart failed: ${error instanceof Error ? error.message : String(error)}`,
-        "error",
-      );
-    }
-  };
-
-  const khalaMemoryRemove = async (
-    args: string | undefined,
-    ctx: ExtensionCommandContext,
-  ): Promise<void> => {
-    const parsed = parseKhalaMemoryRemoveArgs(args ?? "");
-    if (parsed.error) {
-      notify(ctx, parsed.error, "error");
-      return;
-    }
-
-    const installTargetFlag =
-      parsed.scope === "global" ? "--global" : "--project";
-
-    try {
-      try {
-        await execFileAsync(
-          "graphify",
-          ["pi", "uninstall", installTargetFlag],
-          { cwd: ctx.cwd },
-        );
-      } catch {
-        await execFileAsync("graphify", ["pi", "uninstall"], { cwd: ctx.cwd });
-      }
-    } catch {
-      // best effort uninstall before uv removal
-    }
-
-    try {
-      await execFileAsync("uv", ["tool", "uninstall", "graphifyy"], {
-        cwd: ctx.cwd,
-      });
-      notify(ctx, `Graphify memory removed (${parsed.scope}).`, "success");
-    } catch (error) {
-      notify(
-        ctx,
-        `Graphify remove failed: ${error instanceof Error ? error.message : String(error)}`,
-        "error",
-      );
-    }
-  };
 
   const { compliance: _unusedComplianceHandler, ...complianceGateHandlers } =
     complianceHandlers;
@@ -800,10 +739,6 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       ...workflowHandlers,
       endAgent: agentHandlers.endAgent,
       khala,
-      graphify,
-      khalaMemorySetup,
-      khalaMemoryRestart,
-      khalaMemoryRemove,
     },
   });
 }
