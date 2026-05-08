@@ -1,7 +1,12 @@
 import path from "node:path";
 import { buildLifecycleHookMarkdown, type HookConfig } from "../hooks/config";
 import { readText, readTextIfExists } from "../lib/io";
-import type { LearningPaths } from "../learning/store";
+import {
+  getActiveLearningLessonsTail,
+  getLearnedSkillsList,
+  getLearningMemoryTail,
+  type LearningPaths,
+} from "../learning/store";
 import {
   parseFirstPrinciplesConfig,
   type FirstPrinciplesConfig,
@@ -59,17 +64,29 @@ export async function getBootstrapPayload(params: {
     instructions,
     complianceProfile,
     startupHooks,
+    memoryTail,
+    learnedSkills,
+    activeLessons,
   ] = await Promise.all([
     readTextIfExists(path.join(params.runtimeDir, "SOUL.md")),
     readTextIfExists(path.join(params.runtimeDir, "RULES.md")),
     readTextIfExists(path.join(params.runtimeDir, "DUTIES.md")),
     readTextIfExists(path.join(params.runtimeDir, "INSTRUCTIONS.md")),
-    readTextIfExists(path.join(params.runtimeDir, "compliance", "risk-assessment.md")),
+    readTextIfExists(
+      path.join(params.runtimeDir, "compliance", "risk-assessment.md"),
+    ),
     buildLifecycleHookMarkdown({
       lifecycle: "on_session_start",
       activeHookConfig: params.activeHookConfig,
       hooksDir: params.hooksDir,
     }),
+    getLearningMemoryTail(
+      params.cwd,
+      params.learningPathCache,
+      params.memoryTailLines,
+    ),
+    getLearnedSkillsList(params.cwd, params.learningPathCache),
+    getActiveLearningLessonsTail(params.cwd, params.learningPathCache, 8),
   ]);
 
   return [
@@ -89,6 +106,13 @@ export async function getBootstrapPayload(params: {
     complianceProfile.trim(),
     startupHooks.trim() ? "[LIFECYCLE HOOKS: on_session_start]" : "",
     startupHooks.trim(),
+    memoryTail ? "[LEARNING MEMORY TAIL]" : "",
+    memoryTail,
+    learnedSkills.length > 0
+      ? `[LEARNED SKILLS] ${learnedSkills.join(", ")}`
+      : "",
+    activeLessons ? "[LEARNED OPERATING RULES]" : "",
+    activeLessons,
   ]
     .filter((line) => line.length > 0)
     .join("\n");

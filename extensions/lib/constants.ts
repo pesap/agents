@@ -46,14 +46,14 @@ export const UV_INSTALL_GUIDANCE = [
 
 export const DESTRUCTIVE_COMMAND_PATTERNS: Array<{ pattern: RegExp; detail: string }> = [
   {
-    pattern: /(?:^|\n|[;|&]{1,2})\s*(?:sudo\s+)?rm\b[^\n;|&]*\s-(?:[^\n;|&]*r[^\n;|&]*f|[^\n;|&]*f[^\n;|&]*r)\b/m,
+    pattern: /(?:^|\n|[;|&]{1,2})\s*(?:sudo\s+)?rm\b[^\n;|&]*\s-(?:[^\s\n;|&]*r[^\s\n;|&]*f|[^\s\n;|&]*f[^\s\n;|&]*r)\b/m,
     detail: "recursive forced delete",
   },
   { pattern: /(?:^|\n|[;|&]{1,2})\s*(?:sudo\s+)?find\b[^\n;|&]*\s-delete\b/m, detail: "find -delete" },
   { pattern: /(?:^|\n|[;|&]{1,2})\s*git\s+reset\b[^\n;|&]*\s--hard\b/m, detail: "git reset --hard" },
-  { pattern: /(?:^|\n|[;|&]{1,2})\s*git\s+clean\b[^\n;|&]*\s-[^\n;|&]*f[^\n;|&]*\b/m, detail: "git clean -f" },
+  { pattern: /(?:^|\n|[;|&]{1,2})\s*git\s+clean\b[^\n;|&]*\s-[^\s\n;|&]*f[^\s\n;|&]*\b/m, detail: "git clean -f" },
   {
-    pattern: /(?:^|\n|[;|&]{1,2})\s*git\s+push\b[^\n;|&]*(?:\s--force(?:-with-lease)?\b|\s-[^\n;|&]*f[^\n;|&]*\b)/m,
+    pattern: /(?:^|\n|[;|&]{1,2})\s*git\s+push\b[^\n;|&]*(?:\s--force(?:-with-lease)?\b|\s-[^\s\n;|&]*f[^\s\n;|&]*\b)/m,
     detail: "forced git push",
   },
   { pattern: /(?:^|\n|[;|&]{1,2})\s*(?:sudo\s+)?mkfs\.[a-z0-9]+\b/m, detail: "filesystem formatting" },

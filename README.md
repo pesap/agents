@@ -2,10 +2,10 @@
 
 Khala is a Pi package for a guarded, self-learning coding-agent runtime. It adds:
 
-- workflow commands for debugging, review, simplification, planning, TDD, issue triage, shipping, and skill creation,
+- workflow commands for debugging, feature delivery, review, simplification, planning, TDD, issue triage, shipping, and skill creation,
 - session policy controls for risky commands, preflight/postflight checks, and response compliance,
 - bundled Pi extensions (`pi-subagents`, `@ff-labs/pi-fff`, `pi-thinking-steps`, `pi-lens`),
-- optional Graphify installation/refresh helpers and a `/graphify` request shim.
+- file-backed learning from workflow outcomes and passive normal-chat corrective feedback.
 
 ## Quick start
 
@@ -44,36 +44,27 @@ pi -e https://github.com/pesap/agents -p "/khala"
 These are registered and enabled by default unless `runtime/profile.yaml` disables them or their prompt/spec files fail validation.
 
 - `/debug <problem> [--fix]`
+- `/feature <request> [--ship]`
 - `/review [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`
 - `/git-review`
 - `/simplify [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`
+- `/ship [extra instruction]` - simplify current uncommitted scope, run tests/CI, push branch, and open/confirm PR/MR (creates a feature branch first when on `main`/`master`)
+- `/remove-slop [scope]`
 - `/plan <plan_or_topic>`
-- `/ship`
-- `/triage-issue <github_issue_or_problem_statement>`
-- `/tdd <goal> [--lang <hint>]` where examples include `auto`, `python`, `rust`, and `c`.
+- `/triage-issue <problem_statement>`
+- `/tdd <goal> [--lang auto|python|rust|c]`
 - `/address-open-issues [--limit N] [--repo owner/repo]`
 - `/learn-skill <topic> [--from <path|url>] [--from-file path] [--from-url url] [--dry-run]`
 
-`feature` and `remove-slop` workflow files exist in this repo, but their commands are currently disabled/not registered for normal use.
+## Run workflow commands outside the REPL
 
-### Graphify commands
-
-- `/khala-memory-setup [project|global]` installs Graphify with `uv` and asks Graphify to install its Pi integration.
-- `/khala-memory-restart [project|global]` refreshes Graphify's Pi integration.
-- `/khala-memory-remove [project|global]` best-effort removes Graphify's Pi integration, then uninstalls the `graphifyy` uv tool.
-- `/graphify [args]` queues an assistant request to use the installed Graphify skill/CLI. No args defaults to `/graphify .`.
-
-`/graphify` is a thin shim, not a tracked khala workflow. It sends a user message back into Pi with instructions:
-
-- build/update/wiki requests such as `/graphify .`, `/graphify ./docs --update`, or `/graphify . --wiki` should follow Graphify's installed skill workflow,
-- query/path/explain/add/hook/merge-graphs requests should prefer the `graphify` CLI and summarize the output,
-- if Graphify is missing, run `/khala-memory-setup project` first.
-
-## Planning
-
-Use `/plan <topic>` as the planning entrypoint for focused design decisions, feature direction, terminology alignment, edge cases, and vertical-slice issue planning. It stays lightweight by default and updates `CONTEXT.md`/ADRs only when useful.
-
-After planning, use the focused delivery workflows: `/tdd`, `/debug`, `/review`, `/simplify`, `/triage-issue`, or `/ship`.
+```bash
+pi -e https://github.com/pesap/agents -p "/review README.md --extra 'focus on correctness'"
+pi -e https://github.com/pesap/agents -p "/simplify src/commands/review.ts"
+pi -e https://github.com/pesap/agents -p "/ship"
+pi -e https://github.com/pesap/agents -p "/remove-slop src"
+pi -e https://github.com/pesap/agents -p "/tdd 'Add retry policy for hook loading' --lang rust"
+```
 
 ## Runtime behavior
 
@@ -102,7 +93,7 @@ Blocked/steered command families include `pip`, `pip3`, `poetry`, `python -m pip
 - `commands/` contains user-facing workflow prompts.
 - `workflows/` contains workflow specs loaded into queued workflow messages.
 
-Workflow prompt frontmatter can list `skills:`. By default, khala injects a skill **manifest** only: skill name, description, and `skills/<name>/SKILL.md` path. Full skill bodies are injected only when a prompt/spec sets `skillContext: full`; `skillContext: none` disables skill context. Missing required skills stop the workflow before it is queued.
+Workflow prompt frontmatter can list `skills:`. By default, khala injects a skill manifest only: skill name, description, and `skills/<name>/SKILL.md` path. Full skill bodies are injected only when a prompt/spec sets `skillContext: full`; `skillContext: none` disables skill context. Missing required skills stop the workflow before it is queued.
 
 ### Skills and learned skills
 
@@ -112,6 +103,8 @@ Package-registered skills come from `package.json` Pi config:
 - `./node_modules/pi-subagents/skills`
 - `./node_modules/pi-lens/skills`
 
+Packaged skills include `librarian`, copied from `https://github.com/mitsuhiko/agent-stuff/tree/main/skills/librarian`.
+
 `/learn-skill` writes learning artifacts to the khala learning store, not to package `skills/`, and does not automatically add them to package manifests or workflow skill frontmatter.
 
 ### Extension implementation
@@ -119,36 +112,63 @@ Package-registered skills come from `package.json` Pi config:
 - `extensions/index.ts` registers the package extension, bundled sub-extensions, policy interception, and commands.
 - `extensions/commands/` contains command registration and command handlers.
 - `extensions/workflows/` contains workflow queueing/tracking helpers.
+- `scripts/` contains lightweight guard/regression checks.
 
-## Graphify setup details
+## Self-learning storage
 
-Setup command runs:
+Durable artifacts are written to:
 
-```bash
-uv tool install graphifyy
-graphify install --platform pi
-graphify pi install --project|--global  # falls back to graphify pi install
-graphify --help
-```
+- Preferred (project-local): `<repo>/.pi/khala/` (when `.pi/` exists in cwd)
+- Fallback (global): `~/.pi/khala/`
 
-Restart command runs:
+Stored files:
 
-```bash
-graphify pi install --project|--global  # falls back to graphify pi install
-```
+- `memory/learning.jsonl` - structured observations per workflow run
+- `memory/lessons.jsonl` - structured passive lessons inferred from corrective normal prompts
+- `memory/MEMORY.md` - concise chronological learnings
+- `memory/promotion-queue.md` - promotion/improvement hints from repeated outcomes
+- `runs/*.json` - per-run workflow records
+- `skills/<name>/SKILL.md` - skills created by `/learn-skill`
 
-Remove command runs:
+## How learning actually works
 
-```bash
-graphify pi uninstall --project|--global  # best effort, falls back to graphify pi uninstall
-uv tool uninstall graphifyy
-```
+Learning is event-based memory, not model fine-tuning.
 
-Graphify itself is not a dependency of this package and khala no longer bundles a `graphify` skill, so Graphify's own installed skill remains authoritative and avoids skill-name collisions.
+1. A workflow command starts (`/debug`, `/feature`, `/review`, `/ship`, etc.).
+2. The extension opens a tracked run (`runs/<id>.json`) and records an observation on completion.
+3. On completion, it appends:
+   - one JSON line to `memory/learning.jsonl`
+   - one summary line to `memory/MEMORY.md`
+4. Normal prompts can also create passive lessons when they contain clear corrective feedback (for example “wrong”, “not working”, “stalling”, “implement it instead”). These are deduplicated and written to `memory/lessons.jsonl`.
+5. If enough recent runs of the same workflow exist, it may append a hint to `memory/promotion-queue.md`.
+
+### What is enforced vs not enforced
+
+Enforced (configurable warn/enforce modes):
+
+- preflight before mutation tools (`edit`, `write`, mutating `bash`)
+- postflight evidence after mutation
+- workflow response footer lines: `Result: ...` and `Confidence: 0..1`
+
+Not enforced / not automatic:
+
+- No automatic edits to `README.md`, `INSTRUCTIONS.md`, or skills from learning.
+- No automatic model training/fine-tuning.
+- Passive normal-chat learning is limited to compact corrective lessons; it does not store raw transcripts or full tool output.
+
+### How learning is injected back into the session
+
+When agent mode is enabled, the extension injects into bootstrap context:
+
+- the latest tail of `memory/MEMORY.md` (recent learned outcomes)
+- active operating rules from `memory/lessons.jsonl`
+- names of learned skills in the learning store
+
+This affects prompt context for subsequent turns, but does not rewrite files automatically.
 
 ## Compliance modes
 
-Session command:
+Fast path (session-scoped, no file edits):
 
 ```text
 /khala enforce
@@ -170,13 +190,16 @@ Persistent defaults are in:
 
 - `runtime/compliance/first-principles-gate.yaml`
 
-## Known documentation gaps / repo notes
+Expected strict behavior:
 
-- `package.json` declares `./themes` in the Pi manifest, but this repo currently has no `themes/` directory.
-- `feature` and `remove-slop` workflow assets are present but not available as normal registered/enabled commands.
-- `/graphify` is intentionally a request shim. Direct CLI execution for `query`, `path`, `explain`, and related commands may be added later.
+- Missing preflight before first mutation (`edit`/`write`/mutating `bash`) -> mutation is blocked with remediation text.
+- Missing postflight evidence after mutation -> workflow is marked failed at completion.
+- Missing final `Result:` / `Confidence:` lines in workflow output -> response is blocked until fixed.
 
-## Notes
+## Design goals
 
-- This package auto-loads bundled dependencies (`pi-subagents`, `pi-subagents/notify`, `@ff-labs/pi-fff`, `pi-thinking-steps`, `pi-lens`) with warning-only failure handling.
-- It uses Pi package manifests and does not edit `~/.pi/agent/settings.json` at runtime.
+1. One canonical agent identity.
+2. Learn from user feedback and workflow outcomes.
+3. Stay concise/token-efficient by default.
+4. Prefer transparent file-backed learning (`learning.jsonl`, `lessons.jsonl`, `MEMORY.md`).
+5. Enable safe self-improvement with explicit guardrails.

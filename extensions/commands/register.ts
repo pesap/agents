@@ -17,125 +17,39 @@ export interface CommandRegistrarDeps {
     preflight: CommandHandler;
     postflight: CommandHandler;
     debug: CommandHandler;
+    feature: CommandHandler;
     review: CommandHandler;
     gitReview: CommandHandler;
     simplify: CommandHandler;
-    plan: CommandHandler;
     ship: CommandHandler;
+    removeSlop: CommandHandler;
+    plan: CommandHandler;
     triageIssue: CommandHandler;
     tdd: CommandHandler;
     addressOpenIssues: CommandHandler;
     learnSkill: CommandHandler;
-    graphify: CommandHandler;
-    khalaMemorySetup: CommandHandler;
-    khalaMemoryRestart: CommandHandler;
-    khalaMemoryRemove: CommandHandler;
   };
 }
 
 export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
   const commands = [
-    {
-      name: "khala",
-      description:
-        "Initialize khala context injection and optionally set compliance mode (/khala enforce|warn|monitor|reset|status)",
-      handler: handlers.khala,
-    },
-    {
-      name: "end-agent",
-      description: "Stop khala context injection for this session",
-      handler: handlers.endAgent,
-    },
-    {
-      name: "approve-risk",
-      description: "Record checker approval for one high-risk command",
-      handler: handlers.approveRisk,
-    },
-    {
-      name: "preflight",
-      description: "Set mutation intent line for first-principles gate",
-      handler: handlers.preflight,
-    },
-    {
-      name: "postflight",
-      description:
-        "Record verification evidence line for first-principles gate",
-      handler: handlers.postflight,
-    },
-    {
-      name: "debug",
-      description: "Run the khala debug workflow",
-      handler: handlers.debug,
-    },
-    {
-      name: "review",
-      description:
-        "Run the khala code review workflow (adapted from pi-review)",
-      handler: handlers.review,
-    },
-    {
-      name: "git-review",
-      description: "Run git history diagnostics before reading code",
-      handler: handlers.gitReview,
-    },
-    {
-      name: "simplify",
-      description: "Run the khala cleanup and code-quality workflow",
-      handler: handlers.simplify,
-    },
-    {
-      name: "plan",
-      description:
-        "Run rigorous planning workflow with edge-case capture and context/ADR updates",
-      handler: handlers.plan,
-    },
-    {
-      name: "ship",
-      description: "Simplify, run CI, push branch, and open PR if missing",
-      handler: handlers.ship,
-    },
-    {
-      name: "triage-issue",
-      description: "Investigate a bug and create a TDD fix-plan issue",
-      handler: handlers.triageIssue,
-    },
-    {
-      name: "tdd",
-      description: "Run a strict red-green-refactor workflow",
-      handler: handlers.tdd,
-    },
-    {
-      name: "address-open-issues",
-      description:
-        "Sweep open issues authored by you through triage, TDD, review, and remediation",
-      handler: handlers.addressOpenIssues,
-    },
-    {
-      name: "learn-skill",
-      description: "Create and refine a reusable skill",
-      handler: handlers.learnSkill,
-    },
-    {
-      name: "graphify",
-      description: "Run the installed Graphify skill/CLI workflow",
-      handler: handlers.graphify,
-    },
-    {
-      name: "khala-memory-setup",
-      description:
-        "Install Graphify memory integration via uv (project/global)",
-      handler: handlers.khalaMemorySetup,
-    },
-    {
-      name: "khala-memory-restart",
-      description: "Restart Graphify memory integration (project/global)",
-      handler: handlers.khalaMemoryRestart,
-    },
-    {
-      name: "khala-memory-remove",
-      description: "Remove Graphify memory integration (project/global)",
-      handler: handlers.khalaMemoryRemove,
-    },
+    { name: "khala", description: "Initialize khala context injection and optionally set compliance mode (/khala enforce|warn|monitor|reset|status)", handler: handlers.khala },
+    { name: "end-agent", description: "Stop khala context injection for this session", handler: handlers.endAgent },
+    { name: "approve-risk", description: "Record checker approval for one high-risk command", handler: handlers.approveRisk },
+    { name: "preflight", description: "Set mutation intent line for first-principles gate", handler: handlers.preflight },
+    { name: "postflight", description: "Record verification evidence line for first-principles gate", handler: handlers.postflight },
+    { name: "debug", description: "Run the khala debug workflow", handler: handlers.debug },
+    { name: "feature", description: "Run the khala feature workflow", handler: handlers.feature },
+    { name: "review", description: "Run the khala code review workflow (adapted from pi-review)", handler: handlers.review },
+    { name: "git-review", description: "Run git history diagnostics before reading code", handler: handlers.gitReview },
+    { name: "simplify", description: "Run the khala code simplification workflow", handler: handlers.simplify },
+    { name: "ship", description: "Simplify, verify, push current branch, and open PR/MR", handler: handlers.ship },
+    { name: "remove-slop", description: "Run the khala cleanup and code-quality workflow", handler: handlers.removeSlop },
+    { name: "plan", description: "Run rigorous planning workflow with edge-case capture and context/ADR updates", handler: handlers.plan },
+    { name: "triage-issue", description: "Investigate a bug and create a TDD fix-plan issue", handler: handlers.triageIssue },
+    { name: "tdd", description: "Run a strict red-green-refactor workflow", handler: handlers.tdd },
+    { name: "address-open-issues", description: "Sweep open issues authored by you through triage, TDD, review, and remediation", handler: handlers.addressOpenIssues },
+    { name: "learn-skill", description: "Create and refine a reusable skill", handler: handlers.learnSkill },
   ] as const;
 
   for (const command of commands) {

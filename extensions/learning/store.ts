@@ -33,12 +33,29 @@ export interface LearningPaths {
   runsDir: string;
   skillsDir: string;
   learningJsonl: string;
+  lessonsJsonl: string;
   memoryMd: string;
   promotionQueue: string;
   stateJson: string;
 }
 
-export interface LearningObservation<TWorkflowType extends string = string, TWorkflowOutcome extends string = string> {
+export interface LearningLesson {
+  version: number;
+  id: string;
+  timestamp: string;
+  scope: "global" | "repo";
+  type: "workflow_correction" | "preference" | "tool_rule" | "project_fact";
+  trigger: string;
+  lesson: string;
+  evidenceSnippet: string;
+  confidence: number;
+  status: "active" | "superseded";
+}
+
+export interface LearningObservation<
+  TWorkflowType extends string = string,
+  TWorkflowOutcome extends string = string,
+> {
   version: number;
   id: string;
   timestamp: string;
@@ -56,15 +73,19 @@ interface LearningState {
 }
 
 function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+  return (
+    Array.isArray(value) && value.every((entry) => typeof entry === "string")
+  );
 }
 
 function isWorkflowFlagValue(value: unknown): value is WorkflowFlagValue {
-  return value === null
-    || typeof value === "string"
-    || typeof value === "number"
-    || typeof value === "boolean"
-    || isStringArray(value);
+  return (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    isStringArray(value)
+  );
 }
 
 function isWorkflowFlags(value: unknown): value is WorkflowFlags {
@@ -80,12 +101,14 @@ function parseLearningHint(value: unknown): LearningHint | null {
   const scoreRate = value.scoreRate;
   const at = value.at;
 
-  if ((kind !== "promote" && kind !== "improve")
-    || typeof sampleSize !== "number"
-    || !Number.isFinite(sampleSize)
-    || typeof scoreRate !== "number"
-    || !Number.isFinite(scoreRate)
-    || typeof at !== "string") {
+  if (
+    (kind !== "promote" && kind !== "improve") ||
+    typeof sampleSize !== "number" ||
+    !Number.isFinite(sampleSize) ||
+    typeof scoreRate !== "number" ||
+    !Number.isFinite(scoreRate) ||
+    typeof at !== "string"
+  ) {
     return null;
   }
 
@@ -118,18 +141,20 @@ function parseLearningObservation(value: unknown): LearningObservation | null {
   const evidenceSnippet = value.evidenceSnippet;
   const workflowId = value.workflowId;
 
-  if (typeof version !== "number"
-    || !Number.isFinite(version)
-    || typeof id !== "string"
-    || typeof timestamp !== "string"
-    || typeof taskType !== "string"
-    || typeof input !== "string"
-    || !isWorkflowFlags(flags)
-    || typeof outcome !== "string"
-    || typeof confidence !== "number"
-    || !Number.isFinite(confidence)
-    || typeof evidenceSnippet !== "string"
-    || typeof workflowId !== "string") {
+  if (
+    typeof version !== "number" ||
+    !Number.isFinite(version) ||
+    typeof id !== "string" ||
+    typeof timestamp !== "string" ||
+    typeof taskType !== "string" ||
+    typeof input !== "string" ||
+    !isWorkflowFlags(flags) ||
+    typeof outcome !== "string" ||
+    typeof confidence !== "number" ||
+    !Number.isFinite(confidence) ||
+    typeof evidenceSnippet !== "string" ||
+    typeof workflowId !== "string"
+  ) {
     return null;
   }
 
@@ -154,6 +179,7 @@ function buildLearningPaths(root: string): LearningPaths {
     runsDir: path.join(root, "runs"),
     skillsDir: path.join(root, "skills"),
     learningJsonl: path.join(root, "memory", "learning.jsonl"),
+    lessonsJsonl: path.join(root, "memory", "lessons.jsonl"),
     memoryMd: path.join(root, "memory", "MEMORY.md"),
     promotionQueue: path.join(root, "memory", "promotion-queue.md"),
     stateJson: path.join(root, "state.json"),
@@ -161,10 +187,15 @@ function buildLearningPaths(root: string): LearningPaths {
 }
 
 function getGlobalLearningPaths(): LearningPaths {
-  return buildLearningPaths(path.join(homedir(), ".pi", LEARNING_STORE_DIRNAME));
+  return buildLearningPaths(
+    path.join(homedir(), ".pi", LEARNING_STORE_DIRNAME),
+  );
 }
 
-async function resolveLearningPaths(cwd: string, cache: Map<string, LearningPaths>): Promise<LearningPaths> {
+async function resolveLearningPaths(
+  cwd: string,
+  cache: Map<string, LearningPaths>,
+): Promise<LearningPaths> {
   const cached = cache.get(cwd);
   if (cached) return cached;
   const projectPiDir = path.join(cwd, ".pi");
@@ -181,19 +212,25 @@ async function initializeLearningStore(paths: LearningPaths): Promise<void> {
   await fs.mkdir(paths.runsDir, { recursive: true });
   await fs.mkdir(paths.skillsDir, { recursive: true });
   await ensureFile(paths.learningJsonl, "");
+  await ensureFile(paths.lessonsJsonl, "");
   await ensureFile(paths.memoryMd, "# MEMORY\n");
   await ensureFile(paths.promotionQueue, "# Promotion Queue\n");
   await ensureFile(paths.stateJson, JSON.stringify({ hints: {} }, null, 2));
 }
 
-export async function ensureLearningStore(cwd: string, cache: Map<string, LearningPaths>): Promise<LearningPaths> {
+export async function ensureLearningStore(
+  cwd: string,
+  cache: Map<string, LearningPaths>,
+): Promise<LearningPaths> {
   const primary = await resolveLearningPaths(cwd, cache);
   try {
     await initializeLearningStore(primary);
     return primary;
   } catch (error) {
     if (!isRecoverableLearningStoreError(error)) {
-      throw new Error(`Failed to initialize learning store at ${primary.root}: ${formatErrorMessage(error)}`);
+      throw new Error(
+        `Failed to initialize learning store at ${primary.root}: ${formatErrorMessage(error)}`,
+      );
     }
     const fallback = getGlobalLearningPaths();
     await initializeLearningStore(fallback);
@@ -202,7 +239,11 @@ export async function ensureLearningStore(cwd: string, cache: Map<string, Learni
   }
 }
 
-export async function getLearningMemoryTail(cwd: string, cache: Map<string, LearningPaths>, tailLines: number): Promise<string> {
+export async function getLearningMemoryTail(
+  cwd: string,
+  cache: Map<string, LearningPaths>,
+  tailLines: number,
+): Promise<string> {
   const paths = await ensureLearningStore(cwd, cache);
   const memory = await readTextIfExists(paths.memoryMd);
   if (!memory.trim()) return "";
@@ -215,18 +256,112 @@ export async function getLearningMemoryTail(cwd: string, cache: Map<string, Lear
   return lines.slice(-tailLines).join("\n");
 }
 
-export async function getLearnedSkillsList(cwd: string, cache: Map<string, LearningPaths>): Promise<string[]> {
+export async function getLearnedSkillsList(
+  cwd: string,
+  cache: Map<string, LearningPaths>,
+): Promise<string[]> {
   const paths = await ensureLearningStore(cwd, cache);
   try {
     const entries = await fs.readdir(paths.skillsDir, { withFileTypes: true });
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+    return entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
   } catch (error) {
     if (isMissingPathError(error)) return [];
-    throw new Error(`Failed to list learned skills in ${paths.skillsDir}: ${formatErrorMessage(error)}`);
+    throw new Error(
+      `Failed to list learned skills in ${paths.skillsDir}: ${formatErrorMessage(error)}`,
+    );
   }
 }
 
-async function readLearningState(paths: LearningPaths): Promise<LearningState> {
+function parseLearningLesson(value: unknown): LearningLesson | null {
+  if (!isRecord(value)) return null;
+
+  if (
+    typeof value.version !== "number" ||
+    typeof value.id !== "string" ||
+    typeof value.timestamp !== "string" ||
+    (value.scope !== "global" && value.scope !== "repo") ||
+    (value.type !== "workflow_correction" &&
+      value.type !== "preference" &&
+      value.type !== "tool_rule" &&
+      value.type !== "project_fact") ||
+    typeof value.trigger !== "string" ||
+    typeof value.lesson !== "string" ||
+    typeof value.evidenceSnippet !== "string" ||
+    typeof value.confidence !== "number" ||
+    (value.status !== "active" && value.status !== "superseded")
+  ) {
+    return null;
+  }
+
+  return value as unknown as LearningLesson;
+}
+
+function parseLearningLessonsJsonl(raw: string): LearningLesson[] {
+  const lessons: LearningLesson[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const parsed = parseLearningLesson(JSON.parse(trimmed));
+      if (parsed) lessons.push(parsed);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+    }
+  }
+  return lessons;
+}
+
+export async function appendLearningLesson(
+  paths: LearningPaths,
+  lesson: LearningLesson,
+): Promise<void> {
+  const existing = parseLearningLessonsJsonl(
+    await readTextIfExists(paths.lessonsJsonl),
+  );
+  const duplicate = existing
+    .slice(-20)
+    .some(
+      (entry) =>
+        entry.status === "active" &&
+        entry.trigger === lesson.trigger &&
+        entry.lesson === lesson.lesson,
+    );
+  if (duplicate) return;
+
+  await appendLine(paths.lessonsJsonl, JSON.stringify(lesson));
+  await appendLine(
+    paths.memoryMd,
+    `- ${lesson.timestamp.slice(0, 10)} [lesson/${lesson.type}] ${lesson.lesson} (confidence=${lesson.confidence.toFixed(2)})`,
+  );
+}
+
+export async function getActiveLearningLessonsTail(
+  cwd: string,
+  cache: Map<string, LearningPaths>,
+  tailLines: number,
+): Promise<string> {
+  const paths = await ensureLearningStore(cwd, cache);
+  const raw = await readTextIfExists(paths.lessonsJsonl);
+  if (!raw.trim()) return "";
+
+  return parseLearningLessonsJsonl(raw)
+    .filter((lesson) => lesson.status === "active")
+    .slice(-tailLines)
+    .map((lesson) => `- When ${lesson.trigger}: ${lesson.lesson}`)
+    .join("\n");
+}
+
+type LearningHintPaths = Pick<
+  LearningPaths,
+  "learningJsonl" | "promotionQueue" | "stateJson"
+>;
+
+async function readLearningState(
+  paths: LearningHintPaths,
+): Promise<LearningState> {
   const raw = await readTextIfExists(paths.stateJson);
   if (!raw.trim()) return { hints: {} };
 
@@ -234,20 +369,33 @@ async function readLearningState(paths: LearningPaths): Promise<LearningState> {
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error(`Invalid learning state JSON in ${paths.stateJson}: ${formatErrorMessage(error)}`);
+    throw new Error(
+      `Invalid learning state JSON in ${paths.stateJson}: ${formatErrorMessage(error)}`,
+    );
   }
 
   if (!isRecord(parsed)) {
-    throw new Error(`Invalid learning state in ${paths.stateJson}: expected a top-level object.`);
+    throw new Error(
+      `Invalid learning state in ${paths.stateJson}: expected a top-level object.`,
+    );
   }
   return { hints: parseLearningHints(parsed.hints) };
 }
 
-async function writeLearningState(paths: LearningPaths, state: LearningState): Promise<void> {
-  await fs.writeFile(paths.stateJson, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+async function writeLearningState(
+  paths: LearningHintPaths,
+  state: LearningState,
+): Promise<void> {
+  await fs.writeFile(
+    paths.stateJson,
+    `${JSON.stringify(state, null, 2)}\n`,
+    "utf8",
+  );
 }
 
-async function readLearningEntries(paths: LearningPaths): Promise<LearningObservation[]> {
+async function readLearningEntries(
+  paths: Pick<LearningPaths, "learningJsonl">,
+): Promise<LearningObservation[]> {
   const raw = await readTextIfExists(paths.learningJsonl);
   if (!raw.trim()) return [];
   const entries: LearningObservation[] = [];
@@ -261,7 +409,9 @@ async function readLearningEntries(paths: LearningPaths): Promise<LearningObserv
       jsonValue = JSON.parse(trimmed);
     } catch (error) {
       if (error instanceof SyntaxError) continue;
-      throw new Error(`Failed to parse learning entry at ${paths.learningJsonl}:${index + 1}: ${formatErrorMessage(error)}`);
+      throw new Error(
+        `Failed to parse learning entry at ${paths.learningJsonl}:${index + 1}: ${formatErrorMessage(error)}`,
+      );
     }
 
     const parsed = parseLearningObservation(jsonValue);
@@ -270,8 +420,11 @@ async function readLearningEntries(paths: LearningPaths): Promise<LearningObserv
   return entries;
 }
 
-export async function maybeEmitPromotionHint<TWorkflowType extends string, TWorkflowOutcome extends string>(params: {
-  paths: LearningPaths;
+export async function maybeEmitPromotionHint<
+  TWorkflowType extends string,
+  TWorkflowOutcome extends string,
+>(params: {
+  paths: LearningHintPaths;
   observation: LearningObservation<TWorkflowType, TWorkflowOutcome>;
   ctx: ExtensionContext;
   promotionMinObservations: number;
@@ -279,10 +432,16 @@ export async function maybeEmitPromotionHint<TWorkflowType extends string, TWork
   promotionImprovementThreshold: number;
   nowIso: () => string;
   summarizeEvidence: (text: string, max?: number) => string;
-  notify: (ctx: ExtensionContext, message: string, type: "info" | "warning" | "error" | "success") => void;
+  notify: (
+    ctx: ExtensionContext,
+    message: string,
+    type: "info" | "warning" | "error" | "success",
+  ) => void;
 }): Promise<void> {
   const entries = await readLearningEntries(params.paths);
-  const relevant = entries.filter((entry) => entry.taskType === params.observation.taskType).slice(-20);
+  const relevant = entries
+    .filter((entry) => entry.taskType === params.observation.taskType)
+    .slice(-20);
 
   if (relevant.length < params.promotionMinObservations) return;
 
@@ -306,7 +465,10 @@ export async function maybeEmitPromotionHint<TWorkflowType extends string, TWork
   const key = `${params.observation.taskType}:${kind}`;
   const previous = state.hints[key];
 
-  if (previous && relevant.length - previous.sampleSize < params.promotionMinObservations) {
+  if (
+    previous &&
+    relevant.length - previous.sampleSize < params.promotionMinObservations
+  ) {
     return;
   }
 
@@ -339,7 +501,9 @@ export async function maybeEmitPromotionHint<TWorkflowType extends string, TWork
   );
 }
 
-export async function loadProjectReviewGuidelines(cwd: string): Promise<string | null> {
+export async function loadProjectReviewGuidelines(
+  cwd: string,
+): Promise<string | null> {
   let currentDir = path.resolve(cwd);
 
   while (true) {

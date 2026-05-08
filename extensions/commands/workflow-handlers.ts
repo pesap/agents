@@ -127,9 +127,9 @@ export function createWorkflowCommandHandlers(params: {
   review: CommandHandler;
   gitReview: CommandHandler;
   simplify: CommandHandler;
+  ship: CommandHandler;
   removeSlop: CommandHandler;
   plan: CommandHandler;
-  ship: CommandHandler;
   triageIssue: CommandHandler;
   tdd: CommandHandler;
   addressOpenIssues: CommandHandler;
@@ -461,14 +461,16 @@ export function createWorkflowCommandHandlers(params: {
       });
     },
 
-    ship: async (_args, ctx) => {
+    ship: async (args, ctx) => {
+      const extraInstruction = normalizeWhitespace(args ?? "");
       if (!ensureWorkflowSlotAvailable(ctx)) return;
 
       await runWorkflowCommand({
         ctx,
         type: "ship",
-        input: "current branch",
+        input: extraInstruction || "current branch",
         flags: {
+          extraInstruction: extraInstruction || null,
           source: constants.SHIP_COMMAND_SOURCE,
         },
         sections: [
@@ -476,19 +478,20 @@ export function createWorkflowCommandHandlers(params: {
           `Source reference: ${constants.SHIP_COMMAND_SOURCE}`,
           "",
           "Instruction: Run simplify on current uncommitted changes first, preserving behavior.",
+          "Instruction: If current branch is main or master, create a new feature branch before commit/push/PR unless the user specified a branch name.",
           "Instruction: Run project CI/test command(s) and stop on failure with actionable diagnostics.",
           "Instruction: If tests pass and branch is ahead, push current branch.",
-          "Instruction: If no open PR exists for current branch, open one using .github/pull_request_template.md.",
+          "Instruction: If no open PR exists for current branch, open one targeting main using .github/pull_request_template.md when present.",
           "Instruction: If PR already exists, update/confirm it instead of creating duplicate.",
+          extraInstruction ? `Additional instruction: ${extraInstruction}` : "",
           constants.POSTFLIGHT_INSTRUCTION,
           constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
         ],
         entry: {
-          branch: "current",
+          extraInstruction: extraInstruction || null,
           source: constants.SHIP_COMMAND_SOURCE,
         },
-        startedMessage:
-          "Started ship workflow (simplify -> test -> push -> PR).",
+        startedMessage: "Started ship workflow (simplify -> test -> push -> PR).",
       });
     },
 
