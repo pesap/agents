@@ -1,9 +1,9 @@
 ---
 name: commit
-description: "Read this skill before making git commits"
+description: "Read this skill before making commits with GitButler"
 ---
 
-Create a git commit for the current changes using a concise Conventional Commits-style subject.
+Create a GitButler commit for the current changes using a concise Conventional Commits-style subject.
 
 ## Tool
 
@@ -22,6 +22,7 @@ Create a git commit for the current changes using a concise Conventional Commits
 - Body is OPTIONAL. If needed, add a blank line after the subject and write short paragraphs.
 - Do NOT include breaking-change markers or footers.
 - Do NOT add sign-offs (no `Signed-off-by`).
+- Use GitButler (`but`) for commit mutations; do NOT use `git add` or `git commit`.
 - Only commit; do NOT push.
 - If it is unclear whether a file should be included, ask the user which files to commit.
 - Treat any caller-provided arguments as additional commit guidance. Common patterns:
@@ -32,11 +33,11 @@ Create a git commit for the current changes using a concise Conventional Commits
 ## Steps
 
 1. Infer from the prompt if the user provided specific file paths/globs and/or additional instructions.
-2. Review `git status` and `git diff` to understand the current changes (limit to argument-specified files if provided).
-3. (Optional) Run `git log -n 50 --pretty=format:%s` to see commonly used scopes.
-4. If there are ambiguous extra files, ask the user for clarification before committing.
-5. Stage only the intended files (all changes if no files specified).
-6. Run `git commit -m "<subject>"` (and `-m "<body>"` if needed).
+2. Run `but status -fv` and `but diff` to understand the current changes (limit to argument-specified files if provided).
+3. If GitButler setup is required, run `but setup --status-after`, then rerun `but status -fv`.
+4. (Optional) Run `git log -n 50 --pretty=format:%s` to see commonly used scopes.
+5. If there are ambiguous extra files, ask the user for clarification before committing.
+6. Commit only the intended change IDs with `but commit <branch> -m "<subject>" --changes <ids> --status-after` (add body flags if needed).
 
 ## Validation
 

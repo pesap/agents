@@ -91,7 +91,6 @@ export function createWorkflowCommandHandlers(params: {
     parsed: Exclude<ReviewArgsResult, { error: string }>,
   ) => ScopedTarget;
   loadProjectReviewGuidelines: (cwd: string) => Promise<string | null>;
-  parseRemoveSlopArgs: (args: string) => { scope: string };
   parsePlanArgs: (args: string) => { plan: string };
   parseTriageIssueArgs: (args: string) => { problem: string };
   parseTddArgs: (args: string) => { goal: string; language: string };
@@ -128,7 +127,6 @@ export function createWorkflowCommandHandlers(params: {
   gitReview: CommandHandler;
   simplify: CommandHandler;
   ship: CommandHandler;
-  removeSlop: CommandHandler;
   plan: CommandHandler;
   triageIssue: CommandHandler;
   tdd: CommandHandler;
@@ -152,7 +150,6 @@ export function createWorkflowCommandHandlers(params: {
     parseReviewArgs,
     buildReviewTarget,
     loadProjectReviewGuidelines,
-    parseRemoveSlopArgs,
     parsePlanArgs,
     parseTriageIssueArgs,
     parseTddArgs,
@@ -394,32 +391,6 @@ export function createWorkflowCommandHandlers(params: {
           source: constants.SIMPLIFY_COMMAND_SOURCE,
         },
         startedMessage: `Started simplify workflow (${target.summary}).`,
-      });
-    },
-
-    removeSlop: async (args, ctx) => {
-      const parsed = parseRemoveSlopArgs(args ?? "");
-      if (!ensureWorkflowSlotAvailable(ctx)) return;
-
-      await runWorkflowCommand({
-        ctx,
-        type: "remove-slop",
-        input: parsed.scope,
-        flags: {
-          scope: parsed.scope,
-        },
-        sections: [
-          `Cleanup scope: ${parsed.scope}`,
-          "",
-          "Instruction: Run analysis tracks first, then implement approved low-risk items sequentially.",
-          "Instruction: Select language-aware skills based on the codebase stack. Mention missing useful skills if any.",
-          constants.POSTFLIGHT_INSTRUCTION,
-          constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
-        ],
-        entry: {
-          scope: parsed.scope,
-        },
-        startedMessage: `Started remove-slop workflow (scope=${parsed.scope}).`,
       });
     },
 

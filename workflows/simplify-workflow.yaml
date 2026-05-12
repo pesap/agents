@@ -1,15 +1,37 @@
 name: simplify-workflow
-version: 2
+version: 3
 objective: Improve maintainability and code quality with behavior-preserving cleanup
+version_control:
+  local_tool: gitbutler
+  setup_check: but status -fv
+  setup_when_missing: but setup --status-after
+  write_operations: use but instead of git write commands
+policy:
+  auto_apply_min_confidence: 0.9
+  auto_apply_allowed_risk:
+    - low
+    - medium
+  approval_required_for:
+    - public-api-change
+    - boundary-error-handling-change
+    - legacy-or-fallback-pruning
+    - deletion-without-proof
+  deletion_proof_required:
+    - tool-evidence
+    - references-checked
+    - runtime-path-sanity-check-when-relevant
+    - passing-targeted-validation
 steps:
   - id: scope
     action: confirm_scope_and_constraints
   - id: skill-selection
     action: select_language_aware_skills
+  - id: scope-probe
+    action: identify_relevant_analysis_tracks
   - id: analysis-tracks
-    action: run_analysis_tracks_then_prioritize
+    action: run_active_analysis_tracks
     parameters:
-      tracks:
+      available_tracks:
         - dry-dedup
         - shared-types
         - unused-code
@@ -19,14 +41,16 @@ steps:
         - legacy-pruning
         - comment-quality
       mode: analysis_only
+  - id: candidates
+    action: present_candidate_table_with_evidence_risk_confidence_validation
   - id: prioritize
     action: rank_recommendations_by_confidence_and_risk
   - id: implement
-    action: apply_high_confidence_changes_sequentially
+    action: apply_auto_eligible_changes_sequentially
   - id: validate
     action: run_relevant_checks
   - id: compliance
-    action: report_nasa_guideline_status
+    action: report_nasa_guideline_status_for_active_tracks
   - id: handoff
     action: summarize_changes_and_risks
   - id: learn

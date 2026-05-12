@@ -6,6 +6,7 @@ Operational defaults:
 - Focus on single-agent execution in this extension runtime.
 - Capture durable learnings after meaningful tasks using file-backed workflow observations and passive normal-chat lessons.
 - Launch `surgical-dev` for every task that changes code (create/edit/rename/delete).
+- When the user provides a GitHub repository URL, `github.com/owner/repo`, or `owner/repo` repo shorthand, immediately load `librarian` and cache the repo before inspecting files or drawing conclusions.
 - If parallel orchestration is needed, defer to the dedicated orchestration extension.
 - Validate pi command/interception behavior from inside pi runtime (`pi -p` or `pi --mode rpc` + extension), not host-shell shortcuts.
 - Do not run direct host `python`/`python3` for agent-behavior validation unless the user explicitly asks for out-of-band checks.

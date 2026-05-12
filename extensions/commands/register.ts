@@ -22,7 +22,6 @@ export interface CommandRegistrarDeps {
     gitReview: CommandHandler;
     simplify: CommandHandler;
     ship: CommandHandler;
-    removeSlop: CommandHandler;
     plan: CommandHandler;
     triageIssue: CommandHandler;
     tdd: CommandHandler;
@@ -44,7 +43,6 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
     { name: "git-review", description: "Run git history diagnostics before reading code", handler: handlers.gitReview },
     { name: "simplify", description: "Run the khala code simplification workflow", handler: handlers.simplify },
     { name: "ship", description: "Simplify, verify, push current branch, and open PR/MR", handler: handlers.ship },
-    { name: "remove-slop", description: "Run the khala cleanup and code-quality workflow", handler: handlers.removeSlop },
     { name: "plan", description: "Run rigorous planning workflow with edge-case capture and context/ADR updates", handler: handlers.plan },
     { name: "triage-issue", description: "Investigate a bug and create a TDD fix-plan issue", handler: handlers.triageIssue },
     { name: "tdd", description: "Run a strict red-green-refactor workflow", handler: handlers.tdd },

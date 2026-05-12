@@ -1,5 +1,6 @@
 ---
 skills:
+  - but
   - simplify
   - commit
   - caveman
@@ -14,6 +15,7 @@ You are running the khala `/ship` workflow.
 
 Requirements:
 - Be concise.
+- Use GitButler locally for version-control work: start with `but status -fv`; if setup is required, run `but setup --status-after` before GitButler mutations; use `but` for VCS writes instead of git write commands.
 - Workflow order is fixed: simplify -> test/CI -> push -> PR.
 - Run simplify only on current uncommitted scope and preserve exact behavior.
 - Detect project test/CI command from repo conventions; run it and stop on first failure.
@@ -26,6 +28,7 @@ Requirements:
 - End with: simplify summary, test/CI result, push status, PR/MR status/link, risks, `Result: success|partial|failed`, and `Confidence: 0..1`.
 
 Workflow skills manifest:
+- but: GitButler CLI skill for version-control operations. File: skills/but/SKILL.md
 - simplify: Safely simplify recently touched code for readability and maintainability while preserving exact behavior. File: skills/simplify/SKILL.md
 - commit: Read this skill before making git commits. File: skills/commit/SKILL.md
 - caveman: Ultra-compressed communication mode. File: skills/caveman/SKILL.md

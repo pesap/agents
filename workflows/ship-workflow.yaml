@@ -1,6 +1,11 @@
 name: ship-workflow
 version: 1
 objective: Simplify, verify, publish branch, and open PR/MR when missing
+version_control:
+  local_tool: gitbutler
+  setup_check: but status -fv
+  setup_when_missing: but setup --status-after
+  write_operations: use but instead of git write commands
 steps:
   - id: simplify
     action: simplify_current_uncommitted_scope

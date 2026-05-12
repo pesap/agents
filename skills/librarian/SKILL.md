@@ -1,11 +1,11 @@
 ---
 name: librarian
-description: "Cache and refresh remote git repositories under ~/.cache/checkouts/<host>/<org>/<repo> so future references can reuse a local copy. Use this skill when the user points you to a remote git repository as reference or you encountered a remote git repo through other means."
+description: "Cache and refresh remote git repositories under ~/.cache/checkouts/<host>/<org>/<repo> so future references can reuse a local copy. Always use this skill when the user provides a GitHub repository URL, GitHub repo shorthand like owner/repo, or any remote git repository as reference, even if they only ask to inspect, compare, borrow from, or review it."
 ---
 
 Source attribution: copied from Armin Ronacher's `agent-stuff` librarian skill (`https://github.com/mitsuhiko/agent-stuff/tree/main/skills/librarian`).
 
-Use this skill when the user points you to a remote git repository (GitHub/GitLab/Bitbucket URLs, `git@...`, or `owner/repo` shorthand).
+Use this skill whenever the user points you to a remote git repository (GitHub/GitLab/Bitbucket URLs, `git@...`, or `owner/repo` shorthand). For GitHub references, `owner/repo`, `github.com/owner/repo`, and `https://github.com/owner/repo` all require this skill before inspecting files or drawing conclusions.
 
 The goal is to keep a reusable local checkout that is:
 
@@ -62,7 +62,7 @@ bash checkout.sh <repo> --force-update --path-only
 
 ## If edits are needed
 
-Prefer not to edit directly in the shared cache. Create a separate worktree or copy from the cached checkout for task-specific modifications.
+Prefer not to edit directly in the shared cache. Copy from the cached checkout for task-specific modifications.
 
 ## Notes
 

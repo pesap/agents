@@ -49,7 +49,6 @@ These are registered and enabled by default unless `runtime/profile.yaml` disabl
 - `/git-review`
 - `/simplify [uncommitted|branch <name>|commit <sha>|pr <number|url>|folder <paths...>|file <paths...>|<paths...>] [--extra "focus"]`
 - `/ship [extra instruction]` - simplify current uncommitted scope, run tests/CI, push branch, and open/confirm PR/MR (creates a feature branch first when on `main`/`master`)
-- `/remove-slop [scope]`
 - `/plan <plan_or_topic>`
 - `/triage-issue <problem_statement>`
 - `/tdd <goal> [--lang auto|python|rust|c]`
@@ -62,7 +61,6 @@ These are registered and enabled by default unless `runtime/profile.yaml` disabl
 pi -e https://github.com/pesap/agents -p "/review README.md --extra 'focus on correctness'"
 pi -e https://github.com/pesap/agents -p "/simplify src/commands/review.ts"
 pi -e https://github.com/pesap/agents -p "/ship"
-pi -e https://github.com/pesap/agents -p "/remove-slop src"
 pi -e https://github.com/pesap/agents -p "/tdd 'Add retry policy for hook loading' --lang rust"
 ```
 

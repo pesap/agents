@@ -1,5 +1,7 @@
 ---
 skills:
+  - librarian
+  - but
   - skill-creator
 ---
 
@@ -9,6 +11,7 @@ You are running the khala `/learn-skill` workflow.
 
 Requirements:
 - Be concise.
+- Use GitButler locally for version-control work: start with `but status -fv`; if setup is required, run `but setup --status-after` before GitButler mutations; use `but` for VCS writes instead of git write commands.
 - Build or improve a reusable skill with explicit trigger behavior.
 - Ask clarifying questions when scope, trigger, or output format is ambiguous.
 - Keep instructions compact, safe, and generalizable (no overfitting).

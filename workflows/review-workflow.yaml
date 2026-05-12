@@ -1,6 +1,11 @@
 name: review-workflow
 version: 1
 objective: Run a scoped code review with prioritized, actionable findings and a clear verdict
+version_control:
+  local_tool: gitbutler
+  setup_check: but status -fv
+  setup_when_missing: but setup --status-after
+  write_operations: use but instead of git write commands
 steps:
   - id: scope
     action: confirm_review_target_and_constraints
