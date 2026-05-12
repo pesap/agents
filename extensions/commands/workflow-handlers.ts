@@ -91,7 +91,6 @@ export function createWorkflowCommandHandlers(params: {
     parsed: Exclude<ReviewArgsResult, { error: string }>,
   ) => ScopedTarget;
   loadProjectReviewGuidelines: (cwd: string) => Promise<string | null>;
-  parseRemoveSlopArgs: (args: string) => { scope: string };
   parsePlanArgs: (args: string) => { plan: string };
   parseTriageIssueArgs: (args: string) => { problem: string };
   parseTddArgs: (args: string) => { goal: string; language: string };
@@ -128,7 +127,6 @@ export function createWorkflowCommandHandlers(params: {
   gitReview: CommandHandler;
   simplify: CommandHandler;
   ship: CommandHandler;
-  removeSlop: CommandHandler;
   plan: CommandHandler;
   triageIssue: CommandHandler;
   tdd: CommandHandler;
@@ -152,7 +150,6 @@ export function createWorkflowCommandHandlers(params: {
     parseReviewArgs,
     buildReviewTarget,
     loadProjectReviewGuidelines,
-    parseRemoveSlopArgs,
     parsePlanArgs,
     parseTriageIssueArgs,
     parseTddArgs,
@@ -397,32 +394,6 @@ export function createWorkflowCommandHandlers(params: {
       });
     },
 
-    removeSlop: async (args, ctx) => {
-      const parsed = parseRemoveSlopArgs(args ?? "");
-      if (!ensureWorkflowSlotAvailable(ctx)) return;
-
-      await runWorkflowCommand({
-        ctx,
-        type: "remove-slop",
-        input: parsed.scope,
-        flags: {
-          scope: parsed.scope,
-        },
-        sections: [
-          `Cleanup scope: ${parsed.scope}`,
-          "",
-          "Instruction: Run analysis tracks first, then implement approved low-risk items sequentially.",
-          "Instruction: Select language-aware skills based on the codebase stack. Mention missing useful skills if any.",
-          constants.POSTFLIGHT_INSTRUCTION,
-          constants.REQUIRED_WORKFLOW_FOOTER_INSTRUCTION,
-        ],
-        entry: {
-          scope: parsed.scope,
-        },
-        startedMessage: `Started remove-slop workflow (scope=${parsed.scope}).`,
-      });
-    },
-
     plan: async (args, ctx) => {
       const parsed = parsePlanArgs(args ?? "");
       if (!ensureWorkflowSlotAvailable(ctx)) return;
@@ -468,20 +439,23 @@ export function createWorkflowCommandHandlers(params: {
       await runWorkflowCommand({
         ctx,
         type: "ship",
-        input: extraInstruction || "current branch",
+        input: extraInstruction || "GitButler workspace",
         flags: {
           extraInstruction: extraInstruction || null,
           source: constants.SHIP_COMMAND_SOURCE,
         },
         sections: [
-          "Scope: current branch",
+          "Scope: GitButler workspace; select one ship target branch/stack before mutating VCS state",
           `Source reference: ${constants.SHIP_COMMAND_SOURCE}`,
           "",
-          "Instruction: Run simplify on current uncommitted changes first, preserving behavior.",
-          "Instruction: If current branch is main or master, create a new feature branch before commit/push/PR unless the user specified a branch name.",
+          "Instruction: Start with `but status -fv`; identify applied GitButler branches/stacks, unrelated parallel branches, and unassigned changes.",
+          "Instruction: Select exactly one ship target branch/stack; if ambiguous or changes span multiple branches, show a branch/change table and ask before shipping.",
+          "Instruction: Treat other applied branches as parallel work; do not commit, push, or include their changes unless explicitly requested.",
+          "Instruction: Ensure a GitButler branch/stack exists for the ship target before commit/push/PR.",
+          "Instruction: Run simplify on current uncommitted changes for the selected ship target, preserving behavior.",
           "Instruction: Run project CI/test command(s) and stop on failure with actionable diagnostics.",
-          "Instruction: If tests pass and branch is ahead, push current branch.",
-          "Instruction: If no open PR exists for current branch, open one targeting main using .github/pull_request_template.md when present.",
+          "Instruction: If tests pass, commit only selected change IDs for the ship target and push that target.",
+          "Instruction: If no open PR exists for the ship target, open one targeting the repo default branch unless specified, using .github/pull_request_template.md when present.",
           "Instruction: If PR already exists, update/confirm it instead of creating duplicate.",
           extraInstruction ? `Additional instruction: ${extraInstruction}` : "",
           constants.POSTFLIGHT_INSTRUCTION,
@@ -491,7 +465,7 @@ export function createWorkflowCommandHandlers(params: {
           extraInstruction: extraInstruction || null,
           source: constants.SHIP_COMMAND_SOURCE,
         },
-        startedMessage: "Started ship workflow (simplify -> test -> push -> PR).",
+        startedMessage: "Started ship workflow (inspect -> target -> simplify -> test -> commit -> push -> PR).",
       });
     },
 

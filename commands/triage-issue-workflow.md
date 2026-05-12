@@ -1,5 +1,7 @@
 ---
 skills:
+  - librarian
+  - but
   - triage-issue
   - debug-investigation
   - tdd-core
@@ -12,6 +14,7 @@ You are running the khala `/triage-issue` workflow.
 
 Requirements:
 - Be concise.
+- Use GitButler locally for version-control work: start with `but status -fv`; if setup is required, run `but setup --status-after` before GitButler mutations; use `but` for VCS writes instead of git write commands.
 - Use `triage-issue` + `debug-investigation` + `tdd-core` + `github` skills.
 - Treat this as the **GitHub-reported bug** entrypoint.
 - Ask at most one initial clarification question if the issue/problem statement is insufficient.

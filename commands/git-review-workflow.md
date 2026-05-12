@@ -1,5 +1,7 @@
 ---
 skills:
+  - librarian
+  - but
   - github
 ---
 

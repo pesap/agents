@@ -171,16 +171,6 @@ export function parseFeatureArgs(args: string): {
   };
 }
 
-export function parseRemoveSlopArgs(args: string): { scope: string } {
-  const scope = removeFlag(
-    normalizeWhitespace(args),
-    /(^|\s)--parallel\s+\d+(\s|$)/,
-  ).value;
-  return {
-    scope: scope || "current repository",
-  };
-}
-
 export function parsePlanArgs(args: string): { plan: string } {
   return { plan: normalizeWhitespace(args) };
 }

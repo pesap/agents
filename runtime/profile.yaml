@@ -35,10 +35,6 @@ commands:
     enabled: true
     prompt: ship-workflow.md
     workflow: ship-workflow.yaml
-  remove-slop:
-    enabled: false
-    prompt: remove-slop-workflow.md
-    workflow: remove-slop-workflow.yaml
   plan:
     enabled: true
     prompt: plan-workflow.md

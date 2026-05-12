@@ -14,6 +14,7 @@ description: Rust implementation workflow for safe, idiomatic, strongly-typed co
 - No E2E tests unless explicitly requested.
 - Avoid global mutable state; pass context explicitly.
 - Keep `unsafe` isolated, minimal, and documented with invariants.
+- Justify every `unsafe` block: why safe Rust is insufficient, what invariants make it sound, and how tests/review cover the risk.
 - Treat warnings as errors and fix immediately.
 - Optimize hot paths and benchmark performance-sensitive changes.
 - If tests live in the same module, keep `mod tests {}` at the bottom.
@@ -27,13 +28,28 @@ description: Rust implementation workflow for safe, idiomatic, strongly-typed co
 1. Clarify behavior and contracts before coding.
 2. Model domain types first (enums/newtypes/structs), then implement logic.
 3. Add focused tests (unit/integration as appropriate; no E2E unless asked).
-4. Run `cargo fmt`, `cargo clippy -- -D warnings`, and `cargo test`.
-5. For hot paths, run a benchmark/profiling check and summarize trade-offs.
+4. Prefer specific tests over the full suite unless broad validation is needed.
+5. Run `cargo fmt`, `cargo clippy -- -D warnings`, and targeted `cargo test`.
+6. For hot paths, run a benchmark/profiling check and summarize trade-offs.
 
 ## Safety and error handling
 - Use `Result`/`thiserror`-style typed errors where appropriate.
 - Prefer explicit error propagation (`?`) with context.
+- Prefer `if let`/let chains for fallibility over panic-prone shortcuts.
 - Avoid hidden fallbacks that mask failures.
+- If adding or touching `unsafe`, include a concise `SAFETY` justification in code or review notes.
+
+## Rust style and maintenance
+- Read and match nearby test/style patterns before adding cases.
+- Prefer integration tests when behavior crosses module/CLI boundaries.
+- Prefer snapshots or structured assertions over brittle substring assertions.
+- Prefer top-level imports over local imports or fully qualified names.
+- Avoid shortened variable names; use descriptive domain names.
+- Prefer [`TypeName`] references in Rust doc comments.
+- Prefer `#[expect(...)]` over `#[allow(...)]` when suppressing Clippy.
+- Never assume Clippy warnings are pre-existing.
+- Do not update all lockfile dependencies; use precise updates for lockfile changes.
+- Do not use release-profile builds unless requested or reproducing performance issues.
 
 ## Output
 - Summary of code/test changes
