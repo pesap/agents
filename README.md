@@ -81,6 +81,11 @@ flowchart LR
 | `/approve-risk <reason> [--ttl MINUTES]` | Approve one high-risk command. TTL defaults to 20 minutes and is capped to 1–120 minutes. |
 | `/preflight Preflight: skill=<name\|none> reason="<short>" clarify=<yes\|no>` | Record manual mutation intent. |
 | `/postflight Postflight: verify="<command_or_check>" result=<pass\|fail\|not-run>` | Record verification evidence. |
+| `/skill-status <name>` | Show learned skill provenance and lifecycle state. |
+| `/skill-report` | Regenerate the learned skill curator report from file-backed metadata. |
+| `/pin-skill <name> [on\|off]` | Pin or unpin a learned skill. |
+| `/archive-skill <name>` | Archive a learned skill without deleting it. |
+| `/restore-skill <name>` | Restore an archived learned skill. |
 
 ### Workflow commands
 
@@ -196,8 +201,12 @@ Durable artifacts are written to:
 | `memory/lessons.jsonl` | Passive lessons inferred from corrective normal prompts. |
 | `memory/MEMORY.md` | Concise chronological learnings. |
 | `memory/promotion-queue.md` | Promotion/improvement hints from repeated outcomes. |
+| `memory/skill-curator-report.md` | Post-workflow learned-skill review notes and patch recommendations. |
 | `runs/*.json` | Per-run workflow records. |
-| `skills/<name>/SKILL.md` | Skills created by `/learn-skill`. |
+| `skills/<name>/SKILL.md` | Main learned skill instructions. |
+| `skills/<name>/metadata.json` | Learned skill provenance and lifecycle metadata. |
+| `skills/<name>/{references,templates,scripts}/` | Optional learned skill support assets. |
+| `archive/skills/<name>/` | Recoverable archive path for archived learned skills. |
 
 <details>
 <summary><strong>What is enforced vs not enforced</strong></summary>
@@ -210,7 +219,7 @@ Durable artifacts are written to:
 
 **Not automatic:**
 
-- no automatic edits to `README.md`, `INSTRUCTIONS.md`, or skills from learning
+- no automatic edits to `README.md`, `INSTRUCTIONS.md`, or user-authored/imported skills from learning
 - no model training/fine-tuning
 - no raw transcript or full tool-output storage for passive normal-chat learning
 

@@ -27,6 +27,11 @@ export interface CommandRegistrarDeps {
     tdd: CommandHandler;
     addressOpenIssues: CommandHandler;
     learnSkill: CommandHandler;
+    skillStatus: CommandHandler;
+    skillReport: CommandHandler;
+    pinSkill: CommandHandler;
+    archiveSkill: CommandHandler;
+    restoreSkill: CommandHandler;
   };
 }
 
@@ -48,6 +53,11 @@ export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
     { name: "tdd", description: "Run a strict red-green-refactor workflow", handler: handlers.tdd },
     { name: "address-open-issues", description: "Sweep open issues authored by you through triage, TDD, review, and remediation", handler: handlers.addressOpenIssues },
     { name: "learn-skill", description: "Create and refine a reusable skill", handler: handlers.learnSkill },
+    { name: "skill-status", description: "Show learned skill provenance and lifecycle status", handler: handlers.skillStatus },
+    { name: "skill-report", description: "Regenerate the learned skill curator report", handler: handlers.skillReport },
+    { name: "pin-skill", description: "Pin or unpin a learned skill to exclude it from autonomous curation", handler: handlers.pinSkill },
+    { name: "archive-skill", description: "Archive a learned skill without deleting it", handler: handlers.archiveSkill },
+    { name: "restore-skill", description: "Restore an archived learned skill", handler: handlers.restoreSkill },
   ] as const;
 
   for (const command of commands) {

@@ -25,6 +25,7 @@ export interface PendingWorkflow<
   flags: TWorkflowFlags;
   startedAt: string;
   runFile: string;
+  loadedSkills: string[];
   mutationCount: number;
   policyWarnings: string[];
 }
@@ -138,7 +139,7 @@ export async function enqueueWorkflow(params: {
   readCommandPrompt: (name: string) => Promise<string>;
   readWorkflow: (name: string) => Promise<string>;
   readSkill?: (name: string) => Promise<string>;
-}): Promise<void> {
+}): Promise<{ loadedSkills: string[] }> {
   const [promptTemplateRaw, workflowSpec] = await Promise.all([
     params.readCommandPrompt(params.workflowPromptName),
     params.readWorkflow(params.workflowFileName),
@@ -200,6 +201,7 @@ export async function enqueueWorkflow(params: {
     .join("\n");
 
   params.pi.sendUserMessage(payload);
+  return { loadedSkills: workflowSkills };
 }
 
 export async function beginWorkflowTracking<
@@ -250,6 +252,7 @@ export async function beginWorkflowTracking<
     flags: params.flags,
     startedAt,
     runFile,
+    loadedSkills: [],
     mutationCount: 0,
     policyWarnings: [],
   };
