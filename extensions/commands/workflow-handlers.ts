@@ -439,13 +439,13 @@ export function createWorkflowCommandHandlers(params: {
       await runWorkflowCommand({
         ctx,
         type: "ship",
-        input: extraInstruction || "current branch",
+        input: extraInstruction || "GitButler workspace",
         flags: {
           extraInstruction: extraInstruction || null,
           source: constants.SHIP_COMMAND_SOURCE,
         },
         sections: [
-          "Scope: current branch",
+          "Scope: GitButler workspace; select one ship target branch/stack before mutating VCS state",
           `Source reference: ${constants.SHIP_COMMAND_SOURCE}`,
           "",
           "Instruction: Start with `but status -fv`; identify applied GitButler branches/stacks, unrelated parallel branches, and unassigned changes.",
@@ -465,7 +465,7 @@ export function createWorkflowCommandHandlers(params: {
           extraInstruction: extraInstruction || null,
           source: constants.SHIP_COMMAND_SOURCE,
         },
-        startedMessage: "Started ship workflow (simplify -> test -> push -> PR).",
+        startedMessage: "Started ship workflow (inspect -> target -> simplify -> test -> commit -> push -> PR).",
       });
     },
 

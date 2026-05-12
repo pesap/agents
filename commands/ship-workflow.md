@@ -26,18 +26,7 @@ Requirements:
 - Commit only selected change IDs for the ship target.
 - Push only after tests pass.
 - Detect tracker platform and use matching skill/tooling (`github` or `gitlab`).
-- If PR/MR for current branch is already open, do not create duplicate; return link/status.
-- If none is open, create one using `.github/pull_request_template.md` when present, otherwise `skills/github/pr-template.md` for GitHub (or GitLab equivalent body).
+- If PR/MR for the ship target is already open, do not create duplicate; return link/status.
+- If none is open, create one against the repo default branch unless a base was specified, using `.github/pull_request_template.md` when present, otherwise `skills/github/pr-template.md` for GitHub (or GitLab equivalent body).
 - If you mutate files (`edit`, `write`, or mutating `bash`), include: `Postflight: verify="<command_or_check>" result=<pass|fail|not-run>`.
 - End with: simplify summary, test/CI result, push status, PR/MR status/link, risks, `Result: success|partial|failed`, and `Confidence: 0..1`.
-
-Workflow skills manifest:
-- but: GitButler CLI skill for version-control operations. File: skills/but/SKILL.md
-- simplify: Safely simplify recently touched code for readability and maintainability while preserving exact behavior. File: skills/simplify/SKILL.md
-- commit: Read this skill before making git commits. File: skills/commit/SKILL.md
-- caveman: Ultra-compressed communication mode. File: skills/caveman/SKILL.md
-- github: GitHub PR/CI workflow support. File: skills/github/SKILL.md
-- gitlab: GitLab MR/CI workflow support. File: skills/gitlab/SKILL.md
-- librarian: Cache remote git repositories for reusable local reference checkouts. Source: https://github.com/mitsuhiko/agent-stuff/tree/main/skills/librarian. File: skills/librarian/SKILL.md
-
-Load full skill docs only when needed for a concrete analysis track or edit.
