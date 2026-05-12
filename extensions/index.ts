@@ -6,8 +6,6 @@ import type {
 import { createBashTool } from "@mariozechner/pi-coding-agent";
 import registerFffExtension from "@ff-labs/pi-fff/src/index.ts";
 import path from "node:path";
-import registerThinkingStepsExtension from "pi-thinking-steps/index.ts";
-import registerLensExtension from "pi-lens/index.ts";
 import registerSubagentExtension from "pi-subagents/index.ts";
 import registerSubagentNotifyExtension from "pi-subagents/notify.ts";
 import { createAgentCommandHandlers } from "./commands/agent";
@@ -244,12 +242,6 @@ function ensureBundledExtensions(
   registerBundledExtension(ctx, "@ff-labs/pi-fff", () =>
     registerFffExtension(pi),
   );
-
-  registerBundledExtension(ctx, "pi-thinking-steps", () =>
-    registerThinkingStepsExtension(pi),
-  );
-
-  registerBundledExtension(ctx, "pi-lens", () => registerLensExtension(pi));
 }
 
 function isPreflightClarify(value: unknown): value is PreflightClarify {
@@ -727,7 +719,6 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     const compliancePreset = normalizeWhitespace(args ?? "") || "warn";
     await complianceHandlers.compliance(compliancePreset, ctx);
   };
-
 
   const { compliance: _unusedComplianceHandler, ...complianceGateHandlers } =
     complianceHandlers;
