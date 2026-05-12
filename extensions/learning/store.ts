@@ -32,11 +32,13 @@ export interface LearningPaths {
   memoryDir: string;
   runsDir: string;
   skillsDir: string;
+  archivedSkillsDir: string;
   learningJsonl: string;
   lessonsJsonl: string;
   memoryMd: string;
   promotionQueue: string;
   stateJson: string;
+  curatorReport: string;
 }
 
 export interface LearningLesson {
@@ -178,11 +180,13 @@ function buildLearningPaths(root: string): LearningPaths {
     memoryDir: path.join(root, "memory"),
     runsDir: path.join(root, "runs"),
     skillsDir: path.join(root, "skills"),
+    archivedSkillsDir: path.join(root, "archive", "skills"),
     learningJsonl: path.join(root, "memory", "learning.jsonl"),
     lessonsJsonl: path.join(root, "memory", "lessons.jsonl"),
     memoryMd: path.join(root, "memory", "MEMORY.md"),
     promotionQueue: path.join(root, "memory", "promotion-queue.md"),
     stateJson: path.join(root, "state.json"),
+    curatorReport: path.join(root, "memory", "skill-curator-report.md"),
   };
 }
 
@@ -211,10 +215,12 @@ async function initializeLearningStore(paths: LearningPaths): Promise<void> {
   await fs.mkdir(paths.memoryDir, { recursive: true });
   await fs.mkdir(paths.runsDir, { recursive: true });
   await fs.mkdir(paths.skillsDir, { recursive: true });
+  await fs.mkdir(paths.archivedSkillsDir, { recursive: true });
   await ensureFile(paths.learningJsonl, "");
   await ensureFile(paths.lessonsJsonl, "");
   await ensureFile(paths.memoryMd, "# MEMORY\n");
   await ensureFile(paths.promotionQueue, "# Promotion Queue\n");
+  await ensureFile(paths.curatorReport, "# Skill Curator Report\n");
   await ensureFile(paths.stateJson, JSON.stringify({ hints: {} }, null, 2));
 }
 

@@ -53,3 +53,5 @@ Self-improvement policy:
 - Must request approval before applying self-edits.
 - Must explain expected benefit and rollback path.
 - Use repeated observations in `memory/learning.jsonl` and passive lessons in `memory/lessons.jsonl` to suggest promotion hints into `memory/promotion-queue.md`.
+- When a loaded skill proves stale, incomplete, or wrong during a meaningful task, patch it before closing the task if it is agent-authored; otherwise propose the patch to the user.
+- Prefer patching an existing class-level skill over creating a new narrow skill. Create a new skill only when the learning is reusable across a class of tasks and no existing umbrella skill fits.

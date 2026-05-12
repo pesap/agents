@@ -10,6 +10,7 @@ import registerSubagentExtension from "pi-subagents/index.ts";
 import registerSubagentNotifyExtension from "pi-subagents/notify.ts";
 import { createAgentCommandHandlers } from "./commands/agent";
 import { createComplianceCommandHandlers } from "./commands/compliance";
+import { createCuratorCommandHandlers } from "./commands/curator";
 import {
   buildReviewTarget,
   buildSimplifyTarget,
@@ -55,6 +56,7 @@ import {
   loadHooksConfig,
   type HookConfig,
 } from "./hooks/config";
+import { refreshCuratorReport } from "./learning/curator";
 import {
   appendLearningLesson,
   ensureLearningStore,
@@ -64,6 +66,12 @@ import {
   type LearningObservation,
   type LearningPaths,
 } from "./learning/store";
+import {
+  ensureLearnedSkillLayout,
+  readLearnedSkillMetadata,
+  touchLearnedSkillUsage,
+} from "./learning/skills";
+import { validateGeneratedSkillDir } from "./learning/skill-guard";
 import {
   extractPostflightFromAssistantText,
   isMutationToolCall,
@@ -226,6 +234,76 @@ function inferPassiveLessonFromUserText(
   };
 }
 
+function shouldRunActiveLearningReview(workflow: PendingWorkflow): boolean {
+  return (
+    workflow.type !== "learn-skill" &&
+    (workflow.mutationCount > 0 ||
+      workflow.loadedSkills.length > 0 ||
+      workflow.type === "debug" ||
+      workflow.type === "feature" ||
+      workflow.type === "review" ||
+      workflow.type === "simplify" ||
+      workflow.type === "tdd" ||
+      workflow.type === "plan")
+  );
+}
+
+function inferSkillPatchSignal(text: string): boolean {
+  return /\b(?:workaround|manual step|missing step|stale|incomplete|pitfall|had to)\b/i.test(
+    text,
+  );
+}
+
+async function appendCuratorReportEntry(params: {
+  cwd: string;
+  workflow: PendingWorkflow;
+  assistantText: string;
+}): Promise<void> {
+  if (!shouldRunActiveLearningReview(params.workflow)) return;
+
+  const paths = await ensureLearningStore(params.cwd, learningPathCache);
+  const touched: string[] = [];
+  const recommendations: string[] = [];
+  const reviewAt = nowIso();
+
+  for (const skillName of params.workflow.loadedSkills) {
+    const record = await touchLearnedSkillUsage({
+      paths,
+      skillName,
+      nowIso: reviewAt,
+    });
+    if (!record) continue;
+    touched.push(
+      `${skillName} (${record.metadata.provenance}, uses=${record.metadata.useCount})`,
+    );
+
+    if (inferSkillPatchSignal(params.assistantText)) {
+      recommendations.push(
+        record.metadata.provenance === "agent-authored" ||
+          record.metadata.provenance === "background-review-authored"
+          ? `Patch learned skill \`${skillName}\` from workflow ${params.workflow.id}.`
+          : `Propose a patch for read-only learned skill \`${skillName}\` from workflow ${params.workflow.id}.`,
+      );
+    }
+  }
+
+  if (touched.length === 0 && recommendations.length === 0) return;
+
+  const entry = [
+    `## ${reviewAt} ${params.workflow.type}/${params.workflow.id}`,
+    touched.length > 0 ? `- Loaded learned skills: ${touched.join(", ")}` : "",
+    recommendations.length > 0
+      ? `- Recommendations: ${recommendations.join(" ")}`
+      : "",
+    `- Evidence: ${summarizeEvidence(params.assistantText, 220)}`,
+    "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  await appendLine(paths.curatorReport, entry);
+}
+
 function ensureBundledExtensions(
   pi: ExtensionAPI,
   ctx?: Pick<ExtensionContext, "hasUI" | "ui">,
@@ -283,8 +361,8 @@ async function enqueueWorkflow(
   workflowPromptName: string,
   workflowFileName: string,
   sections: string[],
-): Promise<void> {
-  await enqueueWorkflowMessage({
+): Promise<{ loadedSkills: string[] }> {
+  return enqueueWorkflowMessage({
     pi,
     workflowPromptName,
     workflowFileName,
@@ -363,6 +441,24 @@ async function completeWorkflowTracking(
       lowConfidenceEvents.push(event);
     },
   });
+  try {
+    await appendCuratorReportEntry({
+      cwd: ctx.cwd,
+      workflow,
+      assistantText,
+    });
+    const paths = await ensureLearningStore(ctx.cwd, learningPathCache);
+    await refreshCuratorReport({
+      paths,
+      nowIso: nowIso(),
+    });
+  } catch (error) {
+    notify(
+      ctx,
+      `Active-learning review failed: ${error instanceof Error ? error.message : String(error)}`,
+      "warning",
+    );
+  }
 }
 
 export default function khalaExtension(pi: ExtensionAPI): void {
@@ -610,6 +706,32 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       }
     }
 
+    if (workflow.type === "learn-skill" && workflow.flags.dryRun !== true) {
+      const targetSkill =
+        typeof workflow.flags.targetSkill === "string"
+          ? workflow.flags.targetSkill
+          : null;
+      if (targetSkill) {
+        const paths = await ensureLearningStore(ctx.cwd, learningPathCache);
+        const record = await readLearnedSkillMetadata(paths, targetSkill);
+        if (record) {
+          const guard = await validateGeneratedSkillDir(record.dir);
+          if (!guard.ok) {
+            return {
+              block: true,
+              reason: [
+                "LEARNED SKILL SAFETY CHECK FAILED",
+                "",
+                ...guard.issues.map((issue) => `- ${issue.file}: ${issue.reason}`),
+                "",
+                "Remove the unsafe content and retry.",
+              ].join("\n"),
+            };
+          }
+        }
+      }
+    }
+
     try {
       await completeWorkflowTracking(pi, ctx, workflow, text);
     } finally {
@@ -686,6 +808,16 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     parseAddressOpenIssuesArgs,
     parseLearnSkillArgs,
     ensureLearningStore: (cwd) => ensureLearningStore(cwd, learningPathCache),
+    ensureLearnedSkillLayout: async (cwd, skillName, sourceRunId) => {
+      const paths = await ensureLearningStore(cwd, learningPathCache);
+      return ensureLearnedSkillLayout({
+        paths,
+        skillName,
+        nowIso: nowIso(),
+        provenance: "agent-authored",
+        sourceRunId,
+      });
+    },
     exists,
     readText,
     buildSkillTemplate,
@@ -702,6 +834,12 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       TDD_COMMAND_SOURCE,
       ADDRESS_OPEN_ISSUES_COMMAND_SOURCE,
     },
+  });
+
+  const curatorHandlers = createCuratorCommandHandlers({
+    ensureLearningStore: (cwd) => ensureLearningStore(cwd, learningPathCache),
+    nowIso,
+    notify,
   });
 
   const khala = async (
@@ -726,6 +864,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     handlers: {
       ...complianceGateHandlers,
       ...workflowHandlers,
+      ...curatorHandlers,
       endAgent: agentHandlers.endAgent,
       khala,
     },

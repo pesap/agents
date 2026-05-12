@@ -70,7 +70,7 @@ export function createWorkflowCommandHandlers(params: {
     workflowPromptName: string,
     workflowFileName: string,
     sections: string[],
-  ) => Promise<void>;
+  ) => Promise<{ loadedSkills: string[] }>;
   notifyWorkflowStarted: (
     ctx: ExtensionCommandContext,
     message: string,
@@ -102,6 +102,11 @@ export function createWorkflowCommandHandlers(params: {
     dryRun: boolean;
   };
   ensureLearningStore: (cwd: string) => Promise<{ skillsDir: string }>;
+  ensureLearnedSkillLayout: (
+    cwd: string,
+    skillName: string,
+    sourceRunId?: string | null,
+  ) => Promise<{ dir: string; skillFile: string; metadataFile: string }>;
   exists: (filePath: string) => Promise<boolean>;
   readText: (filePath: string) => Promise<string>;
   buildSkillTemplate: (skillName: string, topic: string) => string;
@@ -177,19 +182,20 @@ export function createWorkflowCommandHandlers(params: {
     }
 
     ensureAgentEnabledForCommand(pi, config.ctx, config.type);
-    await beginWorkflowTracking(
+    const pending = await beginWorkflowTracking(
       pi,
       config.ctx,
       config.type,
       config.input,
       config.flags,
     );
-    await enqueueWorkflow(
+    const queued = await enqueueWorkflow(
       pi,
       runtime.promptFile,
       runtime.workflowFile,
       config.sections,
     );
+    pending.loadedSkills = queued.loadedSkills;
 
     pi.appendEntry(runtime.entryType, {
       ...config.entry,
@@ -608,14 +614,16 @@ export function createWorkflowCommandHandlers(params: {
       const skillHint =
         parsed.topic || parsed.fromFile || parsed.fromUrl || "new-skill";
       const skillName = slugify(skillHint);
-      const skillDir = path.join(paths.skillsDir, skillName);
-      const skillFile = path.join(skillDir, "SKILL.md");
+      const skillFile = path.join(paths.skillsDir, skillName, "SKILL.md");
 
       if (!parsed.dryRun) {
-        await fs.mkdir(skillDir, { recursive: true });
-        if (!(await exists(skillFile))) {
+        const learnedSkill = await params.ensureLearnedSkillLayout(
+          ctx.cwd,
+          skillName,
+        );
+        if (!(await exists(learnedSkill.skillFile))) {
           await fs.writeFile(
-            skillFile,
+            learnedSkill.skillFile,
             buildSkillTemplate(skillName, parsed.topic || skillHint),
             "utf8",
           );
