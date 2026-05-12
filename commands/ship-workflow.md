@@ -16,10 +16,14 @@ You are running the khala `/ship` workflow.
 Requirements:
 - Be concise.
 - Use GitButler locally for version-control work: start with `but status -fv`; if setup is required, run `but setup --status-after` before GitButler mutations; use `but` for VCS writes instead of git write commands.
-- Workflow order is fixed: simplify -> test/CI -> push -> PR.
-- Run simplify only on current uncommitted scope and preserve exact behavior.
+- Workflow order is fixed: inspect GitButler state -> select ship target -> simplify -> test/CI -> commit -> push -> PR.
+- Identify all applied GitButler branches/stacks from `but status -fv`: ship target, dependency/stacked branches, unrelated parallel branches, and unassigned changes.
+- Select exactly one ship target branch/stack. If ambiguous, show a branch/change table and ask before shipping.
+- Treat other applied branches as parallel work; do not commit, push, or include their changes unless explicitly requested.
+- Run simplify only on current uncommitted scope for the selected ship target and preserve exact behavior.
 - Detect project test/CI command from repo conventions; run it and stop on first failure.
-- If current branch is `main` or `master`, create a new feature branch before commit/push/PR unless the user specified a branch name.
+- Ensure a GitButler branch/stack exists for the ship target before commit/push/PR.
+- Commit only selected change IDs for the ship target.
 - Push only after tests pass.
 - Detect tracker platform and use matching skill/tooling (`github` or `gitlab`).
 - If PR/MR for current branch is already open, do not create duplicate; return link/status.

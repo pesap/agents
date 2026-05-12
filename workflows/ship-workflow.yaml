@@ -7,20 +7,24 @@ version_control:
   setup_when_missing: but setup --status-after
   write_operations: use but instead of git write commands
 steps:
-  - id: simplify
-    action: simplify_current_uncommitted_scope
+  - id: inspect-gitbutler
+    action: inspect_gitbutler_state_and_list_applied_parallel_branches
+  - id: select-target
+    action: select_exactly_one_ship_target_branch_or_stack_and_ask_if_ambiguous
   - id: branch
-    action: create_feature_branch_if_current_branch_is_main_or_master_and_no_branch_was_specified
+    action: ensure_gitbutler_branch_or_stack_exists_for_ship_target
+  - id: simplify
+    action: simplify_current_uncommitted_scope_for_selected_ship_target
   - id: validate
     action: run_project_ci_or_test_command
   - id: commit
-    action: commit_verified_changes_when_needed
+    action: commit_only_selected_change_ids_for_ship_target_when_needed
   - id: push
-    action: push_current_branch_after_green_checks
+    action: push_ship_target_after_green_checks
   - id: pr-check
-    action: detect_existing_pr_or_mr_for_current_branch
+    action: detect_existing_pr_or_mr_for_ship_target
   - id: pr-open
-    action: open_pr_or_mr_if_missing_using_template_targeting_main_unless_specified
+    action: open_pr_or_mr_if_missing_using_template_targeting_default_or_specified_base
   - id: summarize
     action: report_simplify_test_push_pr_status
   - id: learn
