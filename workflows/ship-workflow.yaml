@@ -13,6 +13,8 @@ steps:
     action: select_exactly_one_ship_target_branch_or_stack_and_ask_if_ambiguous
   - id: freshness-check
     action: verify_ship_target_has_unique_unmerged_work_and_is_not_already_on_default_branch
+  - id: branch-reuse-check
+    action: verify_ship_target_has_not_already_been_merged_and_reused_after_squash_merge
   - id: scope-check
     action: verify_requested_edits_exist_in_repo_local_diff_not_external_agent_paths
   - id: branch

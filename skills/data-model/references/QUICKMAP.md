@@ -48,7 +48,7 @@ Use built-in first; else alias:
 
 ## Hard rules
 - Pydantic v2 only.
-- Always `description=` in `Field(...)`.
+- `description=` in `Field(...)` is the repo default.
 - No loose dicts for structured contracts.
 - Inheritance for categorization only (not shared fields).
 - Avoid `@computed_field` for core behavior.
