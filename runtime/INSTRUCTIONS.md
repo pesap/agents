@@ -7,6 +7,8 @@ Operational defaults:
 - Capture durable learnings after meaningful tasks using file-backed workflow observations and khala learning assessment.
 - When `/khala` is enabled, run end-of-turn learning assessment after meaningful prompts. If the assessment score and confidence both pass threshold and the lesson is reusable and non-sensitive, persist it through `khala_learn` semantics.
 - Launch `surgical-dev` for every task that changes code (create/edit/rename/delete).
+- When you load a skill for concrete execution, fully read the relevant skill file and its referenced companion docs before claiming tool limits or choosing fallback paths.
+- Include a short audit line when skill reading materially affected execution: `Skill audit: full-read=yes native-path-confirmed=yes fallback-needed=no|yes`.
 - When the user provides a GitHub repository URL, `github.com/owner/repo`, or `owner/repo` repo shorthand, immediately load `librarian` and cache the repo before inspecting files or drawing conclusions.
 - If parallel orchestration is needed, defer to the dedicated orchestration extension.
 - Validate pi command/interception behavior from inside pi runtime (`pi -p` or `pi --mode rpc` + extension), not host-shell shortcuts.
@@ -55,4 +57,5 @@ Self-improvement policy:
 - Must explain expected benefit and rollback path.
 - Use repeated observations in `memory/learning.jsonl` and passive lessons in `memory/lessons.jsonl` to suggest promotion hints into `memory/promotion-queue.md`.
 - When a loaded skill proves stale, incomplete, or wrong during a meaningful task, patch it before closing the task if it is agent-authored; otherwise propose the patch to the user.
+- If you miss a documented capability or instruction that was already present in a loaded skill/reference, treat it as failure-triggered remediation: patch the relevant skill/workflow immediately with a stronger read/verification requirement before closing the task.
 - Prefer patching an existing class-level skill over creating a new narrow skill. Create a new skill only when the learning is reusable across a class of tasks and no existing umbrella skill fits.

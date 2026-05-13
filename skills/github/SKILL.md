@@ -29,6 +29,7 @@ description: Use this skill when the user needs GitHub terminal workflows (PRs, 
 - Check for an existing open PR for the same head branch before creating a new one.
 - Prefer explicit PR body injection over implicit defaults.
 - Use repo-local templates when present; otherwise use `skills/github/pr-template.md`.
+- Before claiming PR success, inspect the real remote PR and verify base branch, commit list, signature state, body format, and checks status.
 
 ## Reference loading guide
 - Read `references/prs.md` when replying to review comments, checking PR state, or creating PRs.
