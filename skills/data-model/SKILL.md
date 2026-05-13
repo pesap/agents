@@ -1,6 +1,6 @@
 ---
 name: data-model
-description: Design robust data contracts with dataclasses, Pydantic v2, pydantic-settings, and infrasys component patterns. Use when users ask about model shape, validation, serialization, typed config, or schema evolution.
+description: Design robust data contracts with dataclasses, Pydantic v2, pydantic-settings, and infrasys component patterns. Use when users ask about model shape, validation, serialization, typed config, schema evolution, or cleaning up loose dict/schema/model code into explicit typed contracts, even if they do not name Pydantic or dataclasses directly.
 license: MIT
 allowed-tools: Read Edit Grep Glob Bash Write
 metadata:
@@ -17,6 +17,8 @@ metadata:
 - Defining field constraints, validators, serializers, aliases, or payload filtering.
 - Creating generic typed response/container models.
 - Updating schemas safely with backward compatibility in mind.
+- Cleaning up loose dict/schema/model code into explicit validated contracts.
+- Making config typed, fixing serialization shape, or tightening a weak data boundary.
 
 ## Avoid when
 - Task is not about data contracts.
@@ -29,6 +31,10 @@ metadata:
 3. App config/env -> `pydantic-settings` (`BaseSettings`).
 4. infrasys system entities -> `Component` / `SupplementalAttribute`.
 
+## Guidance levels
+- **Repo convention / default**: follow these unless local code reality or the user explicitly wants a different contract.
+- **General modeling guidance**: use judgment where multiple good patterns exist.
+
 ## Non-negotiable rules
 
 ### A) Core modeling
@@ -37,7 +43,7 @@ metadata:
 3. Use `Annotated[...]` for modeled fields.
 4. Put full type hint inside `Annotated`.
 5. Use `Field(...)` for constrained fields.
-6. Always include `description=` in `Field(...)`.
+6. In this repo, include `description=` in `Field(...)` unless there is a strong local reason not to.
 7. Never use `typing.Union[...]`; use `A | B`.
 
 ### B) Type quality
@@ -75,9 +81,11 @@ metadata:
 6. Check migration/compatibility impact.
 
 See:
-- [REFERENCE.md](./REFERENCE.md) for full copy-paste patterns.
-- [EXAMPLES.md](./EXAMPLES.md) for bad -> good snippets.
-- [QUICKMAP.md](./QUICKMAP.md) for fast intent -> pattern lookup.
+- [references/REFERENCE.md](./references/REFERENCE.md) for full copy-paste patterns.
+- [references/EXAMPLES.md](./references/EXAMPLES.md) for bad -> good snippets.
+- [references/QUICKMAP.md](./references/QUICKMAP.md) for fast intent -> pattern lookup.
+- `evals/train-trigger-prompts.json` and `evals/validation-trigger-prompts.json` for trigger tuning.
+- `evals/evals.json` for output-quality checks.
 
 ## Output
 - Chosen model type and reason.
