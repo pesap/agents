@@ -17,8 +17,9 @@ Use GitButler CLI (`but`) as the default version-control interface.
 4. Start with `but status -fv` before mutations so IDs and stack state are current.
 5. Create a branch for new work with `but branch new <name>` when needed.
 6. Before shipping or opening a PR, verify the target branch still contains unique work relative to the default branch. If its changes are already merged, do not push or open a duplicate PR.
-7. Before committing, verify the edited files live in the current repository/worktree, not in an agent-installed skill directory, cache checkout, or other external copy.
-8. Never create an unsigned commit. If signing is unavailable, failing, or cannot be confirmed, stop and ask the user for assistance.
+7. If a target branch is stale or stacked on already-merged work, update from the default branch and rebuild on a fresh branch from the latest mainline instead of stacking new work on the stale branch.
+8. Before committing, verify the edited files live in the current repository/worktree, not in an agent-installed skill directory, cache checkout, or other external copy.
+9. Never create an unsigned commit. If signing is unavailable, failing, or cannot be confirmed, stop and ask the user for assistance.
 
 ## Core Flow
 
