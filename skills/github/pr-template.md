@@ -1,5 +1,6 @@
-Closes {LINK TO GH ISSUE}
-p
+Closes: none
+
+<!-- Replace `none` with an issue link or reference when applicable. -->
 
 ## Description
 

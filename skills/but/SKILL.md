@@ -9,6 +9,10 @@ author: GitButler Team
 
 Use GitButler CLI (`but`) as the default version-control interface.
 
+Skill audit line for meaningful GitButler execution:
+- `Skill audit: full-read=yes native-path-confirmed=yes fallback-needed=no|yes`
+- Use `fallback-needed=yes` only after checking the documented GitButler-native path in this skill and its references.
+
 ## Non-Negotiable Rules
 
 1. Use `but` for all write operations. Never run `git add`, `git commit`, `git push`, `git checkout`, `git merge`, `git rebase`, `git stash`, or `git cherry-pick`. If the user says a `git` write command, translate it to `but` and run that.
@@ -21,6 +25,8 @@ Use GitButler CLI (`but`) as the default version-control interface.
 8. If a branch already had a merged PR (especially after squash merge), do not reuse that branch for follow-up work. Create a fresh branch from the latest default branch and move only the intended current diff.
 9. Before committing, verify the edited files live in the current repository/worktree, not in an agent-installed skill directory, cache checkout, or other external copy.
 10. Never create an unsigned commit. If signing is unavailable, failing, or cannot be confirmed, stop and ask the user for assistance.
+11. Do not ship from an existing branch/stack until you prove it is the correct target for this task and does not carry prior unrelated commits.
+12. Before reporting ship success, verify the remote PR/branch invariants on the actual forge artifact: one intended commit, default-branch base, verified signature, plain text/markdown body (no HTML), green checks, and mergeable/non-conflicting status.
 
 ## Core Flow
 
@@ -75,8 +81,31 @@ When investigating signing in a GitButler-managed workspace:
 1. Inspect real commit signatures with `git log --show-signature --pretty='%h %G? %GS %s' -10`.
 2. Do not treat an unsigned `GitButler Workspace Commit` at `HEAD` as proof that branch commits are unsigned; it is an internal virtual-workspace merge commit.
 3. Interpret signature status codes: `G` = good signature, `N` = no signature, `U` = signature exists but is not trusted locally.
-4. For SSH signing, verify the effective config includes `commit.gpgsign=true`, `gpg.format=ssh`, `gitbutler.signCommits=true`, a usable key source such as `gpg.ssh.defaultKeyCommand=ssh-add -L`, and a trusted `gpg.ssh.allowedSignersFile`.
-5. If GitButler signing fails even with `gpg.ssh.defaultKeyCommand`, set `user.signingKey` explicitly to the SSH public key from `ssh-add -L`.
+4. Treat commit signature verification as separate from CI/test verification. `unverified` on a commit is a signing problem unless forge evidence shows otherwise.
+5. For SSH signing, verify the effective config includes `commit.gpgsign=true`, `gpg.format=ssh`, `gitbutler.signCommits=true`, a usable key source such as `gpg.ssh.defaultKeyCommand=ssh-add -L`, and a trusted `gpg.ssh.allowedSignersFile`.
+6. If GitButler signing fails even with `gpg.ssh.defaultKeyCommand`, set `user.signingKey` explicitly to the SSH public key from `ssh-add -L`.
+
+### Ship target verification
+
+Before commit/push/PR on a GitButler workspace:
+
+1. Use `but status -fv` to list all applied branches/stacks and unassigned changes.
+2. Pick exactly one ship target branch/stack.
+3. Before concluding a GitButler-native path is missing, read the relevant reference entries (`references/reference.md`, `references/concepts.md`, `references/examples.md`) for the task.
+4. Record a short audit in your summary when this skill materially guided execution: `Skill audit: full-read=yes native-path-confirmed=yes fallback-needed=no|yes`.
+5. Prove the target is fresh for this task:
+   - unique relative to the latest default branch
+   - merge-base with `origin/<default>` is the current default-branch tip for this task, or you have explicitly rebased/rebuilt onto that tip
+   - not already used by a merged PR
+   - not carrying unrelated historical commits
+6. If the target fails any check, stop reusing it. Rebuild on a fresh branch from the latest default branch.
+7. Before claiming success, inspect the forge PR/branch and verify:
+   - one intended commit
+   - correct base = default branch unless user specified otherwise
+   - signature verified on the shipped commit
+   - no HTML in PR body/final reported body content
+   - checks green
+   - PR is mergeable / not conflicting
 
 ### Amend into existing commit
 

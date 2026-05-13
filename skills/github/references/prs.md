@@ -18,6 +18,20 @@ gh pr create --repo owner/repo \
   --body-file skills/github/pr-template.md
 ```
 
+Verify the created/existing PR before claiming success:
+```bash
+gh pr view <number> --repo owner/repo \
+  --json number,title,url,headRefName,baseRefName,body,commits,statusCheckRollup
+```
+
+Ship invariants to verify from forge data:
+- commit list is exactly the intended commit set (prefer one commit for one logical change)
+- base branch is the default branch unless the user asked otherwise
+- commit signatures are verified on the shipped commit(s)
+- PR body is plain markdown/text; do not submit or report raw HTML
+- PR body has no unreplaced placeholders such as `Closes {LINK TO GH ISSUE}`
+- checks are green before reporting ship success
+
 ## Reply to reviewer comments in-thread (preferred)
 
 List review comments and IDs:

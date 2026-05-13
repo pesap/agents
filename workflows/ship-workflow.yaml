@@ -13,6 +13,8 @@ steps:
     action: select_exactly_one_ship_target_branch_or_stack_and_ask_if_ambiguous
   - id: freshness-check
     action: verify_ship_target_has_unique_unmerged_work_and_is_not_already_on_default_branch
+  - id: base-sync-check
+    action: verify_ship_target_merge_base_matches_latest_default_branch_or_rebuild_before_pr
   - id: branch-reuse-check
     action: verify_ship_target_has_not_already_been_merged_and_reused_after_squash_merge
   - id: scope-check
@@ -27,13 +29,17 @@ steps:
     action: verify_commit_will_be_signed_or_stop_for_user_assistance
   - id: commit
     action: commit_only_selected_change_ids_for_ship_target_when_needed
+  - id: commit-verify
+    action: verify_exact_ship_commit_is_signed_and_not_a_gitbutler_workspace_commit_false_positive
   - id: push
     action: push_ship_target_after_green_checks
   - id: pr-check
     action: detect_existing_pr_or_mr_for_ship_target
   - id: pr-open
     action: open_pr_or_mr_if_missing_using_template_targeting_default_or_specified_base
+  - id: remote-verify
+    action: verify_remote_pr_or_mr_invariants_one_commit_default_base_signed_commit_plain_text_body_green_checks_and_no_conflicts
   - id: summarize
-    action: report_simplify_test_push_pr_status
+    action: report_simplify_test_push_pr_status_only_after_remote_invariants_pass
   - id: learn
     action: persist_learnings

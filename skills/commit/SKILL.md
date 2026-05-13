@@ -24,6 +24,7 @@ Create a GitButler commit for the current changes using a concise Conventional C
 - Do NOT add sign-offs (no `Signed-off-by`).
 - Use GitButler (`but`) for commit mutations; do NOT use `git add` or `git commit`.
 - Never create an unsigned commit. If commit signing is unavailable, failing, or unclear, stop and request user assistance before committing.
+- Treat commit signature verification separately from CI/test verification. `unverified` on a commit means a signing problem until proven otherwise.
 - Only commit; do NOT push.
 - Commit only repo-local changes from the current working tree. If edits landed in an agent-installed skill, cache checkout, or any path outside the current repo, stop and fix scope before committing.
 - Do not reuse a branch that already had a merged PR for follow-up work. If the current branch was previously merged or carries historical commits outside the intended scope, stop and create a fresh branch from the latest default branch first.
@@ -43,7 +44,8 @@ Create a GitButler commit for the current changes using a concise Conventional C
 6. (Optional) Run `git log -n 50 --pretty=format:%s` to see commonly used scopes.
 7. If there are ambiguous extra files, or the requested edits are not present in the repo-local diff, ask for clarification before committing.
 8. Verify commit signing is configured and working for this repo/worktree. If signing cannot be confirmed, stop and ask for assistance.
-9. Commit only the intended change IDs with `but commit <branch> -m "<subject>" --changes <ids> --status-after` (add body flags if needed).
+9. Confirm the target commit set is exactly the intended scope for this PR: one logical change, no inherited historical commits, and no reused merged-branch history.
+10. Commit only the intended change IDs with `but commit <branch> -m "<subject>" --changes <ids> --status-after` (add body flags if needed).
 
 ## Validation
 
