@@ -16,6 +16,10 @@ Use GitButler CLI (`but`) as the default version-control interface.
 3. Use CLI IDs from `but status -fv` / `but diff` / `but show`; never hardcode IDs.
 4. Start with `but status -fv` before mutations so IDs and stack state are current.
 5. Create a branch for new work with `but branch new <name>` when needed.
+6. Before shipping or opening a PR, verify the target branch still contains unique work relative to the default branch. If its changes are already merged, do not push or open a duplicate PR.
+7. If a target branch is stale or stacked on already-merged work, update from the default branch and rebuild on a fresh branch from the latest mainline instead of stacking new work on the stale branch.
+8. Before committing, verify the edited files live in the current repository/worktree, not in an agent-installed skill directory, cache checkout, or other external copy.
+9. Never create an unsigned commit. If signing is unavailable, failing, or cannot be confirmed, stop and ask the user for assistance.
 
 ## Core Flow
 
@@ -57,6 +61,17 @@ but <mutation> ... --status-after
 3. `but commit <branch> -m "<msg>" --changes <id1>,<id2> --status-after`
    Use `-c` to create the branch if it doesn't exist. Omit IDs you don't want committed.
 4. **Check the `--status-after` output** for remaining uncommitted changes. If the file still appears as unassigned or assigned to another branch after commit, it may be dependency-locked. See "Stacked dependency / commit-lock recovery" below.
+5. Verify the real branch commit, not just `HEAD`, is signed. In GitButler workspaces, `HEAD` can be an unsigned internal `GitButler Workspace Commit` even when the branch commit is correctly signed.
+
+### Commit signing verification
+
+When investigating signing in a GitButler-managed workspace:
+
+1. Inspect real commit signatures with `git log --show-signature --pretty='%h %G? %GS %s' -10`.
+2. Do not treat an unsigned `GitButler Workspace Commit` at `HEAD` as proof that branch commits are unsigned; it is an internal virtual-workspace merge commit.
+3. Interpret signature status codes: `G` = good signature, `N` = no signature, `U` = signature exists but is not trusted locally.
+4. For SSH signing, verify the effective config includes `commit.gpgsign=true`, `gpg.format=ssh`, `gitbutler.signCommits=true`, a usable key source such as `gpg.ssh.defaultKeyCommand=ssh-add -L`, and a trusted `gpg.ssh.allowedSignersFile`.
+5. If GitButler signing fails even with `gpg.ssh.defaultKeyCommand`, set `user.signingKey` explicitly to the SSH public key from `ssh-add -L`.
 
 ### Amend into existing commit
 
@@ -142,6 +157,8 @@ If `but move` causes conflicts (conflicted commits in status):
 - After a successful `--status-after`, don't run a redundant `but status -fv` unless you need new IDs.
 - Use `but show <branch-id>` to see commit details for a branch, including per-commit file changes and line counts.
 - **Per-commit file counts**: `but status` does NOT include per-commit file counts. Use `but show <branch-id>` or `git show --stat <commit-hash>` to get them.
+- For ship/review tasks, pair GitButler inspection with git/forge checks when needed: compare the target branch against `origin/<default-branch>` (`git cherry`, `git log origin/<default>..<branch>`, PR lookup) to catch stale or already-merged branches.
+- If `but status -fv` is broken or incomplete in a workspace, treat that as degraded mode: use `but branch list`, `but branch show`, and read-only git/forge inspection, then call out the limitation explicitly.
 - Avoid `--help` probes; use this skill and `references/reference.md` first. Only use `--help` after a failed attempt.
 - Run `but skill check` only when command behavior diverges from this skill, not as routine preflight.
 - For command syntax and flags: `references/reference.md`

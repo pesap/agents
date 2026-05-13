@@ -1,6 +1,6 @@
 ---
 name: debug-investigation
-description: Diagnose bugs from first principles by reproducing signals, ranking hypotheses, validating evidence, and converging on a durable root cause before proposing or applying fixes. Use this skill when users ask to debug failures, investigate flaky behavior, or explain why something broke.
+description: Diagnose bugs from first principles by reproducing signals, ranking hypotheses, validating evidence, and converging on a durable root cause before proposing or applying fixes. Use this skill when users ask to debug failures, investigate flaky behavior, explain why something broke, or understand a regression without guess-and-patch changes.
 ---
 
 ## Use when
@@ -20,12 +20,14 @@ description: Diagnose bugs from first principles by reproducing signals, ranking
 2. Collect evidence first.
    - Reproduce if possible, or gather logs/traces/tests/diffs.
    - Identify earliest trustworthy signal and likely change window.
+   - Prefer direct signals over secondhand summaries.
 3. Generate ranked hypotheses.
    - Prefer a small set of concrete hypotheses over many vague ones.
    - Rank by likelihood, blast radius, and testability.
 4. Test hypotheses with targeted checks.
    - Run minimal experiments to falsify quickly.
    - Update ranking as evidence changes.
+   - Stop broad code changes until one hypothesis is strongly supported.
 5. Converge on root cause.
    - Explain causality (trigger -> failure mechanism -> observable symptom).
    - Distinguish confirmed facts from assumptions.
@@ -35,6 +37,13 @@ description: Diagnose bugs from first principles by reproducing signals, ranking
 7. Validate and communicate confidence.
    - Run targeted validation for touched scope.
    - Report residual risk and what would increase confidence.
+
+## Common debugging traps
+- Jumping to a likely fix before reproducing or locating the earliest trustworthy signal.
+- Treating correlated recent changes as causal without falsification.
+- Expanding from one concrete failure into an unbounded architecture cleanup.
+- Calling something root cause when it is only the first visible crash site.
+- Closing the loop without a regression test or equivalent validation path.
 
 ## Output
 - Problem statement and reproduction status

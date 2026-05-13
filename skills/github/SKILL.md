@@ -1,40 +1,43 @@
 ---
 name: github
-description: Use this skill when the user needs GitHub terminal workflows (PRs, issues, CI failures, workflow optimization, caching/artifacts, matrix builds, runner sizing), even if they don't explicitly mention GitHub Actions or gh CLI.
+description: Use this skill when the user needs GitHub terminal workflows (PRs, issues, CI failures, workflow optimization, caching/artifacts, matrix builds, runner sizing), even if they do not explicitly mention GitHub Actions or `gh` and instead ask to check a PR, inspect CI, reply to review comments, optimize workflows, or work an issue from the terminal.
 ---
 
 ## Use when
-- User asks to work with PRs/issues/runs from terminal.
+- User asks to inspect or act on GitHub PRs, issues, review comments, or workflow runs from the terminal.
 - User asks to debug or optimize GitHub Actions workflows.
-- User asks about cache, artifacts, matrix strategy, concurrency, or runner costs.
+- User asks about cache, artifacts, matrix strategy, concurrency, runner sizing, or CI cost/speed tradeoffs.
+- User implicitly needs GitHub CLI workflows: "check this PR", "why did CI fail", "reply to review", "open an issue", or "create the PR".
 
 ## Avoid when
 - GitLab operations (use `gitlab` skill).
 - Deep GitHub App/OAuth app implementation.
+- Pure product/code work with no GitHub workflow component.
 - Raw API workflows beyond practical `gh api` usage.
 
 ## Workflow
 1. Confirm repo scope and desired outcome.
-2. Gather evidence with `gh` commands.
-3. Diagnose failure/bottleneck and propose minimal high-impact changes.
-4. Validate via checks/reruns where possible.
-5. For PR feedback responses, prefer direct replies in the original review thread.
-6. When creating PRs, use the shared template from `skills/github/pr-template.md` via `gh pr create --body-file <path>`.
+2. Gather evidence with `gh` commands before proposing changes.
+3. Diagnose from concrete signals: PR state, review thread, run status, logs, artifacts, labels, issue context, or workflow YAML.
+4. Prefer the smallest high-impact action: rerun, reply in-thread, update metadata, patch workflow config, or open/fill the right PR.
+5. Validate via checks, reruns, or follow-up `gh` inspection where possible.
+6. Load [references/REFERENCE.md](./references/REFERENCE.md) as the index, then read only the relevant file for the task.
 7. Summarize evidence, decisions, and residual risks.
 
-## PR review reply policy
-- Prefer replying in-thread to the reviewer comment (not a general PR comment).
-- Use `gh api` with `in_reply_to` on `pulls/{pull_number}/comments`.
-- Only use `gh pr comment` when there is no thread/comment ID to reply to.
-- If wrong/general replies were posted, delete them and repost in-thread.
+## High-value policies
+- Prefer replying in-thread to reviewer comments, not as loose PR comments.
+- Check for an existing open PR for the same head branch before creating a new one.
+- Prefer explicit PR body injection over implicit defaults.
+- Use repo-local templates when present; otherwise use `skills/github/pr-template.md`.
 
-See [REFERENCE.md](./REFERENCE.md) for command recipes and CI optimization playbook.
-
-## PR creation body policy
-- Prefer explicit body injection over repo-default templates.
-- Use `skills/github/pr-template.md` as baseline and fill placeholders (especially `Closes {LINK TO GH ISSUE}`).
-- Command pattern:
-  - `gh pr create --title "<title>" --body-file skills/github/pr-template.md`
+## Reference loading guide
+- Read `references/prs.md` when replying to review comments, checking PR state, or creating PRs.
+- Read `references/issues.md` when creating, triaging, or relating issues/sub-issues.
+- Read `references/runs.md` when investigating failed CI.
+- Read `references/actions.md` when changing workflow YAML, caching, matrices, artifacts, or concurrency.
+- Read `references/api-patterns.md` when standard `gh` commands do not expose enough data.
+- Use `evals/train-trigger-prompts.json` and `evals/validation-trigger-prompts.json` when refining this skill's trigger surface.
+- Use `evals/evals.json` when grading output quality.
 
 ## Output
 - Command evidence (key `gh` output snippets)
