@@ -93,7 +93,11 @@ Before commit/push/PR on a GitButler workspace:
 2. Pick exactly one ship target branch/stack.
 3. Before concluding a GitButler-native path is missing, read the relevant reference entries (`references/reference.md`, `references/concepts.md`, `references/examples.md`) for the task.
 4. Record a short audit in your summary when this skill materially guided execution: `Skill audit: full-read=yes native-path-confirmed=yes fallback-needed=no|yes`.
-5. Prove the target is fresh for this task:
+5. Update and prove the target is fresh for this task:
+   - run `but status --upstream` (or `but status -u`) to inspect upstream work on the target branch
+   - run `but pull --check` before push/PR to preview whether active branches rebase cleanly onto the latest target branch
+   - if upstream work exists and the check passes, run `but pull --status-after` before push/PR so active branches are rebased onto the latest target branch/base
+   - if conflicts appear, resolve them with `but resolve <commit-id>`, edit conflicted files, verify with `but resolve status`, then `but resolve finish`
    - unique relative to the latest default branch
    - merge-base with `origin/<default>` is the current default-branch tip for this task, or you have explicitly rebased/rebuilt onto that tip
    - not already used by a merged PR
