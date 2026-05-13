@@ -11,12 +11,18 @@ steps:
     action: inspect_gitbutler_state_and_list_applied_parallel_branches
   - id: select-target
     action: select_exactly_one_ship_target_branch_or_stack_and_ask_if_ambiguous
+  - id: freshness-check
+    action: verify_ship_target_has_unique_unmerged_work_and_is_not_already_on_default_branch
+  - id: scope-check
+    action: verify_requested_edits_exist_in_repo_local_diff_not_external_agent_paths
   - id: branch
     action: ensure_gitbutler_branch_or_stack_exists_for_ship_target
   - id: simplify
     action: simplify_current_uncommitted_scope_for_selected_ship_target
   - id: validate
     action: run_project_ci_or_test_command
+  - id: signing-check
+    action: verify_commit_will_be_signed_or_stop_for_user_assistance
   - id: commit
     action: commit_only_selected_change_ids_for_ship_target_when_needed
   - id: push

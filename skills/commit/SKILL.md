@@ -23,7 +23,9 @@ Create a GitButler commit for the current changes using a concise Conventional C
 - Do NOT include breaking-change markers or footers.
 - Do NOT add sign-offs (no `Signed-off-by`).
 - Use GitButler (`but`) for commit mutations; do NOT use `git add` or `git commit`.
+- Never create an unsigned commit. If commit signing is unavailable, failing, or unclear, stop and request user assistance before committing.
 - Only commit; do NOT push.
+- Commit only repo-local changes from the current working tree. If edits landed in an agent-installed skill, cache checkout, or any path outside the current repo, stop and fix scope before committing.
 - If it is unclear whether a file should be included, ask the user which files to commit.
 - Treat any caller-provided arguments as additional commit guidance. Common patterns:
   - Freeform instructions should influence scope, summary, and body.
@@ -33,11 +35,13 @@ Create a GitButler commit for the current changes using a concise Conventional C
 ## Steps
 
 1. Infer from the prompt if the user provided specific file paths/globs and/or additional instructions.
-2. Run `but status -fv` and `but diff` to understand the current changes (limit to argument-specified files if provided).
-3. If GitButler setup is required, run `but setup --status-after`, then rerun `but status -fv`.
-4. (Optional) Run `git log -n 50 --pretty=format:%s` to see commonly used scopes.
-5. If there are ambiguous extra files, ask the user for clarification before committing.
-6. Commit only the intended change IDs with `but commit <branch> -m "<subject>" --changes <ids> --status-after` (add body flags if needed).
+2. Confirm the files to commit are inside the current repository/worktree and match the user's intended scope.
+3. Run `but status -fv` and `but diff` to understand the current changes (limit to argument-specified files if provided).
+4. If GitButler setup is required, run `but setup --status-after`, then rerun `but status -fv`.
+5. (Optional) Run `git log -n 50 --pretty=format:%s` to see commonly used scopes.
+6. If there are ambiguous extra files, or the requested edits are not present in the repo-local diff, ask for clarification before committing.
+7. Verify commit signing is configured and working for this repo/worktree. If signing cannot be confirmed, stop and ask for assistance.
+8. Commit only the intended change IDs with `but commit <branch> -m "<subject>" --changes <ids> --status-after` (add body flags if needed).
 
 ## Validation
 

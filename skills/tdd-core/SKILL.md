@@ -1,6 +1,6 @@
 ---
 name: tdd-core
-description: Test-driven development with red-green-refactor loop. Use when user wants to build features or fix bugs using TDD, mentions "red-green-refactor", wants integration tests, or asks for test-first development.
+description: Test-driven development with a red-green-refactor loop. Use when the user wants test-first development, mentions "red-green-refactor" or TDD, asks for behavior-first tests, or wants a feature/bugfix built through small vertical slices instead of writing all code first.
 ---
 
 # Test-Driven Development
@@ -40,6 +40,16 @@ RIGHT (vertical):
   ...
 ```
 
+## Use when
+- The user explicitly asks for TDD, test-first, or red-green-refactor.
+- The task benefits from behavior-first delivery through public interfaces.
+- A bugfix needs a failing test before the fix.
+
+## Avoid when
+- The task is pure investigation with no agreed implementation path yet.
+- The change is trivial and the user explicitly does not want test work.
+- The environment cannot run meaningful tests and the user only wants a sketch.
+
 ## Workflow
 
 ### 1. Planning
@@ -63,6 +73,9 @@ Ask: "What should the public interface look like? Which behaviors are most impor
 
 Write ONE test that confirms ONE thing about the system:
 
+- Prefer the narrowest public interface that proves behavior end-to-end.
+- Name the test after the behavior/capability, not the helper or implementation detail.
+
 ```
 RED:   Write test for first behavior → test fails
 GREEN: Write minimal code to pass → test passes
@@ -85,6 +98,7 @@ Rules:
 - Only enough code to pass current test
 - Don't anticipate future tests
 - Keep tests focused on observable behavior
+- Prefer broad-but-shallow behavioral coverage over deep implementation coupling
 
 ### 4. Refactor
 
@@ -97,6 +111,14 @@ After all tests pass, look for [refactor candidates](refactoring.md):
 - [ ] Run tests after each refactor step
 
 **Never refactor while RED.** Get to GREEN first.
+
+## Common TDD failure modes
+
+- Writing the whole test suite up front instead of learning one slice at a time.
+- Testing helpers, mocks, or internal wiring rather than behavior through public interfaces.
+- Letting GREEN expand into speculative implementation for future tests.
+- Refactoring while still RED.
+- Keeping brittle tests that fail on refactor without behavior change.
 
 ## Checklist Per Cycle
 

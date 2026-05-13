@@ -15,6 +15,8 @@ steps:
     action: draft_or_update_skill_file
   - id: validate
     action: check_safety_brevity_reusability_and_trigger_quality
+  - id: alignment-score
+    action: score_skill_against_agent_skills_spec_and_best_practices
   - id: test-plan
     action: propose_realistic_test_prompts_for_non_trivial_skills
   - id: save

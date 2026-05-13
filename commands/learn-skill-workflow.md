@@ -15,6 +15,7 @@ Requirements:
 - Build or improve a reusable skill with explicit trigger behavior.
 - Ask clarifying questions when scope, trigger, or output format is ambiguous.
 - Keep instructions compact, safe, and generalizable (no overfitting).
-- For non-trivial skills, propose 2-3 realistic test prompts.
+- Score the skill against Agent Skills spec/best-practice alignment before calling it done.
+- For non-trivial skills, propose realistic trigger evals and, when useful, output-quality eval scaffolding.
 - If you mutate files (`edit`, `write`, or mutating `bash`), include: `Postflight: verify="<command_or_check>" result=<pass|fail|not-run>`.
-- End with: skill summary, generated artifacts, learnings, `Result: success|partial|failed`, and `Confidence: 0..1`.
+- End with: skill summary, generated artifacts, alignment score, learnings, `Result: success|partial|failed`, and `Confidence: 0..1`.
