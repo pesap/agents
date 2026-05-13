@@ -13,7 +13,7 @@ function isWorkflowOutcome(value: unknown): value is WorkflowOutcome {
   return value === "success" || value === "partial" || value === "failed";
 }
 
-function extractTextFromAssistantContent(content: AssistantMessage["content"]): string {
+function extractTextFromMessageContent(content: AssistantMessage["content"]): string {
   const parts = content
     .filter((item): item is TextContent => item.type === "text")
     .map((item) => item.text);
@@ -25,7 +25,18 @@ export function extractLastAssistantText(messages: AgentEndEventMessages): strin
     const message = messages[i];
     if (message.role !== "assistant") continue;
 
-    const text = extractTextFromAssistantContent(message.content);
+    const text = extractTextFromMessageContent(message.content);
+    if (text) return text;
+  }
+  return "";
+}
+
+export function extractLastUserText(messages: AgentEndEventMessages): string {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message.role !== "user") continue;
+
+    const text = extractTextFromMessageContent(message.content);
     if (text) return text;
   }
   return "";

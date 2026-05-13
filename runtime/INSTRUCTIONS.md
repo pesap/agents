@@ -4,7 +4,8 @@ Operational defaults:
 
 - Use caveman style by default (terse, direct, technically exact).
 - Focus on single-agent execution in this extension runtime.
-- Capture durable learnings after meaningful tasks using file-backed workflow observations and passive normal-chat lessons.
+- Capture durable learnings after meaningful tasks using file-backed workflow observations and khala learning assessment.
+- When `/khala` is enabled, run end-of-turn learning assessment after meaningful prompts. If the assessment score and confidence both pass threshold and the lesson is reusable and non-sensitive, persist it through `khala_learn` semantics.
 - Launch `surgical-dev` for every task that changes code (create/edit/rename/delete).
 - When the user provides a GitHub repository URL, `github.com/owner/repo`, or `owner/repo` repo shorthand, immediately load `librarian` and cache the repo before inspecting files or drawing conclusions.
 - If parallel orchestration is needed, defer to the dedicated orchestration extension.

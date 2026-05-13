@@ -58,7 +58,15 @@ import {
 } from "./hooks/config";
 import { refreshCuratorReport } from "./learning/curator";
 import {
-  appendLearningLesson,
+  KhalaAssessLearningParams,
+  KhalaLearnParams,
+  assessLearning,
+  persistKhalaLearningRecord,
+  readRecentKhalaLearningRecords,
+  type KhalaLearningAssessment,
+  type KhalaLearningRecord,
+} from "./learning/khala-learn";
+import {
   ensureLearningStore,
   loadProjectReviewGuidelines,
   maybeEmitPromotionHint,
@@ -111,6 +119,7 @@ import {
 import { notifyWorkflowStarted } from "./workflows/notifications";
 import {
   extractLastAssistantText,
+  extractLastUserText,
   inferOutcomeFromText,
   type WorkflowOutcome,
 } from "./runtime/assistant";
@@ -156,6 +165,8 @@ const workflowReaders = createWorkflowReaders({
   commandsDir: RUNTIME_PATHS.commandsDir,
   packageSkillsPath: RUNTIME_PATHS.packageSkillsPath,
 });
+const USER_CORRECTION_PATTERN =
+  /\b(wrong|not working|stalling|stalled|do not|don't|instead|actually|stop planning|implement it)\b/i;
 
 function prependInterceptedCommandsPath(command: string): string {
   const escapedInterceptedPath = RUNTIME_PATHS.interceptedCommandsDir.replace(
@@ -193,45 +204,87 @@ function registerBundledExtension(
   }
 }
 
-function inferPassiveLessonFromUserText(
-  text: string,
-): Omit<LearningLesson, "version" | "id" | "timestamp"> | null {
-  const lower = text.toLowerCase();
-  const correctionPattern =
-    /\b(wrong|not working|stalling|stalled|do not|don't|instead|actually|you are not|stop planning|implement it)\b/;
-  if (!correctionPattern.test(lower)) return null;
+function shouldConsiderKhalaLearning(params: {
+  userText: string;
+  assistantText: string;
+  workflow: PendingWorkflow | null;
+}): boolean {
+  const combined = normalizeWhitespace(
+    `${params.userText} ${params.assistantText}`,
+  );
+  if (params.workflow !== null) return true;
+  if (combined.length >= 40) return true;
+  return /\b(wrong|not working|stalling|stalled|do not|don't|instead|actually|stop planning|implement it|unsigned commit|duplicate pr|stale branch|preflight|postflight)\b/i.test(
+    combined,
+  );
+}
 
-  let lesson =
-    "Treat this as corrective feedback; adjust behavior immediately instead of repeating the previous approach.";
-  let trigger = "user gives corrective feedback";
-
+async function maybeAssessAndLearn(params: {
+  pi: ExtensionAPI;
+  ctx: ExtensionContext;
+  workflow: PendingWorkflow | null;
+  userText: string;
+  assistantText: string;
+}): Promise<KhalaLearningAssessment | null> {
+  if (!runtimeState.agentEnabled) return null;
   if (
-    /stalling|stalled|you are not working|stop planning|implement it/.test(
-      lower,
-    )
+    !shouldConsiderKhalaLearning({
+      userText: params.userText,
+      assistantText: params.assistantText,
+      workflow: params.workflow,
+    })
   ) {
-    trigger = "user reports stalling or asks for implementation";
-    lesson =
-      "Move to concrete tool action or ask one blocking question; do not keep responding with plans only.";
-  } else if (/instead|actually/.test(lower)) {
-    trigger = "user redirects scope or edits intent";
-    lesson =
-      "Prefer the user's latest correction over prior assumptions and restate only the changed operating rule briefly.";
-  } else if (/wrong|not working/.test(lower)) {
-    trigger = "user says prior result was wrong or broken";
-    lesson =
-      "Investigate the failed assumption from evidence before proposing another fix.";
+    return null;
   }
 
-  return {
-    scope: "repo",
-    type: "workflow_correction",
-    trigger,
-    lesson,
-    evidenceSnippet: summarizeEvidence(text, 220),
-    confidence: 0.72,
-    status: "active",
+  const paths = await ensureLearningStore(params.ctx.cwd, learningPathCache);
+  const recents = await readRecentKhalaLearningRecords(paths, 20);
+  const assessment = assessLearning(
+    {
+      taskSummary: params.userText,
+      assistantSummary: params.assistantText,
+      workflowType: params.workflow?.type,
+      workflowId: params.workflow?.id,
+      mutationCount: params.workflow?.mutationCount ?? 0,
+      loadedSkills: params.workflow?.loadedSkills ?? [],
+      policyWarnings: params.workflow?.policyWarnings ?? [],
+      userCorrection: USER_CORRECTION_PATTERN.test(params.userText),
+    },
+    recents,
+  );
+
+  params.pi.appendEntry("khala-learning-assessment", {
+    at: nowIso(),
+    workflowId: params.workflow?.id ?? null,
+    workflowType: params.workflow?.type ?? null,
+    score: assessment.score,
+    confidence: assessment.confidence,
+    shouldLearn: assessment.shouldLearn,
+    reason: assessment.reason,
+    trigger: assessment.trigger,
+    lesson: assessment.lesson,
+  });
+
+  if (!assessment.shouldLearn) return assessment;
+
+  const record: KhalaLearningRecord = {
+    version: LEARNING_VERSION,
+    id: makeId("khala-learn"),
+    timestamp: nowIso(),
+    source: "auto",
+    workflowType: params.workflow?.type,
+    workflowId: params.workflow?.id,
+    actionTaken: [],
+    ...assessment,
   };
+  await persistKhalaLearningRecord(paths, record);
+
+  notify(
+    params.ctx,
+    `khala learned: ${record.trigger} (score=${record.score.toFixed(2)})`,
+    "info",
+  );
+  return assessment;
 }
 
 function shouldRunActiveLearningReview(workflow: PendingWorkflow): boolean {
@@ -464,6 +517,88 @@ async function completeWorkflowTracking(
 export default function khalaExtension(pi: ExtensionAPI): void {
   ensureBundledExtensions(pi);
 
+  pi.registerTool({
+    name: "khala_assess_learning",
+    label: "Khala Assess Learning",
+    description:
+      "Assess whether a task produced a reusable, non-sensitive lesson worth storing for khala.",
+    parameters: KhalaAssessLearningParams,
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      const paths = await ensureLearningStore(ctx.cwd, learningPathCache);
+      const recents = await readRecentKhalaLearningRecords(paths, 20);
+      const assessment = assessLearning(params, recents);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(assessment, null, 2),
+          },
+        ],
+        details: assessment,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "khala_learn",
+    label: "Khala Learn",
+    description:
+      "Persist a structured khala learning record when an assessment says it is worth storing.",
+    parameters: KhalaLearnParams,
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      const kind =
+        params.kind === "workflow_correction" ||
+        params.kind === "preference" ||
+        params.kind === "tool_rule" ||
+        params.kind === "project_fact"
+          ? (params.kind as LearningLesson["type"])
+          : "workflow_correction";
+      const scope =
+        params.scope === "global" || params.scope === "repo"
+          ? (params.scope as LearningLesson["scope"])
+          : "repo";
+      const paths = await ensureLearningStore(ctx.cwd, learningPathCache);
+      const record: KhalaLearningRecord = {
+        version: LEARNING_VERSION,
+        id: makeId("khala-learn"),
+        timestamp: nowIso(),
+        source: params.source === "manual" ? "manual" : "auto",
+        workflowType: params.workflowType,
+        workflowId: params.workflowId,
+        actionTaken: params.actionTaken,
+        shouldLearn: true,
+        score: params.score,
+        confidence: params.confidence,
+        kind,
+        scope,
+        trigger: params.trigger,
+        lesson: params.lesson,
+        reason: "Stored by khala_learn tool.",
+        evidence: [],
+        evidenceSnippet: params.evidenceSnippet,
+        promotable: params.promotable ?? false,
+        sensitive: false,
+        components: {
+          reusability: 1,
+          evidenceStrength: 1,
+          impact: 1,
+          novelty: 1,
+          clarity: 1,
+        },
+      };
+      await persistKhalaLearningRecord(paths, record);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Stored khala learning: ${record.trigger} (score=${record.score.toFixed(2)}, confidence=${record.confidence.toFixed(2)})`,
+          },
+        ],
+        details: record,
+      };
+    },
+  });
+
   const bashTool = createBashTool(process.cwd(), {
     spawnHook: (spawnContext) => {
       if (!runtimeState.agentEnabled) return spawnContext;
@@ -611,16 +746,6 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     }
 
     if (!runtimeState.agentEnabled) return;
-    const passiveLesson = inferPassiveLessonFromUserText(text);
-    if (!passiveLesson) return;
-
-    const paths = await ensureLearningStore(_ctx.cwd, learningPathCache);
-    await appendLearningLesson(paths, {
-      version: LEARNING_VERSION,
-      id: makeId("lesson"),
-      timestamp: nowIso(),
-      ...passiveLesson,
-    });
   });
 
   pi.on("tool_call", async (event, ctx) => {
@@ -661,14 +786,12 @@ export default function khalaExtension(pi: ExtensionAPI): void {
 
   pi.on("agent_end", async (event, ctx) => {
     const workflow = pendingWorkflow;
-    if (!workflow) return;
-
     const text =
       extractLastAssistantText(event.messages) ||
       "No assistant output captured.";
+    const userText = extractLastUserText(event.messages);
 
-    // Harness compliance enforcement (minimal)
-    if (
+    if (workflow &&
       runtimeState.firstPrinciplesConfig.responseComplianceMode === "enforce"
     ) {
       const resultMatch = text.match(
@@ -706,7 +829,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       }
     }
 
-    if (workflow.type === "learn-skill" && workflow.flags.dryRun !== true) {
+    if (workflow && workflow.type === "learn-skill" && workflow.flags.dryRun !== true) {
       const targetSkill =
         typeof workflow.flags.targetSkill === "string"
           ? workflow.flags.targetSkill
@@ -733,7 +856,16 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     }
 
     try {
-      await completeWorkflowTracking(pi, ctx, workflow, text);
+      if (workflow) {
+        await completeWorkflowTracking(pi, ctx, workflow, text);
+      }
+      await maybeAssessAndLearn({
+        pi,
+        ctx,
+        workflow,
+        userText,
+        assistantText: text,
+      });
     } finally {
       pendingWorkflow = null;
     }
@@ -849,7 +981,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     if (!runtimeState.agentEnabled) {
       setAgentEnabledState(ctx, true);
       appendAgentStateEntry(pi, true, nowIso(), "khala");
-      notify(ctx, "khala initialized.", "success");
+      notify(ctx, "khala initialized. End-of-turn learning assessment is now active.", "success");
     }
 
     const compliancePreset = normalizeWhitespace(args ?? "") || "warn";

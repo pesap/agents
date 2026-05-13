@@ -37,7 +37,7 @@ export interface CommandRegistrarDeps {
 
 export function registerCommands({ pi, handlers }: CommandRegistrarDeps): void {
   const commands = [
-    { name: "khala", description: "Initialize khala context injection and optionally set compliance mode (/khala enforce|warn|monitor|reset|status)", handler: handlers.khala },
+    { name: "khala", description: "Initialize khala context injection, enable end-of-turn learning assessment, and optionally set compliance mode (/khala enforce|warn|monitor|reset|status)", handler: handlers.khala },
     { name: "end-agent", description: "Stop khala context injection for this session", handler: handlers.endAgent },
     { name: "approve-risk", description: "Record checker approval for one high-risk command", handler: handlers.approveRisk },
     { name: "preflight", description: "Set mutation intent line for first-principles gate", handler: handlers.preflight },
