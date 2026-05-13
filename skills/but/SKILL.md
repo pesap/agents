@@ -18,8 +18,9 @@ Use GitButler CLI (`but`) as the default version-control interface.
 5. Create a branch for new work with `but branch new <name>` when needed.
 6. Before shipping or opening a PR, verify the target branch still contains unique work relative to the default branch. If its changes are already merged, do not push or open a duplicate PR.
 7. If a target branch is stale or stacked on already-merged work, update from the default branch and rebuild on a fresh branch from the latest mainline instead of stacking new work on the stale branch.
-8. Before committing, verify the edited files live in the current repository/worktree, not in an agent-installed skill directory, cache checkout, or other external copy.
-9. Never create an unsigned commit. If signing is unavailable, failing, or cannot be confirmed, stop and ask the user for assistance.
+8. If a branch already had a merged PR (especially after squash merge), do not reuse that branch for follow-up work. Create a fresh branch from the latest default branch and move only the intended current diff.
+9. Before committing, verify the edited files live in the current repository/worktree, not in an agent-installed skill directory, cache checkout, or other external copy.
+10. Never create an unsigned commit. If signing is unavailable, failing, or cannot be confirmed, stop and ask the user for assistance.
 
 ## Core Flow
 
@@ -57,11 +58,15 @@ but <mutation> ... --status-after
 ### Commit files
 
 1. `but status -fv`
-2. Find the CLI ID for each file you want to commit.
-3. `but commit <branch> -m "<msg>" --changes <id1>,<id2> --status-after`
+2. Confirm the target branch is the correct fresh branch for this scope:
+   - based on the latest default branch
+   - not already used by a merged PR
+   - not carrying unrelated historical commits for this task
+3. Find the CLI ID for each file you want to commit.
+4. `but commit <branch> -m "<msg>" --changes <id1>,<id2> --status-after`
    Use `-c` to create the branch if it doesn't exist. Omit IDs you don't want committed.
-4. **Check the `--status-after` output** for remaining uncommitted changes. If the file still appears as unassigned or assigned to another branch after commit, it may be dependency-locked. See "Stacked dependency / commit-lock recovery" below.
-5. Verify the real branch commit, not just `HEAD`, is signed. In GitButler workspaces, `HEAD` can be an unsigned internal `GitButler Workspace Commit` even when the branch commit is correctly signed.
+5. **Check the `--status-after` output** for remaining uncommitted changes. If the file still appears as unassigned or assigned to another branch after commit, it may be dependency-locked. See "Stacked dependency / commit-lock recovery" below.
+6. Verify the real branch commit, not just `HEAD`, is signed. In GitButler workspaces, `HEAD` can be an unsigned internal `GitButler Workspace Commit` even when the branch commit is correctly signed.
 
 ### Commit signing verification
 
@@ -158,6 +163,7 @@ If `but move` causes conflicts (conflicted commits in status):
 - Use `but show <branch-id>` to see commit details for a branch, including per-commit file changes and line counts.
 - **Per-commit file counts**: `but status` does NOT include per-commit file counts. Use `but show <branch-id>` or `git show --stat <commit-hash>` to get them.
 - For ship/review tasks, pair GitButler inspection with git/forge checks when needed: compare the target branch against `origin/<default-branch>` (`git cherry`, `git log origin/<default>..<branch>`, PR lookup) to catch stale or already-merged branches.
+- Treat a merged PR on the same head branch as a branch-reuse hazard. After squash merge, Git ancestry may still show old commits on the branch even though the diff was merged; rebuild follow-up work on a fresh branch.
 - If `but status -fv` is broken or incomplete in a workspace, treat that as degraded mode: use `but branch list`, `but branch show`, and read-only git/forge inspection, then call out the limitation explicitly.
 - Avoid `--help` probes; use this skill and `references/reference.md` first. Only use `--help` after a failed attempt.
 - Run `but skill check` only when command behavior diverges from this skill, not as routine preflight.

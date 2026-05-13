@@ -41,7 +41,7 @@ class GeneratorInput(BaseModel):
 
 Rules:
 - `Annotated[type, Field(...)]`.
-- `description=` always present.
+- `description=` by repo convention.
 - constraints in `Field`.
 - unions as `A | B` (never `typing.Union[A, B]`).
 

@@ -26,6 +26,7 @@ Create a GitButler commit for the current changes using a concise Conventional C
 - Never create an unsigned commit. If commit signing is unavailable, failing, or unclear, stop and request user assistance before committing.
 - Only commit; do NOT push.
 - Commit only repo-local changes from the current working tree. If edits landed in an agent-installed skill, cache checkout, or any path outside the current repo, stop and fix scope before committing.
+- Do not reuse a branch that already had a merged PR for follow-up work. If the current branch was previously merged or carries historical commits outside the intended scope, stop and create a fresh branch from the latest default branch first.
 - If it is unclear whether a file should be included, ask the user which files to commit.
 - Treat any caller-provided arguments as additional commit guidance. Common patterns:
   - Freeform instructions should influence scope, summary, and body.
@@ -38,10 +39,11 @@ Create a GitButler commit for the current changes using a concise Conventional C
 2. Confirm the files to commit are inside the current repository/worktree and match the user's intended scope.
 3. Run `but status -fv` and `but diff` to understand the current changes (limit to argument-specified files if provided).
 4. If GitButler setup is required, run `but setup --status-after`, then rerun `but status -fv`.
-5. (Optional) Run `git log -n 50 --pretty=format:%s` to see commonly used scopes.
-6. If there are ambiguous extra files, or the requested edits are not present in the repo-local diff, ask for clarification before committing.
-7. Verify commit signing is configured and working for this repo/worktree. If signing cannot be confirmed, stop and ask for assistance.
-8. Commit only the intended change IDs with `but commit <branch> -m "<subject>" --changes <ids> --status-after` (add body flags if needed).
+5. Confirm the target branch is fresh for this task: based on the latest default branch and not already used by a merged PR.
+6. (Optional) Run `git log -n 50 --pretty=format:%s` to see commonly used scopes.
+7. If there are ambiguous extra files, or the requested edits are not present in the repo-local diff, ask for clarification before committing.
+8. Verify commit signing is configured and working for this repo/worktree. If signing cannot be confirmed, stop and ask for assistance.
+9. Commit only the intended change IDs with `but commit <branch> -m "<subject>" --changes <ids> --status-after` (add body flags if needed).
 
 ## Validation
 

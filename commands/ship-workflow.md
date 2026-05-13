@@ -21,7 +21,9 @@ Requirements:
 - Select exactly one ship target branch/stack. If ambiguous, show a branch/change table and ask before shipping.
 - Treat other applied branches as parallel work; do not commit, push, or include their changes unless explicitly requested.
 - Before shipping, verify the selected branch still has unique unmerged work relative to the repo default branch. If it is already merged or would create a duplicate PR, stop and ask/create a fresh target instead.
+- If the selected branch already had a merged PR, especially after squash merge, do not reuse it for follow-up work. Create a fresh branch from the latest default branch and move only the intended current diff there.
 - Before commit/push/PR, verify the requested edits are present in the current repo/worktree diff. Do not ship edits that were made only in agent-installed skill directories, cache checkouts, or other external copies.
+- Prefer one focused branch and one PR per logical change. If a branch contains previously shipped work plus new work, rebuild the new work on a fresh branch before opening a PR.
 - Never create an unsigned commit. If signing is unavailable, failing, or cannot be confirmed, stop and request assistance.
 - Run simplify only on current uncommitted scope for the selected ship target and preserve exact behavior.
 - Detect project test/CI command from repo conventions; run it and stop on first failure.
