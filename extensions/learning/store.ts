@@ -35,6 +35,7 @@ export interface LearningPaths {
   archivedSkillsDir: string;
   learningJsonl: string;
   lessonsJsonl: string;
+  khalaLearningJsonl: string;
   memoryMd: string;
   promotionQueue: string;
   stateJson: string;
@@ -183,6 +184,7 @@ function buildLearningPaths(root: string): LearningPaths {
     archivedSkillsDir: path.join(root, "archive", "skills"),
     learningJsonl: path.join(root, "memory", "learning.jsonl"),
     lessonsJsonl: path.join(root, "memory", "lessons.jsonl"),
+    khalaLearningJsonl: path.join(root, "memory", "khala-learning.jsonl"),
     memoryMd: path.join(root, "memory", "MEMORY.md"),
     promotionQueue: path.join(root, "memory", "promotion-queue.md"),
     stateJson: path.join(root, "state.json"),
@@ -218,6 +220,7 @@ async function initializeLearningStore(paths: LearningPaths): Promise<void> {
   await fs.mkdir(paths.archivedSkillsDir, { recursive: true });
   await ensureFile(paths.learningJsonl, "");
   await ensureFile(paths.lessonsJsonl, "");
+  await ensureFile(paths.khalaLearningJsonl, "");
   await ensureFile(paths.memoryMd, "# MEMORY\n");
   await ensureFile(paths.promotionQueue, "# Promotion Queue\n");
   await ensureFile(paths.curatorReport, "# Skill Curator Report\n");
