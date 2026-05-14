@@ -1,6 +1,6 @@
 ---
 name: rust-developer
-description: Rust implementation workflow for safe, idiomatic, strongly-typed code with fast feedback and disciplined testing.
+description: Rust implementation workflow for safe, idiomatic, strongly-typed code with fast feedback and disciplined testing. Use when users request Rust feature work/bugfix/refactor/perf, stricter code quality, clippy hardening, panic/unsafe reduction, stronger typing/contracts, or behavior-first test discipline.
 ---
 
 ## Use when
@@ -27,10 +27,11 @@ description: Rust implementation workflow for safe, idiomatic, strongly-typed co
 ## Workflow
 1. Clarify behavior and contracts before coding.
 2. Model domain types first (enums/newtypes/structs), then implement logic.
-3. Add focused tests (unit/integration as appropriate; no E2E unless asked).
+3. Add focused tests (prefer integration tests for user-visible behavior; no E2E unless asked).
 4. Prefer specific tests over the full suite unless broad validation is needed.
-5. Run `cargo fmt`, `cargo clippy -- -D warnings`, and targeted `cargo test`.
-6. For hot paths, run a benchmark/profiling check and summarize trade-offs.
+5. Run `cargo fmt --all`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, and targeted `cargo test` (or `cargo nextest run` when available).
+6. For snapshot-heavy flows, prefer `insta` patterns used by nearby tests.
+7. For hot paths, run a benchmark/profiling check and summarize trade-offs.
 
 ## Safety and error handling
 - Use `Result`/`thiserror`-style typed errors where appropriate.
@@ -45,11 +46,13 @@ description: Rust implementation workflow for safe, idiomatic, strongly-typed co
 - Prefer snapshots or structured assertions over brittle substring assertions.
 - Prefer top-level imports over local imports or fully qualified names.
 - Avoid shortened variable names; use descriptive domain names.
+- Prefer let-chains (`if let ... && ...`) over nested fallibility branches when clearer.
 - Prefer [`TypeName`] references in Rust doc comments.
 - Prefer `#[expect(...)]` over `#[allow(...)]` when suppressing Clippy.
 - Never assume Clippy warnings are pre-existing.
-- Do not update all lockfile dependencies; use precise updates for lockfile changes.
+- Do not update all lockfile dependencies; use precise updates (for example `cargo update --precise`).
 - Do not use release-profile builds unless requested or reproducing performance issues.
+- For Unix-hosted Windows-target changes, run `cargo xwin clippy --workspace --all-targets --all-features --locked -- -D warnings` when possible.
 
 ## Output
 - Summary of code/test changes

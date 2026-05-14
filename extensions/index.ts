@@ -4,6 +4,7 @@ import type {
   ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import { createBashTool } from "@mariozechner/pi-coding-agent";
+import { Type } from "@sinclair/typebox";
 import registerFffExtension from "@ff-labs/pi-fff/src/index.ts";
 import path from "node:path";
 import registerSubagentExtension from "pi-subagents/index.ts";
@@ -68,6 +69,8 @@ import {
 } from "./learning/khala-learn";
 import {
   ensureLearningStore,
+  getActiveLearningLessonsTail,
+  getLearningMemoryTail,
   loadProjectReviewGuidelines,
   maybeEmitPromotionHint,
   type LearningLesson,
@@ -158,6 +161,13 @@ let activeRuntimeProfile: RuntimeProfile = DEFAULT_RUNTIME_PROFILE;
 let lowConfidenceEvents: LowConfidenceEvent[] = [];
 let bundledExtensionsInitialized = false;
 const runtimeState = createRuntimeState();
+let memoryReadThisTurn = false;
+
+function clampPositiveInt(value: unknown, fallback: number, max: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  const int = Math.floor(value);
+  return Math.max(1, Math.min(max, int));
+}
 let sessionFirstPrinciplesDefaults = { ...runtimeState.firstPrinciplesConfig };
 
 const workflowReaders = createWorkflowReaders({
@@ -540,6 +550,62 @@ export default function khalaExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
+    name: "khala_read_memory",
+    label: "Khala Read Memory",
+    description:
+      "Read current khala memory context (active lessons, recent learnings, and memory tail) before tool use.",
+    parameters: Type.Object({
+      tailLines: Type.Optional(
+        Type.Number({
+          description: "Number of tail lines to include from memory/lessons (default 8, max 50)",
+        }),
+      ),
+      recentLimit: Type.Optional(
+        Type.Number({
+          description: "Number of recent khala learned records to include (default 8, max 50)",
+        }),
+      ),
+    }),
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      const tailLines = clampPositiveInt(params.tailLines, 8, 50);
+      const recentLimit = clampPositiveInt(params.recentLimit, 8, 50);
+      const paths = await ensureLearningStore(ctx.cwd, learningPathCache);
+      const [memoryTail, activeLessons, recentRecords] = await Promise.all([
+        getLearningMemoryTail(ctx.cwd, learningPathCache, tailLines),
+        getActiveLearningLessonsTail(ctx.cwd, learningPathCache, tailLines),
+        readRecentKhalaLearningRecords(paths, recentLimit),
+      ]);
+
+      memoryReadThisTurn = true;
+
+      const payload = {
+        storeRoot: paths.root,
+        memoryTail,
+        activeLessons,
+        recentLearnings: recentRecords.map((record) => ({
+          timestamp: record.timestamp,
+          trigger: record.trigger,
+          lesson: record.lesson,
+          score: record.score,
+          confidence: record.confidence,
+          kind: record.kind,
+          workflowType: record.workflowType ?? null,
+        })),
+      };
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(payload, null, 2),
+          },
+        ],
+        details: payload,
+      };
+    },
+  });
+
+  pi.registerTool({
     name: "khala_learn",
     label: "Khala Learn",
     description:
@@ -725,6 +791,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("input", async (event, _ctx) => {
+    memoryReadThisTurn = false;
     const text = typeof event.text === "string" ? event.text.trim() : "";
     if (!text) return;
 
@@ -750,6 +817,17 @@ export default function khalaExtension(pi: ExtensionAPI): void {
 
   pi.on("tool_call", async (event, ctx) => {
     if (!runtimeState.agentEnabled) return;
+
+    if (event.toolName === "khala_read_memory") {
+      memoryReadThisTurn = true;
+    } else if (!memoryReadThisTurn) {
+      return {
+        block: true,
+        reason:
+          "MEMORY READ REQUIRED\n\nCall khala_read_memory before any other tool call in this turn.",
+      };
+    }
+
     if (!isMutationToolCall(event)) return;
 
     if (pendingWorkflow) pendingWorkflow.mutationCount += 1;
