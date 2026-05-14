@@ -1,4 +1,4 @@
-import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { PolicyMode, PostflightRecord, PreflightRecord } from "../policy/first-principles";
 import type { RuntimeState } from "../state/runtime";
 

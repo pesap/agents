@@ -1,5 +1,5 @@
-import type { ToolCallEvent } from "@mariozechner/pi-coding-agent";
-import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import type { ToolCallEvent } from "@earendil-works/pi-coding-agent";
+import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { load as loadYaml } from "js-yaml";
 import { MUTATION_BASH_PATTERN, POSTFLIGHT_LINE_REGEX, PREFLIGHT_LINE_REGEX } from "../lib/constants";
 import { isRecord } from "../lib/io";
