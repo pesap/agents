@@ -1,4 +1,4 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type { LearningLesson, LearningPaths } from "./store";
 import { appendLine, readTextIfExists } from "../lib/io";
 import { normalizeWhitespace, summarizeEvidence } from "../lib/text";

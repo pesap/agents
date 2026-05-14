@@ -2,13 +2,13 @@ import type {
   ExtensionAPI,
   ExtensionCommandContext,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
-import { createBashTool } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+} from "@earendil-works/pi-coding-agent";
+import { createBashTool } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
 import registerFffExtension from "@ff-labs/pi-fff/src/index.ts";
 import path from "node:path";
-import registerSubagentExtension from "pi-subagents/index.ts";
-import registerSubagentNotifyExtension from "pi-subagents/notify.ts";
+import registerSubagentExtension from "pi-subagents/src/extension/index.ts";
 import { createAgentCommandHandlers } from "./commands/agent";
 import { createComplianceCommandHandlers } from "./commands/compliance";
 import { createCuratorCommandHandlers } from "./commands/curator";
@@ -376,7 +376,6 @@ function ensureBundledExtensions(
 
   registerBundledExtension(ctx, "pi-subagents", () => {
     registerSubagentExtension(pi);
-    registerSubagentNotifyExtension(pi);
   });
 
   registerBundledExtension(ctx, "@ff-labs/pi-fff", () =>
@@ -524,6 +523,106 @@ async function completeWorkflowTracking(
   }
 }
 
+function clipDisplay(text: unknown, maxLength = 120): string {
+  const normalized = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+type KhalaToolRenderResult = { details?: unknown; content?: Array<{ text?: string }> };
+type KhalaToolTheme = Parameters<
+  NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["renderResult"]>
+>[2];
+
+function parseToolJsonDetails<T>(result: KhalaToolRenderResult): T | null {
+  if (result.details && typeof result.details === "object") return result.details as T;
+  const text = result.content?.find((item) => typeof item.text === "string")?.text;
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function expandHint(expanded: boolean): string {
+  return expanded ? "" : " (ctrl+o to expand)";
+}
+
+function renderKhalaAssessResult(
+  result: KhalaToolRenderResult,
+  expanded: boolean,
+  theme: KhalaToolTheme,
+): Text {
+  const assessment = parseToolJsonDetails<KhalaLearningAssessment>(result);
+  if (!assessment) return new Text(theme.fg("muted", "assessment complete"), 0, 0);
+
+  const decision = assessment.shouldLearn ? "learn" : "skip";
+  let text = `${theme.fg(assessment.shouldLearn ? "success" : "muted", decision)} `;
+  text += `${assessment.kind}/${assessment.scope} `;
+  text += theme.fg("muted", `score=${assessment.score.toFixed(2)} conf=${assessment.confidence.toFixed(2)}`);
+  text += ` — ${clipDisplay(assessment.trigger, 90)}${expandHint(expanded)}`;
+
+  if (expanded) {
+    text += `\nlesson: ${clipDisplay(assessment.lesson || assessment.reason, 220)}`;
+    if (assessment.evidence.length > 0) {
+      text += `\nevidence: ${assessment.evidence.slice(0, 3).map((item) => clipDisplay(item, 90)).join("; ")}`;
+      if (assessment.evidence.length > 3) text += `; +${assessment.evidence.length - 3} more`;
+    }
+  }
+
+  return new Text(text, 0, 0);
+}
+
+function renderKhalaMemoryResult(
+  result: KhalaToolRenderResult,
+  expanded: boolean,
+  theme: KhalaToolTheme,
+): Text {
+  const payload = parseToolJsonDetails<{
+    storeRoot: string;
+    memoryTail: string;
+    activeLessons: string;
+    recentLearnings: Array<{ trigger: string; kind: string; confidence: number }>;
+  }>(result);
+  if (!payload) return new Text(theme.fg("muted", "memory read"), 0, 0);
+
+  const lessonCount = payload.activeLessons.split("\n").filter(Boolean).length;
+  const tailCount = payload.memoryTail.split("\n").filter(Boolean).length;
+  let text = `${theme.fg("success", "memory read")} `;
+  text += theme.fg("muted", `${payload.recentLearnings.length} recent, ${lessonCount} active, ${tailCount} tail lines`);
+  text += expandHint(expanded);
+
+  if (expanded) {
+    text += `\nstore: ${payload.storeRoot}`;
+    for (const record of payload.recentLearnings.slice(0, 5)) {
+      text += `\n- ${record.kind} ${record.confidence.toFixed(2)}: ${clipDisplay(record.trigger, 100)}`;
+    }
+  }
+
+  return new Text(text, 0, 0);
+}
+
+function renderKhalaLearnResult(
+  result: KhalaToolRenderResult,
+  expanded: boolean,
+  theme: KhalaToolTheme,
+): Text {
+  const record = parseToolJsonDetails<KhalaLearningRecord>(result);
+  if (!record) return new Text(theme.fg("success", "stored khala learning"), 0, 0);
+
+  let text = `${theme.fg("success", "stored")} ${record.kind}/${record.scope} `;
+  text += theme.fg("muted", `score=${record.score.toFixed(2)} conf=${record.confidence.toFixed(2)}`);
+  text += ` — ${clipDisplay(record.trigger, 90)}${expandHint(expanded)}`;
+
+  if (expanded) {
+    text += `\nlesson: ${clipDisplay(record.lesson, 220)}`;
+    text += `\nevidence: ${clipDisplay(record.evidenceSnippet, 220)}`;
+  }
+
+  return new Text(text, 0, 0);
+}
+
 export default function khalaExtension(pi: ExtensionAPI): void {
   ensureBundledExtensions(pi);
 
@@ -533,6 +632,14 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     description:
       "Assess whether a task produced a reusable, non-sensitive lesson worth storing for khala.",
     parameters: KhalaAssessLearningParams,
+    renderCall: (args, theme) =>
+      new Text(
+        `${theme.fg("toolTitle", theme.bold("khala_assess_learning"))} ${theme.fg("muted", clipDisplay(args.taskSummary, 90))}`,
+        0,
+        0,
+      ),
+    renderResult: (result, { expanded }, theme) =>
+      renderKhalaAssessResult(result, expanded, theme),
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       const paths = await ensureLearningStore(ctx.cwd, learningPathCache);
       const recents = await readRecentKhalaLearningRecords(paths, 20);
@@ -566,6 +673,17 @@ export default function khalaExtension(pi: ExtensionAPI): void {
         }),
       ),
     }),
+    renderCall: (args, theme) =>
+      new Text(
+        `${theme.fg("toolTitle", theme.bold("khala_read_memory"))} ${theme.fg(
+          "muted",
+          `tail=${args.tailLines ?? 8} recent=${args.recentLimit ?? 8}`,
+        )}`,
+        0,
+        0,
+      ),
+    renderResult: (result, { expanded }, theme) =>
+      renderKhalaMemoryResult(result, expanded, theme),
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       const tailLines = clampPositiveInt(params.tailLines, 8, 50);
       const recentLimit = clampPositiveInt(params.recentLimit, 8, 50);
@@ -611,6 +729,17 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     description:
       "Persist a structured khala learning record when an assessment says it is worth storing.",
     parameters: KhalaLearnParams,
+    renderCall: (args, theme) =>
+      new Text(
+        `${theme.fg("toolTitle", theme.bold("khala_learn"))} ${theme.fg(
+          "muted",
+          `${args.kind ?? "record"}/${args.scope ?? "repo"} — ${clipDisplay(args.trigger, 80)}`,
+        )}`,
+        0,
+        0,
+      ),
+    renderResult: (result, { expanded }, theme) =>
+      renderKhalaLearnResult(result, expanded, theme),
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       const kind =
         params.kind === "workflow_correction" ||

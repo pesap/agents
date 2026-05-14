@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { isRecord } from "../lib/io";
 import { AGENT_STATE_TYPE, COMPLIANCE_MODE_TYPE, POLICY_EVENT_TYPE, POSTFLIGHT_EVENT_TYPE, PREFLIGHT_STATE_TYPE, RISK_APPROVAL_TYPE } from "../lib/constants";
 import { parsePolicyMode, type PostflightRecord, type PreflightRecord } from "../policy/first-principles";

@@ -1,4 +1,4 @@
-import type { AssistantMessage, TextContent } from "@mariozechner/pi-ai";
+import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
 
 export type WorkflowOutcome = "success" | "partial" | "failed";
 
