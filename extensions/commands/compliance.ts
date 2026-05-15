@@ -55,7 +55,7 @@ export function createComplianceCommandHandlers(params: {
       const isReset = parsed.preset === "reset";
       const nextConfig = isReset
         ? { ...params.getDefaultFirstPrinciplesConfig() }
-        : applyMode(parsed.preset);
+        : applyMode(parsed.preset as PolicyMode);
 
       params.runtimeState.firstPrinciplesConfig = nextConfig;
       params.appendComplianceModeEntry({

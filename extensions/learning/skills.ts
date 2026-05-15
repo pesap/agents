@@ -101,16 +101,16 @@ function parseMetadata(value: unknown): LearnedSkillMetadata | null {
   }
 
   return {
-    name,
-    provenance,
-    createdAt,
-    lastUsedAt,
-    lastPatchedAt,
-    useCount,
-    patchCount,
-    state,
-    pinned,
-    sourceRunId,
+    name: name as string,
+    provenance: provenance as LearnedSkillProvenance,
+    createdAt: createdAt as string,
+    lastUsedAt: lastUsedAt as string | null,
+    lastPatchedAt: lastPatchedAt as string | null,
+    useCount: useCount as number,
+    patchCount: patchCount as number,
+    state: state as LearnedSkillState,
+    pinned: pinned as boolean,
+    sourceRunId: sourceRunId as string | null,
   };
 }
 
