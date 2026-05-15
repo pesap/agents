@@ -124,7 +124,10 @@ import { notifyWorkflowStarted } from "./workflows/notifications";
 import {
   extractLastAssistantText,
   extractLastUserText,
+  getLastAssistantMessage,
+  hasRequiredWorkflowFooter,
   inferOutcomeFromText,
+  isEmptyTerminalAssistantResponse,
   type WorkflowOutcome,
 } from "./runtime/assistant";
 import {
@@ -1113,47 +1116,55 @@ export default function khalaExtension(pi: ExtensionAPI): void {
   loosePi.on("agent_end", async (event, ctx) => {
     const workflow = pendingWorkflow;
     const messages = (event as { messages: Parameters<typeof extractLastAssistantText>[0] }).messages;
-    const text =
-      extractLastAssistantText(messages) ||
-      "No assistant output captured.";
+    const lastAssistantMessage = getLastAssistantMessage(messages);
+    const assistantText = extractLastAssistantText(messages);
+    const text = assistantText || "No assistant output captured.";
     const userText = extractLastUserText(messages);
+    const hasWorkflowFooter = hasRequiredWorkflowFooter(assistantText);
 
-    if (workflow &&
-      runtimeState.firstPrinciplesConfig.responseComplianceMode === "enforce"
-    ) {
-      const resultMatch = text.match(
-        /^\s*Result:\s*(success|partial|failed)\s*$/im,
-      );
-      const confidenceMatch = text.match(/^\s*Confidence:\s*([\d.]+)\s*$/im);
-      const confidenceValue = confidenceMatch
-        ? parseFloat(confidenceMatch[1])
-        : null;
-      const hasResult = resultMatch !== null;
-      const hasConfidence =
-        confidenceValue !== null &&
-        confidenceValue >= 0 &&
-        confidenceValue <= 1;
-      if (!hasResult || !hasConfidence) {
+    if (isEmptyTerminalAssistantResponse(messages)) {
+      return {
+        block: true,
+        reason: [
+          "EMPTY ASSISTANT RESPONSE",
+          "",
+          "The assistant stopped without visible output or a tool call.",
+          "Continue with the next tool call or send a final user-visible response.",
+          workflow
+            ? "If this is the workflow conclusion, include the required `Result:` and `Confidence:` footer lines."
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      };
+    }
+
+    if (workflow && !hasWorkflowFooter) {
+      if (
+        runtimeState.firstPrinciplesConfig.responseComplianceMode === "enforce" &&
+        lastAssistantMessage?.stopReason === "stop"
+      ) {
         return {
           block: true,
           reason: [
             "HARNESS COMPLIANCE FAILED",
             "",
-            hasResult
-              ? ""
-              : "Missing or invalid: Result: success|partial|failed",
-            hasConfidence
-              ? ""
-              : confidenceMatch
-                ? "Invalid: Confidence must be 0..1"
-                : "Missing: Confidence: 0..1",
-            "",
-            "Add these lines to your response and retry.",
-          ]
-            .filter(Boolean)
-            .join("\n"),
+            "Workflow response is missing the required final footer lines.",
+            "Add both lines and retry:",
+            "- Result: success|partial|failed",
+            "- Confidence: 0..1",
+          ].join("\n"),
         };
       }
+
+      if (lastAssistantMessage?.stopReason === "stop") {
+        notify(
+          ctx,
+          `Workflow ${workflow.type} still active; waiting for final Result/Confidence footer.`,
+          "info",
+        );
+      }
+      return;
     }
 
     if (workflow && workflow.type === "learn-skill" && workflow.flags.dryRun !== true) {

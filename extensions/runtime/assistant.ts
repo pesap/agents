@@ -2,6 +2,12 @@ import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
 
 export type WorkflowOutcome = "success" | "partial" | "failed";
 
+type AgentEndEventMessage = {
+  role: "assistant" | "user" | "toolResult" | "system" | string;
+  content: AssistantMessage["content"];
+  stopReason?: string;
+};
+
 function clampConfidence(value: number): number {
   if (!Number.isFinite(value)) return 0.5;
   if (value < 0) return 0;
@@ -18,6 +24,16 @@ function extractTextFromMessageContent(content: AssistantMessage["content"]): st
     .filter((item): item is TextContent => item.type === "text")
     .map((item) => item.text);
   return parts.join("\n").trim();
+}
+
+export function getLastAssistantMessage(
+  messages: AgentEndEventMessages,
+): AgentEndEventMessage | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message.role === "assistant") return message;
+  }
+  return null;
 }
 
 export function extractLastAssistantText(messages: AgentEndEventMessages): string {
@@ -40,6 +56,24 @@ export function extractLastUserText(messages: AgentEndEventMessages): string {
     if (text) return text;
   }
   return "";
+}
+
+export function hasRequiredWorkflowFooter(text: string): boolean {
+  return /(?:^|\n)\s*Result\s*:\s*(success|partial|failed)\b/i.test(text) &&
+    /(?:^|\n)\s*Confidence\s*:\s*([0-9]{1,3}(?:\.[0-9]+)?%?)/i.test(text);
+}
+
+export function isEmptyTerminalAssistantResponse(
+  messages: AgentEndEventMessages,
+): boolean {
+  const lastAssistant = getLastAssistantMessage(messages);
+  if (!lastAssistant || lastAssistant.stopReason !== "stop") return false;
+
+  return !lastAssistant.content.some((item) => {
+    if (item.type === "toolCall") return true;
+    if (item.type === "text") return item.text.trim().length > 0;
+    return false;
+  });
 }
 
 export function inferOutcomeFromText(text: string): {
@@ -92,7 +126,4 @@ export function inferOutcomeFromText(text: string): {
   return { outcome, confidence: clampConfidence(confidence) };
 }
 
-type AgentEndEventMessages = Array<{
-  role: "assistant" | "user" | "toolResult" | "system" | string;
-  content: AssistantMessage["content"];
-}>;
+type AgentEndEventMessages = AgentEndEventMessage[];
