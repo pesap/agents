@@ -6,7 +6,12 @@ type AgentEndEventMessage = {
   role: "assistant" | "user" | "toolResult" | "system" | string;
   content: AssistantMessage["content"];
   stopReason?: string;
+  toolName?: string;
 };
+
+interface PendingMemoryGateRecovery {
+  blockedToolName: string;
+}
 
 function clampConfidence(value: number): number {
   if (!Number.isFinite(value)) return 0.5;
@@ -74,6 +79,56 @@ export function isEmptyTerminalAssistantResponse(
     if (item.type === "text") return item.text.trim().length > 0;
     return false;
   });
+}
+
+function isMutationToolName(name: string): boolean {
+  return name === "edit" || name === "write" || name === "bash";
+}
+
+function extractToolCallNames(message: AgentEndEventMessage): string[] {
+  return message.content.flatMap((item) => {
+    if (item.type !== "toolCall") return [];
+    return typeof item.name === "string" ? [item.name] : [];
+  });
+}
+
+function isMemoryReadRequiredToolResult(message: AgentEndEventMessage): boolean {
+  if (message.role !== "toolResult") return false;
+  return /^MEMORY READ REQUIRED\b/.test(extractTextFromMessageContent(message.content));
+}
+
+export function findPendingMemoryGateRecovery(
+  messages: AgentEndEventMessages,
+): PendingMemoryGateRecovery | null {
+  let blockedToolName: string | null = null;
+  let sawMemoryRead = false;
+
+  for (const message of messages) {
+    if (isMemoryReadRequiredToolResult(message)) {
+      blockedToolName = message.toolName ?? "mutation";
+      sawMemoryRead = false;
+      continue;
+    }
+
+    if (blockedToolName === null) continue;
+
+    if (message.role !== "assistant") continue;
+    for (const toolName of extractToolCallNames(message)) {
+      if (toolName === "khala_read_memory") {
+        sawMemoryRead = true;
+        continue;
+      }
+
+      if (sawMemoryRead && isMutationToolName(toolName)) {
+        blockedToolName = null;
+        sawMemoryRead = false;
+        break;
+      }
+    }
+  }
+
+  if (blockedToolName === null || !sawMemoryRead) return null;
+  return { blockedToolName };
 }
 
 export function inferOutcomeFromText(text: string): {
