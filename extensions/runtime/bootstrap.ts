@@ -112,7 +112,7 @@ export async function getBootstrapPayload(params: {
     "- Before the first mutation or memory write in a task, call khala_read_memory unless memory is already fresh for this task.",
     `- Memory becomes stale after about ${params.memoryToolCallLimit} tool calls, after memory writes, or after a new task/scope change; refresh before further mutation.`,
     "- Do not say you will perform file reads, edits, commands, or other tool work unless you call the relevant tool in the same assistant turn.",
-    "- If a mutation is blocked with MEMORY READ REQUIRED, call khala_read_memory and immediately retry the blocked work; do not ask the user to continue.",
+    "- If a mutation is blocked with MEMORY READ REQUIRED, call khala_read_memory and immediately retry the exact blocked mutation in the same assistant turn; do not switch to explanation, next-turn promises, or ask the user to continue.",
     memoryTail ? "[LEARNING MEMORY TAIL]" : "",
     memoryTail,
     learnedSkills.length > 0

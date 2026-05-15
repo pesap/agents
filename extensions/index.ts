@@ -124,6 +124,7 @@ import { notifyWorkflowStarted } from "./workflows/notifications";
 import {
   extractLastAssistantText,
   extractLastUserText,
+  findPendingMemoryGateRecovery,
   getLastAssistantMessage,
   hasRequiredWorkflowFooter,
   inferOutcomeFromText,
@@ -1102,7 +1103,6 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     if (decision.warningMessage) {
       pendingWorkflow?.policyWarnings.push(decision.warningMessage);
       notify(ctx, decision.warningMessage, "warning");
-      return;
     }
 
     if (decision.blockReason) {
@@ -1121,6 +1121,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     const text = assistantText || "No assistant output captured.";
     const userText = extractLastUserText(messages);
     const hasWorkflowFooter = hasRequiredWorkflowFooter(assistantText);
+    const pendingMemoryGateRecovery = findPendingMemoryGateRecovery(messages);
 
     if (isEmptyTerminalAssistantResponse(messages)) {
       return {
@@ -1136,6 +1137,20 @@ export default function khalaExtension(pi: ExtensionAPI): void {
         ]
           .filter(Boolean)
           .join("\n"),
+      };
+    }
+
+    if (pendingMemoryGateRecovery && lastAssistantMessage?.stopReason === "stop") {
+      return {
+        block: true,
+        reason: [
+          "MEMORY GATE RECOVERY INCOMPLETE",
+          "",
+          `A previous ${pendingMemoryGateRecovery.blockedToolName} was blocked by MEMORY READ REQUIRED.`,
+          "You already called khala_read_memory.",
+          `Immediately retry the blocked ${pendingMemoryGateRecovery.blockedToolName} in the same assistant turn.`,
+          "Do not switch to explanation, next-turn promises, or ask the user to continue.",
+        ].join("\n"),
       };
     }
 
