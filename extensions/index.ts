@@ -2,6 +2,7 @@ import type {
   ExtensionAPI,
   ExtensionCommandContext,
   ExtensionContext,
+  ToolCallEvent,
 } from "@earendil-works/pi-coding-agent";
 import { createBashTool } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
@@ -161,7 +162,12 @@ let activeRuntimeProfile: RuntimeProfile = DEFAULT_RUNTIME_PROFILE;
 let lowConfidenceEvents: LowConfidenceEvent[] = [];
 let bundledExtensionsInitialized = false;
 const runtimeState = createRuntimeState();
-let memoryReadThisTurn = false;
+let taskToolCallCount = 0;
+let memoryGate = {
+  hasRead: false,
+  toolCallsSinceRead: 0,
+  invalidReason: "task start",
+};
 
 function clampPositiveInt(value: unknown, fallback: number, max: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
@@ -222,6 +228,7 @@ function shouldConsiderKhalaLearning(params: {
   const combined = normalizeWhitespace(
     `${params.userText} ${params.assistantText}`,
   );
+  if (taskToolCallCount > runtimeState.memoryToolCallLimit) return true;
   if (params.workflow !== null) return true;
   if (combined.length >= 40) return true;
   return /\b(wrong|not working|stalling|stalled|do not|don't|instead|actually|stop planning|implement it|unsigned commit|duplicate pr|stale branch|preflight|postflight)\b/i.test(
@@ -249,7 +256,7 @@ async function maybeAssessAndLearn(params: {
 
   const paths = await ensureLearningStore(params.ctx.cwd, learningPathCache);
   const recents = await readRecentKhalaLearningRecords(paths, 20);
-  const assessment = assessLearning(
+  let assessment = assessLearning(
     {
       taskSummary: params.userText,
       assistantSummary: params.assistantText,
@@ -259,9 +266,36 @@ async function maybeAssessAndLearn(params: {
       loadedSkills: params.workflow?.loadedSkills ?? [],
       policyWarnings: params.workflow?.policyWarnings ?? [],
       userCorrection: USER_CORRECTION_PATTERN.test(params.userText),
+      ...(taskToolCallCount > runtimeState.memoryToolCallLimit
+        ? {
+            reusable: true,
+            confidenceHint: 0.78,
+            trigger: "task exceeds memory refresh threshold",
+            lessonCandidate:
+              "For long tasks, refresh memory after the configured tool-call limit and force an end-of-task learning review so stale context and reusable workflow corrections are not missed.",
+            evidence: [
+              `${taskToolCallCount} tool call(s) in task; limit=${runtimeState.memoryToolCallLimit}`,
+            ],
+          }
+        : {}),
     },
     recents,
   );
+
+  if (
+    taskToolCallCount > runtimeState.memoryToolCallLimit &&
+    !assessment.sensitive &&
+    !assessment.shouldLearn &&
+    assessment.lesson.length > 0
+  ) {
+    assessment = {
+      ...assessment,
+      shouldLearn: true,
+      score: Math.max(assessment.score, 0.76),
+      confidence: Math.max(assessment.confidence, 0.76),
+      reason: `Forced learning review after ${taskToolCallCount} tool calls exceeded the ${runtimeState.memoryToolCallLimit}-tool threshold.`,
+    };
+  }
 
   params.pi.appendEntry("khala-learning-assessment", {
     at: nowIso(),
@@ -309,6 +343,49 @@ function shouldRunActiveLearningReview(workflow: PendingWorkflow): boolean {
       workflow.type === "tdd" ||
       workflow.type === "plan")
   );
+}
+
+function isContinuationInput(text: string): boolean {
+  return /^(?:continue|go on|proceed|yes|y|ok|okay|tes)$/i.test(text.trim());
+}
+
+function resetMemoryGate(reason: string): void {
+  memoryGate = {
+    hasRead: false,
+    toolCallsSinceRead: 0,
+    invalidReason: reason,
+  };
+}
+
+function markMemoryRead(): void {
+  memoryGate = {
+    hasRead: true,
+    toolCallsSinceRead: 0,
+    invalidReason: "",
+  };
+}
+
+function isMemoryPersistenceToolCall(event: { toolName: string }): boolean {
+  return event.toolName === "khala_learn";
+}
+
+function requiresFreshMemory(event: ToolCallEvent): boolean {
+  return isMutationToolCall(event) || isMemoryPersistenceToolCall(event);
+}
+
+function isMemoryFresh(): boolean {
+  return (
+    memoryGate.hasRead &&
+    memoryGate.toolCallsSinceRead < runtimeState.memoryToolCallLimit
+  );
+}
+
+function staleMemoryReason(): string {
+  if (!memoryGate.hasRead) return memoryGate.invalidReason || "task start";
+  if (memoryGate.toolCallsSinceRead >= runtimeState.memoryToolCallLimit) {
+    return `${memoryGate.toolCallsSinceRead} tool calls since last memory read (limit=${runtimeState.memoryToolCallLimit})`;
+  }
+  return "unknown";
 }
 
 function isSkillMemoryToolCall(event: { toolName: string; input?: unknown }): boolean {
@@ -928,6 +1005,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       activeHookConfig,
       learningPathCache,
       memoryTailLines: MEMORY_TAIL_LINES,
+      memoryToolCallLimit: runtimeState.memoryToolCallLimit,
     });
     if (!bootstrap.trim()) return;
     return {
@@ -936,9 +1014,12 @@ export default function khalaExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("input", async (event, _ctx) => {
-    memoryReadThisTurn = false;
     const text = typeof event.text === "string" ? event.text.trim() : "";
     if (!text) return;
+    if (!isContinuationInput(text)) {
+      taskToolCallCount = 0;
+      resetMemoryGate("new task or scope change");
+    }
 
     const preflight = parsePreflightLine(text, nowIso);
     if (preflight) {
@@ -963,17 +1044,32 @@ export default function khalaExtension(pi: ExtensionAPI): void {
   pi.on("tool_call", async (event, ctx) => {
     if (!runtimeState.agentEnabled) return;
 
+    if (event.toolName !== "khala_read_memory") {
+      taskToolCallCount += 1;
+      if (!isSkillMemoryToolCall(event)) {
+        memoryGate.toolCallsSinceRead += 1;
+      }
+    }
+
     if (event.toolName === "khala_read_memory") {
-      memoryReadThisTurn = true;
-    } else if (!memoryReadThisTurn && !isSkillMemoryToolCall(event)) {
+      markMemoryRead();
+      return;
+    }
+
+    const needsFreshMemory = requiresFreshMemory(event);
+    if (needsFreshMemory && !isMemoryFresh()) {
       return {
         block: true,
-        reason:
-          "MEMORY READ REQUIRED\n\nCall khala_read_memory before any other tool call in this turn.",
+        reason: `MEMORY READ REQUIRED\n\nMemory context is stale for this task (${staleMemoryReason()}). Call khala_read_memory, then immediately retry the mutation or memory write. Read-only inspection is allowed without memory refresh.`,
       };
     }
 
-    if (!isMutationToolCall(event)) return;
+    if (!isMutationToolCall(event)) {
+      if (isMemoryPersistenceToolCall(event)) {
+        resetMemoryGate("memory was updated");
+      }
+      return;
+    }
 
     if (pendingWorkflow) pendingWorkflow.mutationCount += 1;
 
@@ -1201,13 +1297,35 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     args: string | undefined,
     ctx: ExtensionCommandContext,
   ): Promise<void> => {
+    const rawArgs = args ?? "";
+    const limitMatch = rawArgs.match(/(?:^|\s)--(?:learn-tool-limit|memory-tool-limit)\s+(\d+)(?=\s|$)/);
+    if (limitMatch) {
+      runtimeState.memoryToolCallLimit = Math.max(
+        1,
+        Math.min(100, Number.parseInt(limitMatch[1] ?? "15", 10)),
+      );
+    }
+    const complianceArgs = normalizeWhitespace(
+      rawArgs.replace(/(?:^|\s)--(?:learn-tool-limit|memory-tool-limit)\s+\d+(?=\s|$)/, " "),
+    );
+
     if (!runtimeState.agentEnabled) {
       setAgentEnabledState(ctx, true);
       appendAgentStateEntry(pi, true, nowIso(), "khala");
-      notify(ctx, "khala initialized. End-of-turn learning assessment is now active.", "success");
+      notify(
+        ctx,
+        `khala initialized. End-of-turn learning assessment is now active. memory_tool_limit=${runtimeState.memoryToolCallLimit}`,
+        "success",
+      );
+    } else if (limitMatch) {
+      notify(
+        ctx,
+        `khala memory/tool learning threshold updated: memory_tool_limit=${runtimeState.memoryToolCallLimit}`,
+        "success",
+      );
     }
 
-    const compliancePreset = normalizeWhitespace(args ?? "") || "warn";
+    const compliancePreset = complianceArgs || "warn";
     await complianceHandlers.compliance(compliancePreset, ctx);
   };
 
