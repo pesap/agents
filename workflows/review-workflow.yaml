@@ -1,18 +1,67 @@
 name: review-workflow
-version: 1
-objective: Run a scoped code review with prioritized, actionable findings and a clear verdict
+version: 2
+objective: Run a scoped code review with prioritized, actionable findings and a clear verdict.
+
+command_prompt_policy:
+  principle: keep command prompt thin; maintain procedural detail here and in skills
+  command_file: commands/review-workflow.md
+
 version_control:
-  local_tool: gitbutler
-  setup_check: but status -fv
-  setup_when_missing: but setup --status-after
-  write_operations: use but instead of git write commands
+  primary_tool: gitbutler
+  fallback_tool: git
+  detect:
+    first_command_when_reviewing_repo_state: but status -fv
+    gitbutler_available_when: command succeeds and reports GitButler workspace state
+    normal_git_when: but is unavailable, reports repository is not managed by GitButler, or setup is intentionally declined
+  gitbutler:
+    setup_when_missing: but setup --status-after
+    write_operations: use but instead of git write commands
+  normal_git:
+    allowed_when: GitButler is unavailable or this repo is intentionally not a GitButler workspace
+    write_operations: use git only in normal Git mode; never mix git writes into a GitButler workspace
+
+skill_contracts:
+  review:
+    skill: code-review
+    load_before: evaluating code findings
+  gitbutler:
+    skill: but
+    load_before: GitButler mode detection, branch, diff, or uncommitted workspace review
+  remote_reference:
+    skill: librarian
+    load_when: user provides a GitHub URL, repo shorthand, or remote git reference
+
+gates:
+  vcs_mode:
+    - run the detect command before reviewing repo state
+    - if GitButler is available, review GitButler branches/stacks/unassigned changes by GitButler IDs
+    - if normal Git mode is required, say so explicitly and review current branch, working tree, upstream, and local commits with equivalent scope discipline
+    - never use git write commands after GitButler mode has been detected
+  scope:
+    - confirm exact review target: uncommitted changes, branch diff, commit, PR, or file/folder snapshot
+    - ask before reviewing if scope is ambiguous
+    - do not include unrelated parallel GitButler branches/stacks or unrelated normal-Git local branches
+  evidence:
+    - gather concrete diff or snapshot context before findings
+    - cite precise file paths and line references where possible
+    - separate blocking defects from non-blocking reviewer callouts
+  mutation:
+    - default is read-only review
+    - mutate files only if the user explicitly asks for fixes
+  quality:
+    - prioritize correctness, security, data loss, API contract, correctness-by-construction, performance, and maintainability risks
+    - flag low-quality code when it creates concrete review risk: fragile control flow, unclear invariants, avoidable coupling, or likely future defects
+    - avoid speculative style-only findings unless listed as non-blocking callouts
+
 steps:
+  - id: vcs-mode-detect
+    action: detect_gitbutler_or_normal_git_mode_when_reviewing_repo_state
   - id: scope
     action: confirm_review_target_and_constraints
   - id: collect
     action: gather_required_diff_or_snapshot_context
   - id: inspect
-    action: evaluate_correctness_security_performance_maintainability
+    action: evaluate_correctness_security_performance_and_maintainability
   - id: findings
     action: emit_prioritized_findings_with_file_references
   - id: verdict
@@ -20,4 +69,32 @@ steps:
   - id: callouts
     action: append_human_reviewer_callouts_non_blocking
   - id: learn
-    action: persist_review_learnings
+    action: persist_reusable_non_sensitive_review_learnings
+
+finding_contract:
+  severity_order:
+    - "[P0] release blocker: data loss, security exploit, build/test cannot run"
+    - "[P1] must fix: likely correctness break or significant regression"
+    - "[P2] should fix before merge when it is a moderate bug, edge case, maintainability risk, or low-quality construction that threatens future correctness; do not use P2 for personal preference or repo-style-only changes when the code is mergeable"
+    - "[P3] nitpick or optional: personal preference, repo-style cleanup, naming/readability polish, or minor improvement with clear evidence"
+  required_fields:
+    - severity
+    - concise title
+    - file reference
+    - evidence
+    - suggested fix or next check
+
+final_response_contract:
+  required_sections:
+    - review summary
+    - key findings
+    - verdict
+    - Human Reviewer Callouts (Non-Blocking)
+  verdict_values:
+    - correct
+    - needs attention
+  no_findings_text: change looks good
+  required_lines:
+    - "Result: success|partial|failed"
+    - "Confidence: 0..1"
+  postflight_line_when_mutated: "Postflight: verify=\"<command_or_check>\" result=<pass|fail|not-run>"

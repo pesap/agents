@@ -15,11 +15,13 @@ description: Create or improve reusable agent skills with strong trigger descrip
 
 ## Workflow
 1. **Gather requirements and evidence**
-   - Clarify: domain/task, key use cases, optional scripts, reference materials, and target agent/runtime.
+   - Clarify: domain/task, key use cases, optional scripts, reference materials, target agent/runtime, and where the skill should be saved.
+   - If the save location is not explicit, ask before writing files. Offer common choices when useful: repo skill (`skills/<name>/`), local khala skill (`.pi/khala/skills/<name>/`), or another user-specified path.
    - Prefer real source material over generic best practices: successful task transcripts, user corrections, runbooks, issue history, code review comments, specs, or existing docs.
    - If creating from scratch, ask what recurring failure, workflow, or expertise gap the skill should address.
-2. **Choose portability target**
+2. **Choose portability target and save path**
    - Decide whether this is a local-only skill or an Agent Skills–portable skill.
+   - Confirm the exact target directory before mutation; the frontmatter `name` should match the directory basename.
    - When portability matters, follow the Agent Skills spec and standard layout.
 3. **Draft skill artifacts**
    - Create/update `SKILL.md` with concise operational instructions.
@@ -56,7 +58,7 @@ description: Create or improve reusable agent skills with strong trigger descrip
    - Add scripts when evals or traces show repeated mechanical work, fragile formatting, or validation logic that code can do more reliably than prose.
    - Scripts should be deterministic, self-contained or clearly dependency-scoped, non-interactive, and produce agent-friendly errors.
 10. **Review and save**
-   - Present draft, eval plan, and key tradeoffs, then write/update files.
+   - Present draft, eval plan, save path, and key tradeoffs, then write/update files.
 11. **Learn**
    - Persist concise notes on triggers, boundaries, eval outcomes, and why scripts/resources were or were not added.
 
@@ -79,6 +81,7 @@ skill-name/
 ## Output format
 - Skill summary
 - Generated artifacts (paths + what changed)
+- Save location
 - Portability target (`local-only|agent-skills-portable`)
 - Agent Skills alignment score (weighted total + category breakdown)
 - Trigger eval plan (positive + near-miss negatives)

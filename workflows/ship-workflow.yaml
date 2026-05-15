@@ -1,45 +1,136 @@
 name: ship-workflow
-version: 1
-objective: Simplify, verify, publish branch, and open PR/MR when missing
+version: 2
+objective: Simplify, verify, publish one focused branch, and open or confirm a PR/MR.
+
+command_prompt_policy:
+  principle: keep command prompt thin; maintain procedural detail here and in skills
+  command_file: commands/ship-workflow.md
+
 version_control:
-  local_tool: gitbutler
-  setup_check: but status -fv
-  setup_when_missing: but setup --status-after
-  write_operations: use but instead of git write commands
+  primary_tool: gitbutler
+  fallback_tool: git
+  detect:
+    first_command: but status -fv
+    gitbutler_available_when: command succeeds and reports GitButler workspace state
+    normal_git_when: but is unavailable, reports repository is not managed by GitButler, or setup is intentionally declined
+  gitbutler:
+    setup_when_missing: but setup --status-after
+    write_operations: use but instead of git write commands
+  normal_git:
+    allowed_when: GitButler is unavailable or this repo is intentionally not a GitButler workspace
+    before_writes: state normal Git mode explicitly and preserve the same branch, signing, validation, push, and PR gates
+    write_operations: use git only in normal Git mode; never mix git writes into a GitButler workspace
+
+skill_contracts:
+  gitbutler:
+    skill: but
+    load_before: GitButler mutations, GitButler setup/fallback decisions, or claims that a native capability is missing
+    audit_policy: report the skill audit only when the but skill was actually loaded and followed; never claim full-read unless true
+  simplify:
+    skill: simplify
+    scope: selected ship target only
+  commit:
+    skill: commit
+    load_before: commit creation
+  forge:
+    github_skill: github
+    gitlab_skill: gitlab
+    load_before: PR/MR inspection or creation
+
+gates:
+  vcs_mode:
+    - run the detect.first_command before local VCS decisions
+    - if GitButler is available, use GitButler mode and all GitButler gates
+    - if normal Git mode is required, say so explicitly and apply equivalent freshness, signing, validation, push, and PR gates
+    - never use git write commands after GitButler mode has been detected
+  target_selection:
+    - in GitButler mode, identify all applied branches/stacks, unrelated parallel work, and unassigned changes from GitButler state
+    - in normal Git mode, identify current branch, working tree changes, upstream, and any local commits ahead of default
+    - select exactly one ship target branch/stack
+    - if ambiguous, show a branch/change table and ask before shipping
+    - treat other applied branches/stacks as parallel work unless explicitly requested
+  freshness:
+    - before simplify, commit, push, or PR, update the latest default/base branch using the detected VCS mode
+    - in GitButler mode, run native base update flow: status --upstream, pull --check, pull --status-after when safe
+    - in normal Git mode, fetch/update the default branch and rebase/merge according to repo policy before shipping
+    - resolve conflicts with mode-appropriate conflict workflow before continuing
+    - prove merge-base with origin/default matches latest default branch before push/PR
+    - stop if the target branch was already merged, reused after squash merge, or lacks unique unmerged work
+  scope:
+    - verify requested edits are in the current repo/worktree diff, not external skill/cache paths
+    - ensure a GitButler branch/stack exists before commit/push/PR
+    - commit only selected change IDs for the ship target
+  signing:
+    - never create an unsigned commit
+    - verify the exact ship commit signature, not the GitButler workspace commit
+  validation:
+    - detect project test/CI command from repo conventions
+    - run targeted validation and stop on first failure
+    - push only after tests pass
+  forge:
+    - detect GitHub vs GitLab and use matching tooling
+    - do not create duplicate PR/MR for an existing head branch
+    - use repo PR/MR template when present, otherwise skill template
+    - inspect the real remote artifact before claiming success
+
 steps:
+  - id: vcs-mode-detect
+    action: detect_gitbutler_or_normal_git_mode_before_vcs_mutations
+  - id: update-latest-base
+    action: update_latest_default_or_base_branch_before_simplify_commit_push_or_pr
   - id: base-sync-check
-    action: run_gitbutler_native_base_update_flow_status_upstream_pull_check_pull_status_after_resolve_conflicts_then_verify_merge_base_matches_latest_default_branch_before_pr
+    action: run_mode_appropriate_base_update_flow_and_verify_latest_default_base
   - id: inspect-gitbutler
     action: inspect_gitbutler_state_and_list_applied_parallel_branches
   - id: select-target
-    action: select_exactly_one_ship_target_branch_or_stack_and_ask_if_ambiguous
+    action: select_exactly_one_ship_target_or_ask_if_ambiguous
   - id: freshness-check
-    action: verify_ship_target_has_unique_unmerged_work_and_is_not_already_on_default_branch
-  - id: branch-reuse-check
-    action: verify_ship_target_has_not_already_been_merged_and_reused_after_squash_merge
+    action: verify_unique_unmerged_work_and_no_reused_merged_branch
   - id: scope-check
-    action: verify_requested_edits_exist_in_repo_local_diff_not_external_agent_paths
+    action: verify_requested_edits_exist_in_repo_local_diff
   - id: branch
     action: ensure_gitbutler_branch_or_stack_exists_for_ship_target
   - id: simplify
-    action: simplify_current_uncommitted_scope_for_selected_ship_target
+    action: simplify_current_uncommitted_scope_for_selected_ship_target_preserving_behavior
   - id: validate
     action: run_project_ci_or_test_command
   - id: signing-check
-    action: verify_commit_will_be_signed_or_stop_for_user_assistance
+    action: verify_commit_will_be_signed_or_stop
   - id: commit
     action: commit_only_selected_change_ids_for_ship_target_when_needed
   - id: commit-verify
-    action: verify_exact_ship_commit_is_signed_and_not_a_gitbutler_workspace_commit_false_positive
+    action: verify_exact_ship_commit_is_signed
   - id: push
-    action: push_ship_target_after_green_checks
+    action: push_ship_target_after_green_local_checks
   - id: pr-check
     action: detect_existing_pr_or_mr_for_ship_target
   - id: pr-open
-    action: open_pr_or_mr_if_missing_using_template_targeting_default_or_specified_base
+    action: open_pr_or_mr_if_missing_against_default_base
   - id: remote-verify
-    action: verify_remote_pr_or_mr_invariants_one_commit_default_base_signed_commit_plain_text_body_green_checks_and_no_conflicts
+    action: verify_remote_pr_or_mr_invariants
   - id: summarize
-    action: report_simplify_test_push_pr_status_only_after_remote_invariants_pass
+    action: report_required_final_status
   - id: learn
-    action: persist_learnings
+    action: persist_reusable_non_sensitive_learnings
+
+remote_invariants:
+  - one intended commit unless explicitly justified
+  - base branch is repo default unless user specified otherwise
+  - head branch is the selected ship target
+  - shipped commit signature is verified
+  - PR/MR body is plain markdown/text with no unreplaced template placeholders
+  - checks are green, or explicitly report no checks as partial
+  - mergeability/conflict status is clean
+
+final_response_contract:
+  required_sections:
+    - simplify summary
+    - test/CI result
+    - push status
+    - PR/MR status/link
+    - risks
+  required_lines:
+    - "Skill audit: full-read=yes native-path-confirmed=yes fallback-needed=no|yes" # only if the but skill was actually loaded and read
+    - "Result: success|partial|failed"
+    - "Confidence: 0..1"
+  postflight_line_when_mutated: "Postflight: verify=\"<command_or_check>\" result=<pass|fail|not-run>"
