@@ -1,6 +1,6 @@
 name: ship-workflow
 version: 3
-objective: Publish one focused change safely with minimal ceremony.
+objective: Ship one focused change with minimal ceremony.
 
 command_prompt_policy:
   principle: keep command prompt thin; maintain procedural detail here and in skills
@@ -26,9 +26,6 @@ skill_contracts:
     skill: but
     load_before: GitButler mutations, GitButler setup/fallback decisions, or claims that a native capability is missing
     audit_policy: report the skill audit only when the but skill was actually loaded and followed; never claim full-read unless true
-  simplify:
-    skill: simplify
-    scope: selected ship target only
   commit:
     skill: commit
     load_before: commit creation
@@ -41,9 +38,9 @@ guards:
   - run `but status -fv` before local VCS decisions
   - if GitButler is available, use GitButler mode for local VCS writes; otherwise state normal Git mode explicitly
   - never use git write commands after GitButler mode has been detected
-  - select exactly one ship target branch/stack; if ambiguous, show a branch/change table and ask before shipping
+  - select exactly one ship target branch/stack; if ambiguous, ask before shipping
   - treat other applied branches/stacks as parallel work unless explicitly requested
-  - update the latest default/base branch before simplify, commit, push, or PR
+  - update the latest default/base branch before commit, push, or PR
   - stop if the target branch was already merged, reused after squash merge, stale against latest base, or lacks unique unmerged work
   - verify requested edits are in the current repo/worktree diff, not external skill/cache paths
   - ensure a GitButler branch/stack exists before commit/push/PR
@@ -62,7 +59,7 @@ steps:
   - id: sync
     action: sync_with_latest_base_and_verify_unique_work
   - id: validate
-    action: simplify_scope_and_run_validation
+    action: run_targeted_validation
   - id: publish
     action: create_signed_commit_if_needed_and_push
   - id: pr
@@ -89,7 +86,7 @@ final_response_contract:
     - PR/MR status/link
     - risks
   required_lines:
-    - "Skill audit: full-read=yes native-path-confirmed=yes fallback-needed=no|yes" # only if the but skill was actually loaded and read
+    - "Skill audit: full-read=yes native-path-confirmed=yes fallback-needed=no|yes"
     - "Result: success|partial|failed"
     - "Confidence: 0..1"
   postflight_line_when_mutated: "Postflight: verify=\"<command_or_check>\" result=<pass|fail|not-run>"
