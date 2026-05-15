@@ -578,7 +578,7 @@ async function completeWorkflowTracking(
     ensureLearningStore: (cwd) => ensureLearningStore(cwd, learningPathCache),
     maybeEmitPromotionHint: (paths, observation, context) =>
       maybeEmitPromotionHint({
-        paths,
+        paths: paths as LearningPaths,
         observation: observation as LearningObservation<
           WorkflowType,
           WorkflowOutcome
@@ -623,9 +623,15 @@ function clipDisplay(text: unknown, maxLength = 120): string {
 }
 
 type KhalaToolRenderResult = { details?: unknown; content?: Array<{ text?: string }> };
-type KhalaToolTheme = Parameters<
-  NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["renderResult"]>
->[2];
+type KhalaToolTheme = {
+  fg: (name: string, value: string) => string;
+  bold: (value: string) => string;
+};
+
+type LooseExtensionAPI = {
+  registerTool: (tool: Record<string, unknown>) => void;
+  on: (eventName: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) => void;
+};
 
 function parseToolJsonDetails<T>(result: KhalaToolRenderResult): T | null {
   if (result.details && typeof result.details === "object") return result.details as T;
@@ -718,8 +724,9 @@ function renderKhalaLearnResult(
 
 export default function khalaExtension(pi: ExtensionAPI): void {
   ensureBundledExtensions(pi);
+  const loosePi = pi as unknown as LooseExtensionAPI;
 
-  pi.registerTool({
+  loosePi.registerTool({
     name: "khala_assess_learning",
     label: "Khala Assess Learning",
     description:
@@ -732,7 +739,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
         0,
       ),
     renderResult: (result, { expanded }, theme) =>
-      renderKhalaAssessResult(result, expanded, theme),
+      renderKhalaAssessResult(result as KhalaToolRenderResult, expanded, theme),
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       const paths = await ensureLearningStore(ctx.cwd, learningPathCache);
       const recents = await readRecentKhalaLearningRecords(paths, 20);
@@ -749,7 +756,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerTool({
+  loosePi.registerTool({
     name: "khala_read_memory",
     label: "Khala Read Memory",
     description:
@@ -776,7 +783,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
         0,
       ),
     renderResult: (result, { expanded }, theme) =>
-      renderKhalaMemoryResult(result, expanded, theme),
+      renderKhalaMemoryResult(result as KhalaToolRenderResult, expanded, theme),
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       const tailLines = clampPositiveInt(params.tailLines, 8, 50);
       const recentLimit = clampPositiveInt(params.recentLimit, 8, 50);
@@ -787,7 +794,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
         readRecentKhalaLearningRecords(paths, recentLimit),
       ]);
 
-      memoryReadThisTurn = true;
+      markMemoryRead();
 
       const payload = {
         storeRoot: paths.root,
@@ -816,7 +823,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerTool({
+  loosePi.registerTool({
     name: "khala_learn",
     label: "Khala Learn",
     description:
@@ -832,7 +839,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
         0,
       ),
     renderResult: (result, { expanded }, theme) =>
-      renderKhalaLearnResult(result, expanded, theme),
+      renderKhalaLearnResult(result as KhalaToolRenderResult, expanded, theme),
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
       const kind =
         params.kind === "workflow_correction" ||
@@ -916,7 +923,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerTool(bashTool);
+  loosePi.registerTool(bashTool as unknown as Record<string, unknown>);
   pi.on("session_start", async (_event, ctx) => {
     const [hookConfig, profileLoad] = await Promise.all([
       loadHooksConfig(RUNTIME_PATHS.hooksConfigPath, DEFAULT_HOOK_CONFIG),
@@ -1103,12 +1110,13 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     }
   });
 
-  pi.on("agent_end", async (event, ctx) => {
+  loosePi.on("agent_end", async (event, ctx) => {
     const workflow = pendingWorkflow;
+    const messages = (event as { messages: Parameters<typeof extractLastAssistantText>[0] }).messages;
     const text =
-      extractLastAssistantText(event.messages) ||
+      extractLastAssistantText(messages) ||
       "No assistant output captured.";
-    const userText = extractLastUserText(event.messages);
+    const userText = extractLastUserText(messages);
 
     if (workflow &&
       runtimeState.firstPrinciplesConfig.responseComplianceMode === "enforce"
