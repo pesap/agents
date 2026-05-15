@@ -97,21 +97,63 @@ Rules:
 - do not add an outer shell orchestration layer around normal submit flows
 - if using a documented self-contained Slurm job pattern, follow that specific doc rather than general submit guidance
 
-## 5. Versioned remote code execution
+## 5. Git-backed remote code execution
 Use this when the user wants to run a specific branch, tag, or commit remotely.
 
-### Preferred workflow
-1. Ensure the remote side already has a git checkout or bare mirror.
-2. Fetch the desired branch/tag/commit remotely.
-3. Create or refresh a checkout/worktree for that version.
-4. Run the command from that prepared remote workdir.
-5. Fetch only logs and output artifacts back locally.
-6. Remove temporary worktrees/refs after the run.
+Core rule: **code travels by Git; data stays remote**. Jobs must reference data that already exists on the HPC filesystem, for example `/scratch/$USER/data/...` or `/projects/team/datasets/...`.
+
+### Configure `git push hpc`
+Create or reuse a bare Git repository on the cluster and add it as a local remote:
+
+```bash
+skills/torc-hpc/scripts/setup-hpc-git-remote.sh \
+  --host user@login.cluster \
+  --remote-git-dir /scratch/$USER/git/myrepo.git \
+  --remote-name hpc
+```
+
+Then publish code for a run:
+
+```bash
+git push hpc HEAD:refs/heads/my-run
+SHA=$(git rev-parse HEAD)
+```
+
+### Prepare an exact-SHA run worktree
+Materialize the pushed commit into an isolated run directory:
+
+```bash
+skills/torc-hpc/scripts/prepare-git-run.sh \
+  --host user@login.cluster \
+  --remote-git-dir /scratch/$USER/git/myrepo.git \
+  --sha "$SHA" \
+  --run-root /scratch/$USER/torc-runs/my-run
+```
+
+This creates:
+
+```text
+/scratch/$USER/torc-runs/my-run/src   # exact SHA worktree
+/scratch/$USER/torc-runs/my-run/out   # intended outputs
+/scratch/$USER/torc-runs/my-run/logs  # intended logs
+/scratch/$USER/torc-runs/my-run/metadata.env
+```
+
+Run Torc/Slurm from `src` and point jobs at remote data paths:
+
+```bash
+cd /scratch/$USER/torc-runs/my-run/src
+torc slurm generate --account <acct> workflow.yaml -o ../workflow_slurm.yaml
+torc submit ../workflow_slurm.yaml
+```
 
 Rules:
-- prefer remote `git fetch` + checkout/worktree over rsyncing the full local repo
-- keep the remote directory layout stable so workflow-relative paths still work
-- if the version is not on a permanent branch, create a temporary ref, fetch it remotely, then delete it during cleanup
+- use a bare Git repo as the receiving `hpc` remote; do not push into a mutable checkout used by jobs
+- run jobs from an exact-SHA worktree under a run directory, not from the bare repo or shared checkout
+- prefer exact SHA for big dataset runs; branch names are okay only as inputs to locate the SHA
+- keep remote data paths explicit; this workflow does not move datasets
+- fetch only logs, summaries, and selected artifacts by default; large outputs stay remote unless explicitly requested
+- remove temporary worktrees after results are safe
 
 ## 6. Manual remote command fallback
 Use `scripts/run-remote.sh` only when you truly need to launch a non-Torc remote command manually.
