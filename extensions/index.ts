@@ -311,6 +311,22 @@ function shouldRunActiveLearningReview(workflow: PendingWorkflow): boolean {
   );
 }
 
+function isSkillMemoryToolCall(event: { toolName: string; input?: unknown }): boolean {
+  if (event.toolName !== "read") return false;
+  const input = event.input as { path?: unknown } | undefined;
+  if (typeof input?.path !== "string") return false;
+
+  const normalizedPath = input.path.replaceAll("\\", "/");
+  return (
+    normalizedPath.startsWith("skills/") ||
+    normalizedPath.startsWith(".agents/skills/") ||
+    normalizedPath.startsWith(".pi/khala/skills/") ||
+    normalizedPath.includes("/skills/") ||
+    normalizedPath.includes("/.agents/skills/") ||
+    normalizedPath.includes("/.pi/khala/skills/")
+  );
+}
+
 function inferSkillPatchSignal(text: string): boolean {
   return /\b(?:workaround|manual step|missing step|stale|incomplete|pitfall|had to)\b/i.test(
     text,
@@ -949,7 +965,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
 
     if (event.toolName === "khala_read_memory") {
       memoryReadThisTurn = true;
-    } else if (!memoryReadThisTurn) {
+    } else if (!memoryReadThisTurn && !isSkillMemoryToolCall(event)) {
       return {
         block: true,
         reason:
