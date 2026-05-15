@@ -1,6 +1,6 @@
 name: ship-workflow
-version: 2
-objective: Simplify, verify, publish one focused branch, and open or confirm a PR/MR.
+version: 3
+objective: Publish one focused change safely with minimal ceremony.
 
 command_prompt_policy:
   principle: keep command prompt thin; maintain procedural detail here and in skills
@@ -18,7 +18,7 @@ version_control:
     write_operations: use but instead of git write commands
   normal_git:
     allowed_when: GitButler is unavailable or this repo is intentionally not a GitButler workspace
-    before_writes: state normal Git mode explicitly and preserve the same branch, signing, validation, push, and PR gates
+    before_writes: state normal Git mode explicitly and preserve the same target, signing, validation, push, and PR gates
     write_operations: use git only in normal Git mode; never mix git writes into a GitButler workspace
 
 skill_contracts:
@@ -37,77 +37,36 @@ skill_contracts:
     gitlab_skill: gitlab
     load_before: PR/MR inspection or creation
 
-gates:
-  vcs_mode:
-    - run the detect.first_command before local VCS decisions
-    - if GitButler is available, use GitButler mode and all GitButler gates
-    - if normal Git mode is required, say so explicitly and apply equivalent freshness, signing, validation, push, and PR gates
-    - never use git write commands after GitButler mode has been detected
-  target_selection:
-    - in GitButler mode, identify all applied branches/stacks, unrelated parallel work, and unassigned changes from GitButler state
-    - in normal Git mode, identify current branch, working tree changes, upstream, and any local commits ahead of default
-    - select exactly one ship target branch/stack
-    - if ambiguous, show a branch/change table and ask before shipping
-    - treat other applied branches/stacks as parallel work unless explicitly requested
-  freshness:
-    - before simplify, commit, push, or PR, update the latest default/base branch using the detected VCS mode
-    - in GitButler mode, run native base update flow: status --upstream, pull --check, pull --status-after when safe
-    - in normal Git mode, fetch/update the default branch and rebase/merge according to repo policy before shipping
-    - resolve conflicts with mode-appropriate conflict workflow before continuing
-    - prove merge-base with origin/default matches latest default branch before push/PR
-    - stop if the target branch was already merged, reused after squash merge, or lacks unique unmerged work
-  scope:
-    - verify requested edits are in the current repo/worktree diff, not external skill/cache paths
-    - ensure a GitButler branch/stack exists before commit/push/PR
-    - commit only selected change IDs for the ship target
-  signing:
-    - never create an unsigned commit
-    - verify the exact ship commit signature, not the GitButler workspace commit
-  validation:
-    - detect project test/CI command from repo conventions
-    - run targeted validation and stop on first failure
-    - push only after tests pass
-  forge:
-    - detect GitHub vs GitLab and use matching tooling
-    - do not create duplicate PR/MR for an existing head branch
-    - use repo PR/MR template when present, otherwise skill template
-    - inspect the real remote artifact before claiming success
+guards:
+  - run `but status -fv` before local VCS decisions
+  - if GitButler is available, use GitButler mode for local VCS writes; otherwise state normal Git mode explicitly
+  - never use git write commands after GitButler mode has been detected
+  - select exactly one ship target branch/stack; if ambiguous, show a branch/change table and ask before shipping
+  - treat other applied branches/stacks as parallel work unless explicitly requested
+  - update the latest default/base branch before simplify, commit, push, or PR
+  - stop if the target branch was already merged, reused after squash merge, stale against latest base, or lacks unique unmerged work
+  - verify requested edits are in the current repo/worktree diff, not external skill/cache paths
+  - ensure a GitButler branch/stack exists before commit/push/PR
+  - never create an unsigned commit; verify the exact ship commit signature
+  - detect project test/CI command from repo conventions, run targeted validation, and stop on first failure
+  - detect GitHub vs GitLab and use matching tooling
+  - do not create duplicate PR/MR for an existing head branch
+  - use repo PR/MR template when present, otherwise skill template
+  - inspect the real remote artifact before claiming success
 
 steps:
-  - id: vcs-mode-detect
-    action: detect_gitbutler_or_normal_git_mode_before_vcs_mutations
-  - id: update-latest-base
-    action: update_latest_default_or_base_branch_before_simplify_commit_push_or_pr
-  - id: base-sync-check
-    action: run_mode_appropriate_base_update_flow_and_verify_latest_default_base
-  - id: inspect-gitbutler
-    action: inspect_gitbutler_state_and_list_applied_parallel_branches
-  - id: select-target
-    action: select_exactly_one_ship_target_or_ask_if_ambiguous
-  - id: freshness-check
-    action: verify_unique_unmerged_work_and_no_reused_merged_branch
-  - id: scope-check
-    action: verify_requested_edits_exist_in_repo_local_diff
-  - id: branch
-    action: ensure_gitbutler_branch_or_stack_exists_for_ship_target
-  - id: simplify
-    action: simplify_current_uncommitted_scope_for_selected_ship_target_preserving_behavior
+  - id: detect
+    action: detect_vcs_mode
+  - id: target
+    action: select_single_ship_target
+  - id: sync
+    action: sync_with_latest_base_and_verify_unique_work
   - id: validate
-    action: run_project_ci_or_test_command
-  - id: signing-check
-    action: verify_commit_will_be_signed_or_stop
-  - id: commit
-    action: commit_only_selected_change_ids_for_ship_target_when_needed
-  - id: commit-verify
-    action: verify_exact_ship_commit_is_signed
-  - id: push
-    action: push_ship_target_after_green_local_checks
-  - id: pr-check
-    action: detect_existing_pr_or_mr_for_ship_target
-  - id: pr-open
-    action: open_pr_or_mr_if_missing_against_default_base
-  - id: remote-verify
-    action: verify_remote_pr_or_mr_invariants
+    action: simplify_scope_and_run_validation
+  - id: publish
+    action: create_signed_commit_if_needed_and_push
+  - id: pr
+    action: reuse_or_open_pr_and_verify_remote
   - id: summarize
     action: report_required_final_status
   - id: learn
