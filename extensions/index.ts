@@ -969,7 +969,7 @@ export default function khalaExtension(pi: ExtensionAPI): void {
       return {
         block: true,
         reason:
-          "MEMORY READ REQUIRED\n\nCall khala_read_memory before any other tool call in this turn.",
+          "MEMORY READ REQUIRED\n\nCall khala_read_memory before any other non-skill-memory tool call in this turn. After reading memory, immediately retry the blocked work in the same assistant turn; do not ask the user to continue.",
       };
     }
 

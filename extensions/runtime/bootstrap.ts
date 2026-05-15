@@ -106,6 +106,10 @@ export async function getBootstrapPayload(params: {
     complianceProfile.trim(),
     startupHooks.trim() ? "[LIFECYCLE HOOKS: on_session_start]" : "",
     startupHooks.trim(),
+    "[TURN EXECUTION RULES]",
+    "- Before any non-skill-memory tool call in a user turn, call khala_read_memory first.",
+    "- Do not say you will perform file reads, edits, commands, or other tool work unless you call the relevant tool in the same assistant turn.",
+    "- If a tool call is blocked with MEMORY READ REQUIRED, call khala_read_memory and immediately retry the blocked work; do not ask the user to continue.",
     memoryTail ? "[LEARNING MEMORY TAIL]" : "",
     memoryTail,
     learnedSkills.length > 0
