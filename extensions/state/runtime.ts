@@ -32,6 +32,7 @@ export interface RuntimeState {
   activePreflight: PreflightRecord | null;
   latestPostflight: PostflightRecord | null;
   policyEvents: PolicyEvent[];
+  memoryToolCallLimit: number;
 }
 
 export function createRuntimeState(): RuntimeState {
@@ -43,6 +44,7 @@ export function createRuntimeState(): RuntimeState {
     activePreflight: null,
     latestPostflight: null,
     policyEvents: [],
+    memoryToolCallLimit: 15,
   };
 }
 
