@@ -8,6 +8,7 @@ import { createBashTool } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import registerFffExtension from "@ff-labs/pi-fff/src/index.ts";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import registerSubagentExtension from "pi-subagents/src/extension/index.ts";
 import { createAgentCommandHandlers } from "./commands/agent";
@@ -188,15 +189,278 @@ const workflowReaders = createWorkflowReaders({
 const USER_CORRECTION_PATTERN =
   /\b(wrong|not working|stalling|stalled|do not|don't|instead|actually|stop planning|implement it)\b/i;
 
+const INTERCEPTED_COMMAND_PATHS = [
+  RUNTIME_PATHS.interceptedCommandsDir,
+  path.join(RUNTIME_PATHS.packageRoot, "node_modules", ".bin"),
+] as const;
+
 function prependInterceptedCommandsPath(command: string): string {
-  const escapedInterceptedPath = RUNTIME_PATHS.interceptedCommandsDir.replace(
-    /"/g,
-    '\\"',
+  const escapedPathPrefix = INTERCEPTED_COMMAND_PATHS.map((entry) =>
+    entry.replace(/"/g, '\\"'),
+  ).join(":");
+  return `export PATH="${escapedPathPrefix}:$PATH"\n${command}`;
+}
+
+function withInterceptedPathEnv(baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const currentPath = baseEnv.PATH ?? baseEnv.Path ?? "";
+  const pathPrefix = INTERCEPTED_COMMAND_PATHS.join(path.delimiter);
+  const mergedPath = currentPath
+    ? `${pathPrefix}${path.delimiter}${currentPath}`
+    : pathPrefix;
+
+  return {
+    ...baseEnv,
+    PATH: mergedPath,
+    Path: mergedPath,
+  };
+}
+
+function parseBooleanEnv(name: string): boolean | null {
+  const raw = process.env[name];
+  if (raw === undefined) return null;
+  if (/^(?:1|true|yes|on)$/i.test(raw)) return true;
+  if (/^(?:0|false|no|off)$/i.test(raw)) return false;
+  return null;
+}
+
+function detectPowerShellParentOnWindows(): boolean {
+  const result = spawnSync(
+    "powershell.exe",
+    [
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `$proc = Get-CimInstance Win32_Process -Filter \"ProcessId = ${process.ppid}\"; if ($null -ne $proc) { $proc.Name }`,
+    ],
+    {
+      windowsHide: true,
+      encoding: "utf8",
+      timeout: 1000,
+    },
   );
-  const escapedPackageBinPath = path
-    .join(RUNTIME_PATHS.packageRoot, "node_modules", ".bin")
-    .replace(/"/g, '\\"');
-  return `export PATH="${escapedInterceptedPath}:${escapedPackageBinPath}:$PATH"\n${command}`;
+
+  if (result.error || result.status !== 0) return false;
+  const parentName = (result.stdout ?? "").trim().toLowerCase();
+  return parentName.includes("pwsh") || parentName.includes("powershell");
+}
+
+function shouldUsePowerShellBashOverride(): boolean {
+  if (process.platform !== "win32") return false;
+
+  const forcedPowerShell = parseBooleanEnv("KHALA_FORCE_POWERSHELL_BASH");
+  if (forcedPowerShell !== null) return forcedPowerShell;
+
+  return detectPowerShellParentOnWindows();
+}
+
+function getWindowsPowerShellCandidates(): string[] {
+  const configured = process.env.KHALA_POWERSHELL_PATH?.trim();
+  if (configured) return [configured];
+
+  return ["pwsh.exe", "powershell.exe"];
+}
+
+type PowerShellBashResult = {
+  shell: string;
+  command: string;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+};
+
+async function runPowerShellCommand(params: {
+  shell: string;
+  command: string;
+  timeoutSeconds?: number;
+  signal?: AbortSignal;
+}): Promise<PowerShellBashResult> {
+  const timeoutSeconds =
+    typeof params.timeoutSeconds === "number" && Number.isFinite(params.timeoutSeconds)
+      ? Math.max(1, Math.floor(params.timeoutSeconds))
+      : null;
+  const timeoutMs = timeoutSeconds ? timeoutSeconds * 1000 : null;
+
+  return await new Promise<PowerShellBashResult>((resolve, reject) => {
+    const child = spawn(
+      params.shell,
+      [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        params.command,
+      ],
+      {
+        cwd: process.cwd(),
+        env: withInterceptedPathEnv(process.env),
+        windowsHide: true,
+      },
+    );
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let settled = false;
+
+    const settle = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+
+    child.stdout.on("data", (chunk: Buffer | string) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer | string) => {
+      stderr += chunk.toString();
+    });
+
+    const timeoutHandle =
+      timeoutMs === null
+        ? null
+        : setTimeout(() => {
+            timedOut = true;
+            child.kill();
+          }, timeoutMs);
+
+    const cleanup = (): void => {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      params.signal?.removeEventListener("abort", onAbort);
+    };
+
+    const onAbort = (): void => {
+      child.kill();
+      settle(() => {
+        cleanup();
+        reject(new Error("PowerShell command aborted by signal"));
+      });
+    };
+    params.signal?.addEventListener("abort", onAbort, { once: true });
+
+    child.on("error", (error) => {
+      settle(() => {
+        cleanup();
+        reject(error);
+      });
+    });
+
+    child.on("close", (code) => {
+      settle(() => {
+        cleanup();
+        resolve({
+          shell: params.shell,
+          command: params.command,
+          exitCode: code ?? (timedOut ? 124 : 1),
+          stdout,
+          stderr,
+          timedOut,
+        });
+      });
+    });
+  });
+}
+
+async function runPowerShellCommandWithFallback(params: {
+  command: string;
+  timeoutSeconds?: number;
+  signal?: AbortSignal;
+}): Promise<PowerShellBashResult> {
+  const candidates = getWindowsPowerShellCandidates();
+  let lastError: unknown = null;
+
+  for (const shell of candidates) {
+    try {
+      return await runPowerShellCommand({
+        shell,
+        command: params.command,
+        timeoutSeconds: params.timeoutSeconds,
+        signal: params.signal,
+      });
+    } catch (error) {
+      const errno = (error as NodeJS.ErrnoException | undefined)?.code;
+      if (errno === "ENOENT") {
+        lastError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError ?? new Error("No PowerShell executable found for bash override.");
+}
+
+function createPowerShellBashTool(): Record<string, unknown> {
+  return {
+    name: "bash",
+    description:
+      "Execute a PowerShell command as a Windows bash override. Returns stdout/stderr and exit details.",
+    parameters: Type.Object({
+      command: Type.String({
+        description: "PowerShell command to execute",
+      }),
+      timeout: Type.Optional(
+        Type.Number({
+          description: "Timeout in seconds (optional)",
+        }),
+      ),
+    }),
+    execute: async (
+      _toolCallId: string,
+      params: { command?: string; timeout?: number },
+      signal: AbortSignal,
+    ) => {
+      const command =
+        typeof params.command === "string" ? params.command.trim() : "";
+      if (!command) {
+        throw new Error("bash tool requires a non-empty command string.");
+      }
+
+      if (runtimeState.agentEnabled) {
+        const policy = evaluateSpawnPolicy(command, {
+          hookConfig: activeHookConfig,
+          hasValidRiskApproval: hasValidRiskApproval(runtimeState),
+          nowIso,
+        });
+
+        if (policy.riskEvent) {
+          runtimeState.riskEvents.push(policy.riskEvent);
+        }
+
+        if (policy.consumeRiskApproval) {
+          runtimeState.riskApproval = null;
+        }
+
+        if (policy.blockedMessage) {
+          throw new Error(policy.blockedMessage);
+        }
+      }
+
+      const result = await runPowerShellCommandWithFallback({
+        command,
+        timeoutSeconds: params.timeout,
+        signal,
+      });
+
+      const text = [result.stdout.trimEnd(), result.stderr.trimEnd()]
+        .filter((entry) => entry.length > 0)
+        .join(result.stdout && result.stderr ? "\n" : "") ||
+        `(no output; exit=${result.exitCode})`;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text,
+          },
+        ],
+        details: result,
+      };
+    },
+  };
 }
 
 function warnBundledExtensionLoadFailure(
@@ -898,36 +1162,38 @@ export default function khalaExtension(pi: ExtensionAPI): void {
     },
   });
 
-  const bashTool = createBashTool(process.cwd(), {
-    spawnHook: (spawnContext) => {
-      if (!runtimeState.agentEnabled) return spawnContext;
+  const bashTool = shouldUsePowerShellBashOverride()
+    ? createPowerShellBashTool()
+    : (createBashTool(process.cwd(), {
+        spawnHook: (spawnContext) => {
+          if (!runtimeState.agentEnabled) return spawnContext;
 
-      const policy = evaluateSpawnPolicy(spawnContext.command, {
-        hookConfig: activeHookConfig,
-        hasValidRiskApproval: hasValidRiskApproval(runtimeState),
-        nowIso,
-      });
+          const policy = evaluateSpawnPolicy(spawnContext.command, {
+            hookConfig: activeHookConfig,
+            hasValidRiskApproval: hasValidRiskApproval(runtimeState),
+            nowIso,
+          });
 
-      if (policy.riskEvent) {
-        runtimeState.riskEvents.push(policy.riskEvent);
-      }
+          if (policy.riskEvent) {
+            runtimeState.riskEvents.push(policy.riskEvent);
+          }
 
-      if (policy.consumeRiskApproval) {
-        runtimeState.riskApproval = null;
-      }
+          if (policy.consumeRiskApproval) {
+            runtimeState.riskApproval = null;
+          }
 
-      if (policy.blockedMessage) {
-        throw new Error(policy.blockedMessage);
-      }
+          if (policy.blockedMessage) {
+            throw new Error(policy.blockedMessage);
+          }
 
-      return {
-        ...spawnContext,
-        command: prependInterceptedCommandsPath(spawnContext.command),
-      };
-    },
-  });
+          return {
+            ...spawnContext,
+            command: prependInterceptedCommandsPath(spawnContext.command),
+          };
+        },
+      }) as unknown as Record<string, unknown>);
 
-  loosePi.registerTool(bashTool as unknown as Record<string, unknown>);
+  loosePi.registerTool(bashTool);
   pi.on("session_start", async (_event, ctx) => {
     const [hookConfig, profileLoad] = await Promise.all([
       loadHooksConfig(RUNTIME_PATHS.hooksConfigPath, DEFAULT_HOOK_CONFIG),

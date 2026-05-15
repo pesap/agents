@@ -123,6 +123,8 @@ When khala is enabled (`/khala` or any khala workflow command):
 
 <ul>
   <li><code>bash</code> calls are policy-checked.</li>
+  <li>On Windows, khala can override <code>bash</code> to execute via PowerShell when the parent shell is PowerShell.</li>
+  <li>Set <code>KHALA_FORCE_POWERSHELL_BASH=true|false</code> to force or disable this override, and <code>KHALA_POWERSHELL_PATH</code> to pin a specific executable.</li>
   <li>Risky/destructive commands may be blocked unless approved.</li>
   <li>Direct Python package/runtime commands are steered to <code>uv</code>.</li>
   <li>Workflow commands create auto-preflight records.</li>
